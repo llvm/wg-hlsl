@@ -2,7 +2,7 @@
 
 # Support for in-process, Out-of-process, or both for the c style compiler api
 
-* Proposal: [NNNN](INF-NNNN-inproc-outofproc-compiler-api-support.md)
+* Proposal: [NNNN](NNNN-inproc-outofproc-compiler-api-support.md)
 * Author(s): [Cooper Partin](https://github.com/coopp)
 * Sponsor: [Cooper Partin](https://github.com/coopp)
 * Status: **Under Consideration**
