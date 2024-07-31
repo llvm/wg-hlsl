@@ -2,7 +2,7 @@
 
 # Implementation of Root Signatures in Clang
 
-* Proposal: [0002](INF-0002-root-signture-in-clang.md)
+* Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
   Pepper](https://github.com/damyanp)
 * Sponsor: Damyan Pepper
