@@ -11,10 +11,19 @@
 > When filling out the template below for a new feature proposal, please do the
 > following first:
 
-> 1. exclude the "Planned Version", "PRs" and "Issues" from the header.
-> 2. Do not spend time writing the "Detailed design" until the feature has been
->    merged in the "Under Consideration" phase.
-> 3. Delete this Instructions section including the line below.
+> 1. Copy this template to proposals and name it `NNNN-<some unique name>.md`.
+>    Do not assign the proposal a number.
+> 2. Exclude the "Planned Version", "PRs" and "Issues" from the header as
+>    appropriate.
+> 3. Fill out the "Introduction", "Motivation", and "Proposed Solution" sections
+>    of the template. Do not spend time writing the "Detailed design" until the
+>    feature has been merged in the "Under Consideration" phase.
+> 4. Delete this Instructions section including the line below.
+> 5. Post your new proposal for review in a PR and work through review feedback.
+> 6. When your PR is approved, _immediately before merging_ update the PR to
+>    assign the proposal the highest unused proposal number. Giving each merged
+>    proposal a unique number allows it to be easily referred to in issues and
+>    project planning.
 
 ---
 
