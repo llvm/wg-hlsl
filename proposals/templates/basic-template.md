@@ -17,7 +17,7 @@
 >    appropriate.
 > 3. Fill out the "Introduction", "Motivation", and "Proposed Solution" sections
 >    of the template. Do not spend time writing the "Detailed design" until the
->    feature has been merged in the "Under Consideration" phase.
+>    initial proposal is merged as details will change through design iteration.
 > 4. Delete this Instructions section including the line below.
 > 5. Post your new proposal for review in a PR and work through review feedback.
 > 6. When your PR is approved, _immediately before merging_ update the PR to
@@ -29,8 +29,7 @@
 
 * Proposal: [NNNN](NNNN-filename.md)
 * Author(s): [Author 1](https://github.com/author_username)
-* Sponsor: TBD
-* Status: **Under Consideration**
+* Status: **Design In Progress**
 
 *During the review process, add the following fields as needed:*
 
