@@ -402,23 +402,75 @@ registers are bound multiple times, or where there are multiple RootFlags
 entries, so subsequent stages should not assume that any given root signature in
 IR is valid.
 
+#### Metadata Schema
 
-> **Open Question**: what should the named metadata be?  There's options I
-> think...
+* RootConstant
+
+| ParameterType | ShaderVisibility | ShaderRegister | RegisterSpace | Num32BitValues |
+|---------------|------------------|----------------|---------------|----------------|
+| String        | int              | int            | int           | int            |
+
+
+* RootDescriptor
+
+| ParameterType | ShaderVisibility | ShaderRegister | RegisterSpace | RootDescriptorFlags |
+|---------------|------------------|----------------|---------------|---------------------|
+| String        | int              | int            | int           | int                 |
+
+
+* DescriptorRange
+
+| RangeType | NumDescriptors | BaseShaderRegister | RegisterSpace | DescriptorRangeFlags |
+|-----------|----------------|--------------------|---------------|----------------------|
+| String    | int            | int                | int           | int                  |
+
+
+* DescriptorTable
+
+| DescriptorRanges          |
+|---------------------------|
+| list of DescriptorRanges  |
+
+* StaticSampler
+  
+| Filter | AddressU | AddressV | AddressW | MipLODBias | MaxAnisotropy | ComparisonFunc | BorderColor | MinLOD | MaxLOD | ShaderRegister | RegisterSpace | ShaderVisibility |
+|--------|----------|----------|----------|------------|---------------|----------------|-------------|--------|--------|----------------|---------------|------------------|
+| int    | int      | int      | int      | float      | int           | int            | int         | float  | float  | int            | int           | int              |
+
+* RootSignature
+
+| RootFlag | Parameters                                      | StaticSamplers          |
+|----------|-------------------------------------------------|-------------------------|
+| int      | list of RootDescriptor/RootConstant/DescriptorTable | list of StaticSamplers |
+
+* Function RootSignature pair
+
+| EntryFunction | RootSignature |
+|----------|----------------|
+| Function | RootSignature  |
+
+* RootSignature table
+
+Named metadata with name "dx.rootsignatures".
+
+| Function RootSignature Pairs |
+|-------------------------------------|
+| list of Function RootSignature Pair |
 
 Example for same root signature as above:
 
 ```llvm
 ; placeholder - update this once detailed design complete
-!directx.rootsignatures = !{!2}
+!dx.rootsignatures = !{!2}
 !2 = !{ptr @main, !3 }
 !3 = !{ !4, !5, !6, !7 } ; reference 4 root parameters
 !4 = !{ !"RootFlags", i32 1 } ; root flags, 1 is numeric value of flags
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
 !6 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
-!7 = !{ !"DescriptorTable", i32 0, !8, !9 } ;  0 = visibility, 2 ranges,!8 and !9
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+!7 = !{ !"DescriptorTable", i32 0, !8 } ;  0 = visibility, range list !8
+!8 = !{ !9, !10} ; reference 2 descriptor ranges
+!9 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
+!10 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
 ```
 
 
