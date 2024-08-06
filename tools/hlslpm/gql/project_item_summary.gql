@@ -1,7 +1,7 @@
 query($after: String) {
     organization(login: "llvm") {
         projectV2(number: 4) {
-            items(first: 2, after: $after) {
+            items(first: 100, after: $after) {
                 nodes {
                     updatedAt id                    
                     fieldValueByName(name: "Category") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
