@@ -1,6 +1,8 @@
-from dataclasses import dataclass
+from enum import Enum
+from dataclasses import dataclass, field
 import os
 import sys
+from typing import List, Optional
 import requests
 from datetime import datetime
 
@@ -19,21 +21,35 @@ class GH:
 
         return response.json()
 
-@dataclass
-class ItemSummary:
-    item_id: str
-    item_updatedAt: datetime
-    category: str
-    issue_id: str
-    issue_updatedAt: datetime
 
-def maybe_get(d:dict, *args):
+class Category(Enum):
+    NoCategory = None
+    Item = "Item"
+    Deliverable = "Deliverable"
+    Workstream = "Workstream"
+    WorkstreamMilestone = "Workstream Milestone"
+    ProjectMilestone = "Project Milestone"
+
+
+@dataclass
+class Item:
+    issue_id: str
+    item_id: Optional[str] = field(default=None)
+    item_updatedAt: Optional[datetime] = field(default=None)
+    category: Optional[Category] = field(default=None)
+    issue_updatedAt: Optional[datetime] = field(default=None)
+    title: Optional[str] = field(default=None)
+    body: Optional[str] = field(default=None)
+
+
+def maybe_get(d: dict, *args):
     for a in args:
         if d != None and type(d) == dict:
             d = d.get(a, None)
         else:
             break
     return d
+
 
 def to_datetime(str):
     if not str:
@@ -44,22 +60,40 @@ def to_datetime(str):
 def project_items_summary(gh: GH):
     query = read_file("gql/project_item_summary.gql")
 
-    pageInfo = { 'endCursor': None, 'hasNextPage': True }
+    pageInfo = {'endCursor': None, 'hasNextPage': True}
 
     while pageInfo['hasNextPage']:
         response = gh.graphql(query, {'after': pageInfo['endCursor']})
 
-        items = maybe_get(response, 'data', 'organization', 'projectV2', 'items')
+        items = maybe_get(response, 'data', 'organization',
+                          'projectV2', 'items')
         for node in items['nodes']:
-            yield ItemSummary(
+            yield Item(
                 item_id=node['id'],
                 item_updatedAt=to_datetime(maybe_get(node, 'updatedAt')),
-                category=maybe_get(node, 'fieldValueByName', 'name'),
+                category=Category(maybe_get(node, 'fieldValueByName', 'name')),
                 issue_id=maybe_get(node, 'content', 'id'),
-                issue_updatedAt=to_datetime(maybe_get(node,'content','updatedAt')))
-            
+                issue_updatedAt=to_datetime(maybe_get(node, 'content', 'updatedAt')))
+
         pageInfo = maybe_get(items, 'pageInfo')
 
+
+def get_issues(gh: GH, issues: List[Item]):
+    query = read_file("gql/get_issue_text.gql")
+    chunk_size = 50
+
+    issue_id_chunks = [issues[i:i+chunk_size]
+                       for i in range(0, len(issues), chunk_size)]
+
+    for chunk in issue_id_chunks:
+        response = gh.graphql(
+            query, {'issueIds': [issue.issue_id for issue in chunk]})
+
+        nodes = maybe_get(response, "data", "nodes")
+        for (issue, node) in zip(chunk, nodes):
+            issue.title = node["title"]
+            issue.body = node["body"]
+            yield issue
 
 
 def get_pat():
@@ -76,15 +110,34 @@ def read_file(filename):
         return f.read()
 
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
     gh = GH()
 
-    items_summary = [i for i in project_items_summary(gh)]
-    print(f"{len(items_summary)} items")
+    if True:
+        items_summary = [i for i in project_items_summary(gh)]
+        print(f"{len(items_summary)} items")
 
-    milestones = [i for i in items_summary if i.category == "Project Milestone"]
+        interesting = [i for i in items_summary if i.category ==
+                       Category.ProjectMilestone or i.category == Category.Workstream]
+        
+        interesting = [i for i in get_issues(gh, interesting)]
 
-    for milestone in milestones:
-        print(milestone)
+        milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
+        workstreams = [i for i in items_summary if i.category == Category.Workstream]
 
-    # print(gh.graphql(read_file("gql/project_item_summary.gql")))
+        print("Milestones:")
+        for milestone in milestones:
+            print(milestone.title)
+
+        print("Workstreams:")
+        for workstream in workstreams:
+            print(workstream.title)
+
+    if True:
+        issues = [i for i in get_issues(
+            gh, [Item(issue_id="I_kwDOMbLzis6Rpmkm")])]
+
+        for i in issues:
+            print(f"Title: {i.title}")
+            print(f"Body: {i.body}")
+            print('-----')
