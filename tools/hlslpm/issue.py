@@ -21,7 +21,7 @@ class IssueSection:
     def __init__(self):
         self.contents = []    
 
-    def getReferencedIssue(self):
+    def getReferenceFromTitle(self):
         if not self.title:
             return None
 
@@ -69,6 +69,28 @@ class Issue:
             reference = self.issue_resourcePath
 
         return reference.replace("/", "#")
+    
+    def convertReferenceToResourcePath(self, reference):
+        """
+        Given a reference, in the context of this issue, convert it to a full
+        resource path.
+        """
+        m = re.match(r"(.+)#(\d+)", reference)
+        if m:
+            # If reference is full path we can translate it to a referencePath
+            return f"{m[1]}/{m[2]}"
+        else:
+            # Otherwise construct a full path given the context
+
+            # remove the "#""
+            m = re.match(r"#(\d+)", reference)
+            if not m:
+                raise Exception(f"Unable to parse reference {reference}")
+            reference = m[1]
+
+            basePath = self.getResourcePathBase()
+            return f"{basePath}/{reference}"
+
 
     def update(self, issues):
         if not self.body:
@@ -96,11 +118,12 @@ class Issue:
         self.body = rebuild_body(pre, rebuild_data(data), post)
 
     def updateWorkstreamSectionInMilestone(self, issues, section: IssueSection):
-        sectionIssue = issues.findIssue(self, section.getReferencedIssue())
+        sectionIssue = issues.findIssue(self, section.getReferenceFromTitle())
         if not sectionIssue:
             return section
         
         section.title = self.buildSectionTitle(sectionIssue)
+        section.contents = sectionIssue.getContentsFor(self)
         
         return section
     
@@ -112,6 +135,19 @@ class Issue:
             title = issue.title
 
         return f"{title} ({issue.getIssueReference(self)})"
+    
+    def getContentsFor(self, issue) -> List[str]:
+        (_, data, _) = split_body(self.body)
+        data = parse_data(data)
+
+        for s in data.sections:
+            reference = self.convertReferenceToResourcePath(s.getReferenceFromTitle())
+            if reference == issue.issue_resourcePath:
+                return s.contents
+            
+        return ["n/a"]
+
+
 
 
 def split_body(body: str):
@@ -237,22 +273,7 @@ class Issues:
         return milestone
     
     def findIssue(self, contextIssue:Issue, reference:str):
-        m = re.match(r"(.+)#(\d+)", reference)
-        if m:
-            # If reference is full path we can translate it to a referencePath
-            reference = f"{m[1]}/{m[2]}"
-        else:
-            # Otherwise construct a full path given the context
-
-            # remove the "#""
-            m = re.match(r"#(\d+)", reference)
-            if not m:
-                raise Exception(f"Unable to parse reference {reference}")
-            reference = m[1]
-
-            basePath = contextIssue.getResourcePathBase()
-            reference = f"{basePath}/{reference}"
-        
+        reference = contextIssue.convertReferenceToResourcePath(reference)        
         return self.all_issues[reference]
     
 
