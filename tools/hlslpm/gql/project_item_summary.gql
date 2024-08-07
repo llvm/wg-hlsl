@@ -3,9 +3,9 @@ query($after: String) {
         projectV2(number: 4) {
             items(first: 100, after: $after) {
                 nodes {
-                    updatedAt id                    
+                    updatedAt id                     
                     fieldValueByName(name: "Category") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
-                    content { ... on Issue { id updatedAt } }
+                    content { ... on Issue { id updatedAt resourcePath } }
                 }
                 pageInfo { endCursor hasNextPage }
             }

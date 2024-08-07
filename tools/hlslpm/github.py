@@ -5,6 +5,9 @@ import sys
 from typing import List, Optional
 import requests
 from datetime import datetime
+import json
+
+from issue import Category, Issue
 
 
 class GH:
@@ -22,24 +25,6 @@ class GH:
         return response.json()
 
 
-class Category(Enum):
-    NoCategory = None
-    Item = "Item"
-    Deliverable = "Deliverable"
-    Workstream = "Workstream"
-    WorkstreamMilestone = "Workstream Milestone"
-    ProjectMilestone = "Project Milestone"
-
-
-@dataclass
-class Item:
-    issue_id: str
-    item_id: Optional[str] = field(default=None)
-    item_updatedAt: Optional[datetime] = field(default=None)
-    category: Optional[Category] = field(default=None)
-    issue_updatedAt: Optional[datetime] = field(default=None)
-    title: Optional[str] = field(default=None)
-    body: Optional[str] = field(default=None)
 
 
 def maybe_get(d: dict, *args):
@@ -68,17 +53,18 @@ def project_items_summary(gh: GH):
         items = maybe_get(response, 'data', 'organization',
                           'projectV2', 'items')
         for node in items['nodes']:
-            yield Item(
-                item_id=node['id'],
+            yield Issue(
+                item_id=node['id'],                
                 item_updatedAt=to_datetime(maybe_get(node, 'updatedAt')),
                 category=Category(maybe_get(node, 'fieldValueByName', 'name')),
                 issue_id=maybe_get(node, 'content', 'id'),
+                issue_resourcePath=maybe_get(node, 'content', 'resourcePath'),
                 issue_updatedAt=to_datetime(maybe_get(node, 'content', 'updatedAt')))
 
         pageInfo = maybe_get(items, 'pageInfo')
 
 
-def get_issues(gh: GH, issues: List[Item]):
+def get_issues(gh: GH, issues: List[Issue]):
     query = read_file("gql/get_issue_text.gql")
     chunk_size = 50
 
@@ -127,17 +113,20 @@ if __name__ == '__main__':
 
         print("Milestones:")
         for milestone in milestones:
-            print(milestone.title)
+            print(f"{milestone.issue_resourcePath} - {milestone.title}")
 
         print("Workstreams:")
         for workstream in workstreams:
             print(workstream.title)
 
-    if True:
+    if False:
         issues = [i for i in get_issues(
-            gh, [Item(issue_id="I_kwDOMbLzis6Rpmkm")])]
+            gh, [Issue(issue_id="I_kwDOMbLzis6Rpmkm")])]
 
         for i in issues:
             print(f"Title: {i.title}")
             print(f"Body: {i.body}")
             print('-----')
+            # Serialize 'issues' list to JSON
+            json_data = json.dumps([i.__dict__ for i in issues])
+            print(json_data)
