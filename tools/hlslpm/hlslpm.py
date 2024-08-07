@@ -8,19 +8,17 @@ class Issues:
     milestones: Dict[str, Issue]
     workstreams: Dict[str, Issue]
 
-    def __init__(self):
+    def __init__(self, gh):
         self.milestones = []
         self.workstreams = []
-
-        gh = github.GH()
 
         def is_interesting(i: Issue):
             return i.category in [Category.ProjectMilestone, Category.Workstream]
         
-        self.all_issues = dict([(i.issue_resourcePath, i) for i in github.project_items_summary(gh)])
+        self.all_issues = dict([(i.issue_resourcePath, i) for i in gh.project_items_summary()])
 
         interesting = [i for i in self.all_issues.values() if is_interesting(i)]
-        interesting = [i for i in github.get_issues(gh, interesting)]
+        interesting = [i for i in gh.get_issues(interesting)]
 
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
