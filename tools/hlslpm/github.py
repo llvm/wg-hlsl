@@ -4,7 +4,7 @@ import os
 import sys
 from typing import List, Optional
 import requests
-from datetime import datetime
+from datetime import datetime, date
 import json
 
 from issue import Category, Issue
@@ -39,7 +39,8 @@ class GH:
                     item_id=node['id'],
                     item_updatedAt=to_datetime(maybe_get(node, 'updatedAt')),
                     category=Category(
-                        maybe_get(node, 'fieldValueByName', 'name')),
+                        maybe_get(node, 'category', 'name')),
+                    target_date=to_date(maybe_get(node, 'target', 'date')),
                     issue_id=maybe_get(node, 'content', 'id'),
                     issue_resourcePath=maybe_get(
                         node, 'content', 'resourcePath'),
@@ -79,6 +80,11 @@ def to_datetime(str):
         return None
     return datetime.strptime(str, '%Y-%m-%dT%H:%M:%SZ')
 
+def to_date(str):
+    if not str:
+        return None
+    return datetime.strptime(str, '%Y-%m-%d')
+
 
 def get_pat():
     try:
@@ -113,7 +119,7 @@ if __name__ == '__main__':
 
         print("Milestones:")
         for milestone in milestones:
-            print(f"{milestone.issue_resourcePath} - {milestone.title}")
+            print(f"{milestone.issue_resourcePath} - {milestone.title} - {milestone.target_date}")
 
         print("Workstreams:")
         for workstream in workstreams:

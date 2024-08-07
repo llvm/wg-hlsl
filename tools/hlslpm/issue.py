@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 import re
 from typing import List, Optional, Union
@@ -22,6 +22,7 @@ class Issue:
     item_id: Optional[str] = field(default=None)
     item_updatedAt: Optional[datetime] = field(default=None)
     category: Optional[Category] = field(default=None)
+    target_date: Optional[date] = field(default=None)
     issue_updatedAt: Optional[datetime] = field(default=None)
     title: Optional[str] = field(default=None)
     body: Optional[str] = field(default=None)

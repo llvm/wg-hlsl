@@ -4,7 +4,10 @@ query($after: String) {
             items(first: 100, after: $after) {
                 nodes {
                     updatedAt id                     
-                    fieldValueByName(name: "Category") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    category:fieldValueByName(name: "Category") { 
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    target:fieldValueByName(name: "Target") { 
+                        ... on ProjectV2ItemFieldDateValue { date } }
                     content { ... on Issue { id updatedAt resourcePath } }
                 }
                 pageInfo { endCursor hasNextPage }
