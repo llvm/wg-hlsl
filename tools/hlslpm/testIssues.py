@@ -1,7 +1,7 @@
+from datetime import date
 from typing import List
 import unittest
-from issue import Category, Issue, parse_data, IssueData
-from issues import Issues
+from issue import Category, Issue, IssueSection, Issues, parse_data, IssueData
 
 
 class Test_ParseData(unittest.TestCase):
@@ -56,22 +56,29 @@ class Test_ParseData(unittest.TestCase):
         self.assertEqual(["line 1", "line 2"], d.sections[0].contents)
         self.assertEqual(["line 3"], d.sections[1].contents)
 
+class Test_IssueSection(unittest.TestCase):
+    def test_UpdateTitle(self):
+        s = IssueSection()
+        s.title = "### WorkstreamA (#2)"
+        s.updateTitle("com baz (#1)")
+        self.assertEqual("### com baz (#1)", s.title)
 
 class Test_Issues(unittest.TestCase):
     def setUp(self):
 
-        test_issues = [(1, Category.ProjectMilestone, "[milestone] The First Milestone", ["About the milestone.", "## Workstreams",
+        test_issues = [(1, Category.ProjectMilestone, date(2024, 1, 1), "[milestone] The First Milestone", ["About the milestone.", "## Workstreams",
                         "### WorkstreamA (#2)", "foo", "bar", "### Workstream B(#3)", "com", "baz"]),
-                       (2, Category.Workstream, "[workstream] Super fast workstream",
+                       (2, Category.Workstream, None, "[workstream] Super fast workstream",
                         ["About the workstream.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item1", "- [ ] item2"]),
-                       (3, Category.Workstream, "[workstream] Super slow workstream",
+                       (3, Category.Workstream, None, "[workstream] Super slow workstream",
                         ["Taking it easy.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item3"])]
 
         test_issues = [Issue(issue_id=f"id{id}",
                              issue_resourcePath=f"test/{id}",
                              category=category,
+                             target_date=target,
                              title=title,
-                             body="\n".join(body)) for (id, category, title, body) in test_issues]
+                             body="\n".join(body)) for (id, category, target, title, body) in test_issues]
 
         self.test_issues = dict([(i.issue_id, i) for i in test_issues])
 
@@ -91,9 +98,38 @@ class Test_Issues(unittest.TestCase):
 
         self.issues = Issues(gh)
 
+    def test_findIssue(self):
+        issue1 = self.issues.all_issues["test/1"]
+        issue2 = self.issues.all_issues["test/2"]
+
+
+        self.assertEqual(issue1, self.issues.findIssue(issue2, "test#1"))
+        self.assertEqual(issue1, self.issues.findIssue(issue2, "#1"))
+
+    def test_getIssueReference(self):
+        issue1 = self.issues.all_issues["test/1"]
+        issue2 = self.issues.all_issues["test/2"]
+        issue3 = Issue(issue_id="id100", issue_resourcePath="foo/bar/100")
+
+        self.assertEqual("#1", issue1.getIssueReference(issue1))
+        self.assertEqual("#1", issue1.getIssueReference(issue2))
+        self.assertEqual("test#1", issue1.getIssueReference(issue3))
+
+
+
     def test_MilestoneAndWorkstreamsIdentified(self):
         self.assertEqual(set(["test/1"]), self.issues.milestones.keys())
-        self.assertEqual(set(["test/2", "test/3"]), self.issues.workstreams.keys())
+        self.assertEqual(set(["test/2", "test/3"]),
+                         self.issues.workstreams.keys())
+
+    def test_UpdateMilestone(self):
+        milestone = self.issues.milestones["test/1"]
+
+        milestone.update(self.issues)
+
+        self.assertEqual(["About the milestone.", "## Workstreams",
+                        "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "### Super slow workstream (#3)", "- [ ] item3"],
+                        milestone.body.splitlines())
 
 
 if __name__ == '__main__':
