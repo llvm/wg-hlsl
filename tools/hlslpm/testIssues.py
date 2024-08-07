@@ -56,12 +56,6 @@ class Test_ParseData(unittest.TestCase):
         self.assertEqual(["line 1", "line 2"], d.sections[0].contents)
         self.assertEqual(["line 3"], d.sections[1].contents)
 
-class Test_IssueSection(unittest.TestCase):
-    def test_UpdateTitle(self):
-        s = IssueSection()
-        s.title = "### WorkstreamA (#2)"
-        s.updateTitle("com baz (#1)")
-        self.assertEqual("### com baz (#1)", s.title)
 
 class Test_Issues(unittest.TestCase):
     def setUp(self):
@@ -74,7 +68,7 @@ class Test_Issues(unittest.TestCase):
                         ["Taking it easy.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item3"])]
 
         test_issues = [Issue(issue_id=f"id{id}",
-                             issue_resourcePath=f"test/{id}",
+                             issue_resourcePath=f"test/issues/{id}",
                              category=category,
                              target_date=target,
                              title=title,
@@ -99,37 +93,41 @@ class Test_Issues(unittest.TestCase):
         self.issues = Issues(gh)
 
     def test_findIssue(self):
-        issue1 = self.issues.all_issues["test/1"]
-        issue2 = self.issues.all_issues["test/2"]
-
+        issue1 = self.issues.all_issues["test/issues/1"]
+        issue2 = self.issues.all_issues["test/issues/2"]
 
         self.assertEqual(issue1, self.issues.findIssue(issue2, "test#1"))
         self.assertEqual(issue1, self.issues.findIssue(issue2, "#1"))
 
     def test_getIssueReference(self):
-        issue1 = self.issues.all_issues["test/1"]
-        issue2 = self.issues.all_issues["test/2"]
-        issue3 = Issue(issue_id="id100", issue_resourcePath="foo/bar/100")
+        issue1 = self.issues.all_issues["test/issues/1"]
+        issue2 = self.issues.all_issues["test/issues/2"]
+        issue3 = Issue(issue_id="id100", issue_resourcePath="foo/bar/issues/100")
 
         self.assertEqual("#1", issue1.getIssueReference(issue1))
         self.assertEqual("#1", issue1.getIssueReference(issue2))
         self.assertEqual("test#1", issue1.getIssueReference(issue3))
 
-
-
     def test_MilestoneAndWorkstreamsIdentified(self):
-        self.assertEqual(set(["test/1"]), self.issues.milestones.keys())
-        self.assertEqual(set(["test/2", "test/3"]),
+        self.assertEqual(set(["test/issues/1"]), self.issues.milestones.keys())
+        self.assertEqual(set(["test/issues/2", "test/issues/3"]),
                          self.issues.workstreams.keys())
 
     def test_UpdateMilestone(self):
-        milestone = self.issues.milestones["test/1"]
+        milestone = self.issues.milestones["test/issues/1"]
 
         milestone.update(self.issues)
 
         self.assertEqual(["About the milestone.", "## Workstreams",
-                        "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "### Super slow workstream (#3)", "- [ ] item3"],
-                        milestone.body.splitlines())
+                          "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "### Super slow workstream (#3)", "- [ ] item3"],
+                         milestone.body.splitlines())
+
+    def test_UpdateWorkstream(self):
+        workstream = self.issues.workstreams["test/issues/2"]
+        workstream.update(self.issues)
+
+        self.assertEqual(["About the workstream.", "## Milestones", "### The First Milestone (#1)",
+                         "- [ ] item1", "- [ ] item2"], workstream.body.splitlines())
 
 
 if __name__ == '__main__':

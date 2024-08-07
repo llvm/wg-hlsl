@@ -65,10 +65,13 @@ class Issue:
 
         if contextBase == selfBase:
             reference = self.issue_resourcePath[len(selfBase):]  
+            return reference.replace("/", "#")
         else:
-            reference = self.issue_resourcePath
+            m = re.match(r"(.*)/issues/(\d+)", self.issue_resourcePath)
+            if not m:
+                raise Exception(f"Unabled to parse issue resourcePath '{self.issue_resourcePath}'.")
+            return f"{m[1]}#{m[2]}"
 
-        return reference.replace("/", "#")
     
     def convertReferenceToResourcePath(self, reference):
         """
@@ -78,7 +81,7 @@ class Issue:
         m = re.match(r"(.+)#(\d+)", reference)
         if m:
             # If reference is full path we can translate it to a referencePath
-            return f"{m[1]}/{m[2]}"
+            return f"{m[1]}/issues/{m[2]}"
         else:
             # Otherwise construct a full path given the context
 
@@ -98,12 +101,29 @@ class Issue:
 
         if self.category == Category.ProjectMilestone:
             self.updateMilestone(issues)
+        elif self.category == Category.Workstream:
+            self.updateWorkstream(issues)
 
     def updateMilestone(self, issues):
         """
         Milestones are expected to contain a list of workstreams, with the
         content that each workstream lists for this milestone. The workstream
         issue is authoritative for this content.
+
+        ```
+        text before the data
+
+        ## Workstreams
+
+        ### A workstream (#123)
+        content
+
+        ### Another workstream (#234)
+        more content
+        ----
+        text after the data
+        ```
+
         """
         (pre, data, post) = split_body(self.body)
         data = parse_data(data)
@@ -117,6 +137,38 @@ class Issue:
 
         self.body = rebuild_body(pre, rebuild_data(data), post)
 
+    def updateWorkstream(self, issues):
+        """
+        Workstreams are expected to contain a list of milestones. The issue
+        referenced in the title is authoritative, and so should be updated, but
+        the workstream issues is authoritative for the contents under the
+        milestone.
+
+        ```
+        text before the data
+
+        ## Milestones
+
+        ### A milestone (#123)
+        content
+
+        ### Another mileston (#234)
+        content
+        ----
+        text after the data
+        """
+        (pre, data, post) = split_body(self.body)
+        data = parse_data(data)
+
+        if data.type != "Milestones":
+            raise Exception(
+                f"{self.issue_resourcePath} - body contains '{data.type}', but expected 'Milestones'.")
+
+        for s in data.sections:
+            self.updateMilestoneSectionInWorkstream(issues, s)
+
+        self.body = rebuild_body(pre, rebuild_data(data), post)
+
     def updateWorkstreamSectionInMilestone(self, issues, section: IssueSection):
         sectionIssue = issues.findIssue(self, section.getReferenceFromTitle())
         if not sectionIssue:
@@ -127,6 +179,16 @@ class Issue:
         
         return section
     
+    def updateMilestoneSectionInWorkstream(self, issues, section: IssueSection):
+        sectionIssue = issues.findIssue(self, section.getReferenceFromTitle())
+        if not sectionIssue:
+            return section
+        
+        section.title = self.buildSectionTitle(sectionIssue)
+        
+        return section
+
+
     def buildSectionTitle(self, issue):
         m = re.match(r"\[.*\](.*)", issue.title)
         if m:
