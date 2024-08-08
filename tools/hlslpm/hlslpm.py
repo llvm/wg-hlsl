@@ -1,6 +1,7 @@
+import sys
+import argparse
 import os
 from typing import List
-import issue
 from issue import Issue, Issues
 import github
 
@@ -15,6 +16,17 @@ def saveIssues(basePath, issues:List[Issue]):
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="HLSL Project Manager")
+    parser.add_argument('--save', action='store_true', help="Saves before/after issues")
+    parser.add_argument('--update', action='store_true', help="Update github issues")
+
+    args = parser.parse_args()
+
+    if args.save and args.update:
+        print("Only one of --preview or --update can be specified")
+    
+
     print("Fetching data...")
     gh = github.GH()
     issues = Issues(gh)
@@ -22,16 +34,28 @@ if __name__ == '__main__':
 
     tracked = list(issues.milestones.values()) + list(issues.workstreams.values())
 
-    print(f"Saving {len(tracked)} issues before updating...")
-    saveIssues("output/before", tracked)
+    bodyBefore = dict([(i.issue_id, i.body) for i in tracked])
+
+    if args.save:
+        print(f"Saving {len(tracked)} issues before updating...")
+        saveIssues("output/before", tracked)
 
     print(f"Updating...")
     for issue in tracked:
         issue.update(issues)
 
-    print(f"Saving {len(tracked)} issues after updating...")
-    saveIssues("output/after", tracked)
-    
+    bodyAfter = dict([(i.issue_id, i.body) for i in tracked])
+
+    if args.save:
+        print(f"Saving {len(tracked)} issues after updating...")
+        saveIssues("output/after", tracked)
+
+    for id in bodyBefore.keys():
+        if bodyBefore[id] != bodyAfter[id]:
+            print(f"{id} changed!")
+
+            if args.update:
+                gh.set_issue_body(id, bodyAfter[id])
         
 
 

@@ -65,6 +65,10 @@ class GH:
                 issue.body = node["body"]
                 yield issue
 
+    def set_issue_body(self, id, body):
+        query = read_file("gql/set_issue_body.gql")
+        self.graphql(query, {"id": id, "body": body})
+
 
 def maybe_get(d: dict, *args):
     for a in args:
@@ -79,6 +83,7 @@ def to_datetime(str):
     if not str:
         return None
     return datetime.strptime(str, '%Y-%m-%dT%H:%M:%SZ')
+
 
 def to_date(str):
     if not str:
@@ -119,7 +124,8 @@ if __name__ == '__main__':
 
         print("Milestones:")
         for milestone in milestones:
-            print(f"{milestone.issue_resourcePath} - {milestone.title} - {milestone.target_date}")
+            print(
+                f"{milestone.issue_resourcePath} - {milestone.title} - {milestone.target_date}")
 
         print("Workstreams:")
         for workstream in workstreams:

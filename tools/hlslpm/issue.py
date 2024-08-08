@@ -312,7 +312,8 @@ def rebuild_data(data: IssueData) -> List[str]:
         for line in section.contents:
             body.append(line)
             
-        body.append("")
+        if body[-1] != "":
+            body.append("")
 
     return body
 
