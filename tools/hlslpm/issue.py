@@ -78,6 +78,9 @@ class Issue:
         Given a reference, in the context of this issue, convert it to a full
         resource path.
         """
+        if not reference:
+            return None
+        
         m = re.match(r"(.+)#(\d+)", reference)
         if m:
             # If reference is full path we can translate it to a referencePath
@@ -88,7 +91,7 @@ class Issue:
             # remove the "#""
             m = re.match(r"#(\d+)", reference)
             if not m:
-                raise Exception(f"Unable to parse reference {reference}")
+                return None
             reference = m[1]
 
             basePath = self.getResourcePathBase()
@@ -132,10 +135,24 @@ class Issue:
             raise Exception(
                 f"{self.issue_resourcePath} - body contains '{data.type}', but expected 'Workstreams'.")
 
-        for s in data.sections:
-            self.updateWorkstreamSectionInMilestone(issues, s)
+        # The actual data itself is fully regenerated from the list of workstreams
+        workstreams:List[Issue] = list(issues.workstreams.values())
+        workstreams.sort(key=lambda a: a.issue_resourcePath)
 
+        data.sections = []
+
+        for w in workstreams:
+            section = IssueSection()
+            section.title = self.buildSectionTitle(w)
+            section.contents = w.getContentsFor(self)
+
+            nonBlankLines = [l for l in section.contents if l]
+            if len(nonBlankLines) > 0:
+                data.sections.append(section)
+            
         self.body = rebuild_body(pre, rebuild_data(data), post)
+
+    
 
     def updateWorkstream(self, issues):
         """
@@ -160,25 +177,18 @@ class Issue:
         (pre, data, post) = split_body(self.body)
         data = parse_data(data)
 
+        if not data.type:
+            return
+
         if data.type != "Milestones":
             raise Exception(
                 f"{self.issue_resourcePath} - body contains '{data.type}', but expected 'Milestones'.")
-
+        
         for s in data.sections:
             self.updateMilestoneSectionInWorkstream(issues, s)
 
         self.body = rebuild_body(pre, rebuild_data(data), post)
 
-    def updateWorkstreamSectionInMilestone(self, issues, section: IssueSection):
-        sectionIssue = issues.findIssue(self, section.getReferenceFromTitle())
-        if not sectionIssue:
-            return section
-        
-        section.title = self.buildSectionTitle(sectionIssue)
-        section.contents = sectionIssue.getContentsFor(self)
-        
-        return section
-    
     def updateMilestoneSectionInWorkstream(self, issues, section: IssueSection):
         sectionIssue = issues.findIssue(self, section.getReferenceFromTitle())
         if not sectionIssue:
@@ -207,7 +217,7 @@ class Issue:
             if reference == issue.issue_resourcePath:
                 return s.contents
             
-        return ["n/a"]
+        return []
 
 
 
@@ -296,9 +306,13 @@ def rebuild_data(data: IssueData) -> List[str]:
     body = [f"## {data.type}"]
 
     for section in data.sections:
-        body.append(f"### {section.title}")
+        if section.title:
+            body.append(f"### {section.title}")
+
         for line in section.contents:
             body.append(line)
+            
+        body.append("")
 
     return body
 
@@ -322,19 +336,11 @@ class Issues:
             (i.issue_resourcePath, i) for i in interesting if i.category == Category.ProjectMilestone])
         self.workstreams = dict([
             (i.issue_resourcePath, i) for i in interesting if i.category == Category.Workstream])
-
-    def rewriteMilestone(self, path):
-        milestone = self.milestones[path]
-        (pre, data, post) = split_body(milestone.body)
-
-        milestoneData = parse_data(data)
-
-        if milestoneData.type != "Workstreams":
-            raise Exception(f"{path} - expected Workstreams, but got {milestoneData.type}")        
-
-        return milestone
     
     def findIssue(self, contextIssue:Issue, reference:str):
+        if not reference:
+            return None
+        
         reference = contextIssue.convertReferenceToResourcePath(reference)        
         return self.all_issues[reference]
     

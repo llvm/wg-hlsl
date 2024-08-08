@@ -65,7 +65,10 @@ class Test_Issues(unittest.TestCase):
                        (2, Category.Workstream, None, "[workstream] Super fast workstream",
                         ["About the workstream.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item1", "- [ ] item2"]),
                        (3, Category.Workstream, None, "[workstream] Super slow workstream",
-                        ["Taking it easy.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item3"])]
+                        ["Taking it easy.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item3"]),
+                       (4, Category.Workstream, None,
+                        "[workstream] Empty workstream", ["Some stuff that isn't a milestone list"]),
+                       (5, Category.Workstream, None, "[workstream] Unlisted Workstream", ["## Milestones", "### m1 (#1)", "- [ ] item5"])]
 
         test_issues = [Issue(issue_id=f"id{id}",
                              issue_resourcePath=f"test/issues/{id}",
@@ -102,7 +105,8 @@ class Test_Issues(unittest.TestCase):
     def test_getIssueReference(self):
         issue1 = self.issues.all_issues["test/issues/1"]
         issue2 = self.issues.all_issues["test/issues/2"]
-        issue3 = Issue(issue_id="id100", issue_resourcePath="foo/bar/issues/100")
+        issue3 = Issue(issue_id="id100",
+                       issue_resourcePath="foo/bar/issues/100")
 
         self.assertEqual("#1", issue1.getIssueReference(issue1))
         self.assertEqual("#1", issue1.getIssueReference(issue2))
@@ -110,7 +114,7 @@ class Test_Issues(unittest.TestCase):
 
     def test_MilestoneAndWorkstreamsIdentified(self):
         self.assertEqual(set(["test/issues/1"]), self.issues.milestones.keys())
-        self.assertEqual(set(["test/issues/2", "test/issues/3"]),
+        self.assertEqual(set(["test/issues/2", "test/issues/3", "test/issues/4", "test/issues/5"]),
                          self.issues.workstreams.keys())
 
     def test_UpdateMilestone(self):
@@ -119,7 +123,8 @@ class Test_Issues(unittest.TestCase):
         milestone.update(self.issues)
 
         self.assertEqual(["About the milestone.", "## Workstreams",
-                          "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "### Super slow workstream (#3)", "- [ ] item3"],
+                          "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "### Super slow workstream (#3)", "- [ ] item3",
+                          "### Unlisted Workstream (#5)", "- [ ] item5"],
                          milestone.body.splitlines())
 
     def test_UpdateWorkstream(self):
@@ -127,7 +132,13 @@ class Test_Issues(unittest.TestCase):
         workstream.update(self.issues)
 
         self.assertEqual(["About the workstream.", "## Milestones", "### The First Milestone (#1)",
-                         "- [ ] item1", "- [ ] item2"], workstream.body.splitlines())
+                         "- [ ] item1", "- [ ] item2"], workstream.body.splitlines())        
+
+    def test_UpdateEmptyWorkstream(self):
+        issue = self.issues.workstreams["test/issues/4"]
+        issue.update(self.issues)
+
+        self.assertEqual(["Some stuff that isn't a milestone list"], issue.body.splitlines())
 
 
 if __name__ == '__main__':
