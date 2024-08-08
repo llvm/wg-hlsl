@@ -5,7 +5,7 @@
 * Proposal: [0005](0005-inproc-outofproc-compiler-api-support.md)
 * Author(s): [Cooper Partin](https://github.com/coopp)
 * Sponsor: [Cooper Partin](https://github.com/coopp)
-* Status: **Under Consideration**
+* Status: **Accepted**
 * Impacted Project(s): (Clang)
 
 * Issues:
