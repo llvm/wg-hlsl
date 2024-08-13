@@ -108,7 +108,7 @@ def read_file(filename):
 if __name__ == '__main__':
     gh = GH()
 
-    if True:
+    if False:
         items_summary = [i for i in gh.project_items_summary()]
         print(f"{len(items_summary)} items")
 

@@ -24,7 +24,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.save and args.update:
-        print("Only one of --preview or --update can be specified")
+        print("Only one of --save or --update can be specified")
     
 
     print("Fetching data...")
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         print(f"Saving {len(tracked)} issues before updating...")
         saveIssues("output/before", tracked)
 
-    print(f"Updating...")
+    print(f"Processing...")
     for issue in tracked:
         issue.update(issues)
 

@@ -345,19 +345,3 @@ class Issues:
         reference = contextIssue.convertReferenceToResourcePath(reference)        
         return self.all_issues[reference]
     
-
-if __name__ == '__main__':
-    testData = json.loads(r"""{"issue_id": "I_kwDOMbLzis6Rpmkm", "item_id": null, "item_updatedAt": null, "category": null, "issue_updatedAt": null, "title": "[workstream] Resources", "body": "HLSL has buffer, texture, and sampler types that need to be lowered to resource representations when lowered to DXIL and SPIR-V.\n\n## Milestones\n\n### Compile a runnable shader from Clang (#7)\n- [ ] llvm/llvm-project#101555\n- [ ] llvm/llvm-project#101557\n\n### Compile particle_life.hlsl (#20)\n- [ ] Structured buffers\n- [ ] CBuffer resource types and operations\n\n### Compile all DML shaders, and they pass the validator (#11)\n- [ ] #10\n\n### Render Textured Triangle (#13)\n- [ ] llvm/llvm-project#101558\n\n### Pixel and Vertex Shaders (#16)\n- [ ] Sampler Feedback\n\n### Mesh Shaders (#17)\n- [ ] Input/Output patches\n\n### Ray Tracing (#18)\n- [ ] Ray tracing payloads\n\n----\n\n\nRelated tasks that need to be updated or refined:\n- [ ] llvm/llvm-project#75830 \n- [ ] llvm/llvm-project#58051 \n- [ ] llvm/llvm-project#75981 \n- [ ] llvm/llvm-project#57848\n- [ ] llvm/llvm-project#58654\n"}""")
-    item = Issue("dummy")
-    item.__dict__ = testData
-
-    (pre, data, post) = split_body(item.body)
-
-    print("---- PRE")
-    print(pre)
-
-    print("---- DATA")
-    print(data)
-
-    print("---- POST")
-    print(post)
