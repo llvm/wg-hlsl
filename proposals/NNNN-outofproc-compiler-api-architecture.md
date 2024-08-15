@@ -49,9 +49,6 @@ work in a separte process.
 The out of process system will be initialized on the first creation of a 
 library instance. All calls into the library flow through that system.
 
-> DISCUSSION: I go back and forth on having the caller create a factory object
-first which would be used to factory out compiler instances. 
-
 Instances of the compiler library are created using a creation api entrypoint.
 Library instances must be destroyed using destroy/dispose api entrypoint.
 
@@ -74,11 +71,8 @@ CompilerInstance clang_createCompiler();
 void clang_disposeCompiler(CompilerInstance instance);
 ```
 
-Compiler instances are reference counted and factoried out from a singleton
-instance that is created when the first library instance is created.
-
 Clients that intend to compile using multiple threads will be required to
-create a new api instance per thread.
+create a new api instance per thread. Api calls are synchronous and blocking.
 
 
 ### Singleton initialization and system overview
@@ -109,9 +103,8 @@ At this point there is a dispatcher connected to a worker pool waiting for
 work. 
 
 ### Calling apis
-Compiler instances are passed to different functions to perform operations like
-compiling a shader.  This ensure that the work being performed is tied to a
-specific instance.
+Compiler instances are retuired parameters to apis that perform operations like
+compiling.  This ensure that the work being performed is tied to an instance.
 
 #### Example entry point that takes a compiler instance
 ```c++
@@ -167,7 +160,7 @@ status result data.
 * Return results to the api call dispatcher
 * Spawn a new worker process
 
-#### Worker Process
+#### The Worker Process will...
 * Unpack the message and params from its monitoring thread and call into a
  compiler implementation.
 * Wait for completion
@@ -184,6 +177,9 @@ Error information is communicated back over the IPC mechanism to the caller
 and the application will choose how to handle it.
 
 ## Alternatives considered
+
+> Caller creates a factory object first and uses that to create compiler
+instances.
 
 ## Acknowledgments
 
