@@ -9,14 +9,77 @@
 ## Introduction
 As mentioned in [DXIL.rst](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#vectors) 
 "HLSL vectors are scalarized" and "Matrices are lowered to vectors". Therefore,
- we need to be able to scalarize these types in clang DirectX backend. Today 
-this is done via [`SROA_Parameter_HLSL` Module pass in `ScalarReplAggregatesHLSL.cpp`](https://github.com/microsoft/DirectXShaderCompiler/blob/main/lib/Transforms/Scalar/ScalarReplAggregatesHLSL.cpp#L4263).
-
+ we need to be able to scalarize these types in clang DirectX backend. In DXC, 
+ this is done via [`SROA_Parameter_HLSL` Module pass in `ScalarReplAggregatesHLSL.cpp`](https://github.com/microsoft/DirectXShaderCompiler/blob/main/lib/Transforms/Scalar/ScalarReplAggregatesHLSL.cpp#L4263). 
+ The goal of this proposal is the present a solution for LLVM's pass manager.
 
 ## Motivation
 Without Scalarizing the data structures and call instructions we can't generate valid DXIL.
 
-## Background
+ ## Background
+The rewrite functions specified in the appendix cover the behavior we need to 
+support for scalarization. The specific instructions DXC operates on are
+`CallInst`, `LoadInst`, `StoreInst`, `GetElementPtrInst`, `AddrSpaceCastInst`, `BitCastInst`, 
+and `MemIntrinsic`. DXC  works on two sets of data globals\allocas and 
+function arguments via the `RewriteForScalarRepl`.
+
+There are a few ways we could tackle this work that gets us towards behavioral parity.
+A good example is to look at:
+- [SPIRVEmitIntrinsics.cpp](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/SPIRV/SPIRVEmitIntrinsics.cpp)
+- [SROA.cpp](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Transforms/Scalar/SROA.cpp)
+- [Scalarizer.cpp](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Transforms/Scalar/Scalarizer.cpp)
+
+Given how the existing passes are written we should get `GetElementPtrInst`, `AddrSpaceCastInst`, `BitCastInst`, 
+and `MemIntrinsic` support mostly for free by tapping into functions like 
+`visitGetElementPtrInst`, `visitBitCastInst`,  `visitMemSetInst`, & `visitMemTransferInst`.
+
+There likely shouldn't be any need for `AddrSpaceCastInst`. 
+
+We also will get `LoadInst` and `StoreInst` for non DXIL resources  via  `visitLoadInst` and `visitStoreInst`.
+
+Finally the `CallInst` cases is really just to cover HLSL intrinsics. This can be handled via a simple pass
+that knows all the intrinsics and loops through the vector type to emit the correct number of calls per element.
+
+## Priority of work
+- A good starting place of behaviors to try to match is `RewriteCall` 
+specifically `RewriteWithFlattenedHLIntrinsicCall`As the other pieces are not needed 
+for compute shaders. 
+- Next would be `RewriteForLoad` and `RewriteForStore` as those 
+transformations are need to properly handle resources and breakdown to 
+three simple cases.
+
+The behaviors of `RewriteForGEP`, `RewriteForAddrSpaceCast`, `RewriteForConstExpr`,
+and `RewriteMemIntrin`. Should be things we can get  via existing LLVM passes.
+
+## Areas explicitly ignored
+SROA_Parameter pass has some  matrix loads and stores that this proposal won't go into.
+It also looks to do some legalization via `LegalizeDxilInputOutputs` that won't be covered.
+
+## Tickets
+1. Create a scalarization pass that just handles the flattenArgument case to start.      
+    - To simplify things "workists" will just be HLSL intrinsics.
+    - We iterate over all intrinsics and iterate over all value uses
+    - For now the only value we will check for are `CallInst`
+    - The pass will replace intrinsics used by DXIL.td that are a multi-element 
+    call with multiple scalarized calls
+2. Expand the scalar expansion pass to handle `loads` by checking for `LoadInst`
+   - handle the vector load case
+   - handle the Agregate Vector\Struct Array load case
+   - handle the Agregate scalar load case
+3. Expand the scalar expansion pass to handle `stores` by checking for `StoreInst`
+   - handle the vector store case
+   - handle the Agregate Vector\Struct Array store case
+   - handle the Agregate scalar store case
+4. Expand the scalar expansion pass to handle Geps by checking for `GetElementPtrInst` likely via the `visitGetElementPtrInst` pattern
+5. Expand the scalar expansion pass to handle  bit casts by checking for `BitCastInst` likely via the ``visitBitCastInst` pattern
+6. Expand the scalar expansio pass to handle scalaiarize mem operations by checking for `MemIntrinsic`
+   - Investigate how to handle memcpy, SROA only has visis for memset and mem transfer via `visitMemSetInst`, & `visitMemTransferInst`.
+7. Handle the `GlobalAndAllocas` cases
+
+
+## Appendix
+
+### Background on DXC Behavior
 In DXC the scalarization pass looks  something like this:
 ```
 SROA_Parameter_HLSL::runOnModule 
@@ -36,25 +99,25 @@ RewriteForConstExpr  RewriteForGEP  RewriteForLoad RewriteForStore RewriteMemInt
                                                                                     RewriteCallArg |-> RewriteWithFlattenedHLIntrinsicCall    |-|
 ```
 
-### RewriteForConstExpr
+#### RewriteForConstExpr
 Recursively "flatten" a constant expression (ConstantExpr) in LLVM IR. 
 It checks if the expression is either a GEPOperator (GEP instruction) or an AddrSpaceCast
 If the expression is used by an instruction, it converts the ConstantExpr 
 into an instruction and replaces the use with this new instruction.
 
-### RewriteForGEP
- A function designed to "rewrite" a GetElementPtr (GEP) instruction to make it 
- relative to a new element, usually when dealing with structs, vectors, or arrays.
- for the struct  case when a matching element is found, it simplifies the GEP 
- by updating its base pointer and indices. If no such element exists, new GEPs 
- are created for each element in an array or vector and replaces the old GEP 
- accordingly. The function ensures that the new GEP has the correct type &
- replaces all uses of the original GEP. After rewriting, the old GEP is either
- destroyed or marked for deletion. The goal is to to break down and flatten
- complex memory access patterns in IR.
+#### RewriteForGEP
+A function designed to "rewrite" a GetElementPtr (GEP) instruction to make it 
+relative to a new element, usually when dealing with structs, vectors, or arrays.
+for the struct  case when a matching element is found, it simplifies the GEP 
+by updating its base pointer and indices. If no such element exists, new GEPs 
+are created for each element in an array or vector and replaces the old GEP 
+accordingly. The function ensures that the new GEP has the correct type &
+replaces all uses of the original GEP. After rewriting, the old GEP is either
+destroyed or marked for deletion. The goal is to to break down and flatten
+complex memory access patterns in IR.
 
- ### RewriteForLoad
- Three cases:
+ #### RewriteForLoad
+Three cases:
  1. // Replace for Vector:
 ```
     //   %res = load { 2 x i32 }* %alloc
@@ -85,7 +148,7 @@ into an instruction and replaces the use with this new instruction.
       //   %insert = insertvalue { i32, i32 } %insert.0, i32 %load.1, 1
       // (Also works for arrays instead of structs)
 ```
-### RewriteForStore
+#### RewriteForStore
 1. // Replace for Vector:
 ```
     //   store <2 x float> %val, <2 x float>* %alloc
@@ -129,27 +192,27 @@ into an instruction and replaces the use with this new instruction.
       // (Also works for arrays instead of structs)
 ```
 
-### RewriteMemIntrin
+#### RewriteMemIntrin
 rewriting memory intrinsics (memcpy, memset, memmove) when dealing with scalarized memory. 
 The goal is to decompose the memory intrinsic operation into element-wise operations that 
 apply to each scalar element of the memory being accessed.
 
-### RewriteCall
+#### RewriteCall
 This pass rewrites function calls into either `RewriteCallArg`or `RewriteWithFlattenedHLIntrinsicCall`
 The default case is `RewriteWithFlattenedHLIntrinsicCall`. `RewriteCallArg` 
 is primarily used in ray tracing intrinsics like `TraceRay` `ReportHit`, and `CallShader`.
 
-#### RewriteCallArg
+##### RewriteCallArg
 This function does not operate on flattened (scalarized) data structures,
- this function replaces the original pointer argument (OldVal) with a stack-allocated 
- (alloca) pointer and manages the transfer of data between the original pointer and the alloca.
+this function replaces the original pointer argument (OldVal) with a stack-allocated 
+(alloca) pointer and manages the transfer of data between the original pointer and the alloca.
 - bIn (Copy-In): If bIn then copy the data from the original pointer to the alloca before the function call.
 - bOut (Copy-Out): If bOut then copy data back from the alloca to the original pointer after the function call.
 
-#### RewriteWithFlattenedHLIntrinsicCall
+##### RewriteWithFlattenedHLIntrinsicCall
 This function is used to replace a multi-element call with multiple scalarized calls
 
-### RewriteBitCast
+#### RewriteBitCast
 The RewriteBitCast function processes BitCastInst instructions in LLVM IR:
 1. Remove Unused Bitcasts: If the bitcast is not used, it is removed.
 2. Check and Process Pointer Types: Ensures both source and destination types 
@@ -163,7 +226,7 @@ otherwise, handle errors.
 the resulting GEP instruction further.
 Note: its heavily used to remove lifetime intrinsics.
 
-### RewriteForAddrSpaceCast
+#### RewriteForAddrSpaceCast
 processes AddrSpaceCast instructions in LLVM IR:
 1. Initialize: Sets up a vector to store new AddrSpaceCast values.
 2. Create New Casts: For each element in NewElts, a new AddrSpaceCast is created
@@ -174,45 +237,3 @@ processes AddrSpaceCast instructions in LLVM IR:
 removes or destroys it accordingly.
 The goal of this helper is to handle the transformation and cleanup of 
 AddrSpaceCast operations,replacing old casts with new ones.
-
-
-## Priority of work
-The rewrite functions specified above are the piece of DXC we need to bring over
-for scalarization. `RewriteForScalarRepl` works on two sets of data globals\allocas 
-and function arguments.
-
-The port should start with a compatible alternative to `RewriteCall` 
-specifically `RewriteWithFlattenedHLIntrinsicCall`As the other pieces are not needed 
-for compute shaders.Next would be `RewriteForLoad` and `RewriteForStore` as those 
-transformations are need to properlyhandle resources and are very well defined in 
-their outcomes. Then  `RewriteForGEP` and `RewriteForAddrSpaceCast`. Once those 
-are defined we can tackle `RewriteForConstExpr`  which utilizes both `RewriteForGEP`
- and `RewriteForAddrSpaceCast`. Next to elminiate things like life time markers
-`RewriteBitCast`. And finally to remove memcpys that could have been added
- we should implement `RewriteMemIntrin`.
-
-## Areas explicitly ignored
-SROA_Parameter pass has some  matrix loads and stores that this proposal won't go into.
-It also looks to do some legalization via `LegalizeDxilInputOutputs` that won't be covered.
-
-
-## Tickets
-1. Create a scalarization pass that just handles the flattenArgument case to start.      
-    - To simplify things "workists" will just be HLSL intrinsics.
-    - We iterate over all intrinsics and iterate over all value uses
-    - For now the only value we will check for are `CallInst`
-    - The pass will replace intrinsics used by DXIL.td that are a multi-element 
-    call with multiple scalarized calls
-2. Expand the scalar expansion pass to handle `loads` by checking for `LoadInst`
-   - handle the vector load case
-   - handle the Agregate Vector\Struct Array load case
-   - handle the Agregate scalar load case
-3. Expand the scalar expansion pass to handle `stores` by checking for `StoreInst`
-   - handle the vector store case
-   - handle the Agregate Vector\Struct Array store case
-   - handle the Agregate scalar store case
-4. Expand the scalar expansion pass to handle Geps by checking for `GetElementPtrInst`
-5. Expand the scalar expansion pass to handle Address cases by checking for `AddrSpaceCastInst`
-6. Expand the scalar expansion pass to handle  bit casts by checking for `BitCastInst`
-7. Expand the scalar expansio pass to handle scalaiarize mem operations by checking for `MemIntrinsic`
-8. Handle the `GlobalAndAllocas` cases
