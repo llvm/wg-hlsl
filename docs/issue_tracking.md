@@ -30,12 +30,12 @@ view](https://github.com/orgs/llvm/projects/4/views/15). The [Roadmap
 view](https://github.com/orgs/llvm/projects/4/views/12) also provides a
 graphical view of the milestones over time.
 
-The main body for a Milestone issue is follows this format:
+The main body for a Milestone issue follows this format:
 
 * Preamble - text providing information about the milestone, what the goals are,
   what the challenges might be, why it is an interesting milestone etc.
 * Workstreams - a list of workstreams, and the workstream milestones that
-  contributing to this one.
+  contribute to this one.
 * Postnote - additional text after the workstream list.
 
 The Workstreams section starts with the heading `## Workstreams` and ends either
