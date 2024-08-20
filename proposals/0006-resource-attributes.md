@@ -39,6 +39,11 @@ the attributes we would expect to see on the type that defines these
 texture variables. We should expect that given any combination of
 attributes and values of the attributes, we can directly infer what
 the texture type is and how to construct the associated dxil handle.
+For example, a `RWTexture2DMSArray` texture would have a definition
+in an HLSL header, and the type itself would be constructed with
+specific attributes attached to it: `hlsl::resource_class` would be 
+`SRV`, `hlsl::is_rov` would not be present, `hlsl::texture_dimension`
+would be `2DArray`, and `hlsl::texture_type` would be `MS`.
 
 | HLSL Texture Type              | hlsl::resource_class | hlsl::is_rov | hlsl::texture_dimension | hlsl::texture_type |
 | ------------------------------- | -------------------- | ------------ | ----------------------- | ------------------ |
