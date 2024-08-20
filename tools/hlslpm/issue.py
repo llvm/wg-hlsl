@@ -1,3 +1,5 @@
+# Classes for dealing with issues, including aggregating and updating them.
+
 from dataclasses import dataclass, field
 from datetime import datetime, date
 from enum import Enum
@@ -136,7 +138,7 @@ class Issue:
                 f"{self.issue_resourcePath} - body contains '{data.type}', but expected 'Workstreams'.")
 
         # The actual data itself is fully regenerated from the list of workstreams
-        workstreams:List[Issue] = list(issues.workstreams.values())
+        workstreams:List[Issue] = issues.workstreams
         workstreams.sort(key=lambda a: a.issue_resourcePath)
 
         data.sections = []
@@ -319,8 +321,8 @@ def rebuild_data(data: IssueData) -> List[str]:
 
 class Issues:
     all_issues: Dict[str, Issue]
-    milestones: Dict[str, Issue]
-    workstreams: Dict[str, Issue]
+    milestones: List[Issue]
+    workstreams: List[Issue]
 
     def __init__(self, gh):
         def is_interesting(i: Issue):
@@ -333,10 +335,8 @@ class Issues:
                        if is_interesting(i)]
         interesting = [i for i in gh.get_issues(interesting)]
 
-        self.milestones = dict([
-            (i.issue_resourcePath, i) for i in interesting if i.category == Category.ProjectMilestone])
-        self.workstreams = dict([
-            (i.issue_resourcePath, i) for i in interesting if i.category == Category.Workstream])
+        self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
+        self.workstreams = [i for i in interesting if i.category == Category.Workstream]
     
     def findIssue(self, contextIssue:Issue, reference:str):
         if not reference:

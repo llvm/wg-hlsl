@@ -67,7 +67,7 @@ Issues that track tasks or bug fixes that involve changing code in Clang/LLVM
 are tracked in the [llvm-project](https://github.com/llvm/llvm-project/issues)
 repo.
 
-These labels identify track issues related to HLSL support in Clang:
+These labels track issues related to HLSL support in Clang:
 
 * [HLSL][1] - issues related to HLSL language support.
 * [backend:DirectX][2] - issues related to the DXIL backend

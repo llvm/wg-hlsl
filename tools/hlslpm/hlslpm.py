@@ -1,3 +1,5 @@
+# Main entry point for tool that mangages the HLSL Project on llvm.
+
 import sys
 import argparse
 import os
@@ -32,7 +34,7 @@ if __name__ == '__main__':
     issues = Issues(gh)
 
 
-    tracked = list(issues.milestones.values()) + list(issues.workstreams.values())
+    tracked = issues.milestones + issues.workstreams
 
     bodyBefore = dict([(i.issue_id, i.body) for i in tracked])
 

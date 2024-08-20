@@ -1,8 +1,10 @@
+# Class for working with github's graphql API.
+
 from enum import Enum
 from dataclasses import dataclass, field
 import os
 import sys
-from typing import List, Optional
+from typing import Any, Generator, List, Optional
 import requests
 from datetime import datetime, date
 import json
@@ -24,8 +26,8 @@ class GH:
 
         return response.json()
 
-    def project_items_summary(self):
-        query = read_file("gql/project_item_summary.gql")
+    def project_items_summary(self) -> Generator[Issue, Any, None]:
+        query = read_file_relative_to_this_script("gql/project_item_summary.gql")
 
         pageInfo = {'endCursor': None, 'hasNextPage': True}
 
@@ -48,8 +50,8 @@ class GH:
 
             pageInfo = maybe_get(items, 'pageInfo')
 
-    def get_issues(self, issues: List[Issue]):
-        query = read_file("gql/get_issue_text.gql")
+    def get_issues(self, issues: List[Issue]) -> Generator[Issue, Any, None]:
+        query = read_file_relative_to_this_script("gql/get_issue_text.gql")
         chunk_size = 50
 
         issue_id_chunks = [issues[i:i+chunk_size]
@@ -66,11 +68,17 @@ class GH:
                 yield issue
 
     def set_issue_body(self, id, body):
-        query = read_file("gql/set_issue_body.gql")
+        query = read_file_relative_to_this_script("gql/set_issue_body.gql")
         self.graphql(query, {"id": id, "body": body})
 
 
 def maybe_get(d: dict, *args):
+    """
+    Helper for grabbing items in nested dictionaries.
+
+    >>> maybe_get({ "foo" : { "bar" : 1 } }, "foo", "bar")
+    1
+    """
     for a in args:
         if d != None and type(d) == dict:
             d = d.get(a, None)
@@ -93,14 +101,14 @@ def to_date(str):
 
 def get_pat():
     try:
-        return read_file("pat.txt").strip()
+        return read_file_relative_to_this_script("pat.txt").strip()
     except:
         print(
             f"Couldn't read pat.txt not found - create a pat on github and store it in pat.txt next to {__file__}.")
         sys.exit(1)
 
 
-def read_file(filename):
+def read_file_relative_to_this_script(filename):
     with open(os.path.join(os.path.dirname(__file__), filename), 'r') as f:
         return f.read()
 
