@@ -45,31 +45,35 @@ specific attributes attached to it: `hlsl::resource_class` would be
 `SRV`, `hlsl::is_rov` would not be present, `hlsl::texture_dimension`
 would be `2DArray`, and `hlsl::texture_type` would be `MS`.
 
-| HLSL Texture Type              | hlsl::resource_class | hlsl::is_rov | hlsl::texture_dimension | hlsl::texture_type |
-| ------------------------------- | -------------------- | ------------ | ----------------------- | ------------------ |
-| Texture1D                       | SRV                  | -            | 1D                      | -                  |
-| RWTexture1D                     | UAV                  | -            | 1D                      | -                  |
-| RasterizerOrderedTexture1D      | SRV                  | yes          | 1D                      | -                  |
-| Texture1DArray                  | SRV                  | -            | 1DArray                 | -                  |
-| RWTexture1DArray                | UAV                  | -            | 1DArray                 | -                  |
-| RasterizerOrderedTexture1DArray | SRV                  | yes          | 1DArray                 | -                  |
-| Texture2D                       | SRV                  | -            | 2D                      | -                  |
-| RWTexture2D                     | UAV                  | -            | 2D                      | -                  |
-| RasterizerOrderedTexture2D      | SRV                  | yes          | 2D                      | -                  |
-| Texture2DArray                  | SRV                  | -            | 2DArray                 | -                  |
-| RWTexture2DArray                | UAV                  | -            | 2DArray                 | -                  |
-| RasterizerOrderedTexture2DArray | SRV                  | yes          | 2DArray                 | -                  |
-| Texture3D                       | SRV                  | -            | 3D                      | -                  |
-| RWTexture3D                     | UAV                  | -            | 3D                      | -                  |
-| RasterizerOrderedTexture3D      | SRV                  | yes          | 3D                      | -                  |
-| TextureCUBE                     | SRV                  | -            | CUBE                    | -                  |
-| TextureCUBEArray                | SRV                  | -            | CUBEArray               | -                  |
-| Texture2DMS                     | SRV                  | -            | 2D                      | MS                 |
-| Texture2DMSArray                | SRV                  | -            | 2DArray                 | MS                 |
-| RWTexture2DMS                   | UAV                  | -            | 2D                      | MS                 |
-| RWTexture2DMSArray              | UAV                  | -            | 2DArray                 | MS                 |
-| FeedbackTexture2D               | SRV                  | -            | 2D                      | Feedback           |
-| FeedbackTexture2DArray          | SRV                  | -            | 2DArray                 | Feedback           |
+| HLSL Texture Type               | hlsl::resource_class | hlsl::is_rov | hlsl::texture_dimension | hlsl::is_cube | hlsl::is_ms | hlsl::is_feedback | hlsl::is_array |
+| ------------------------------- | -------------------- | ------------ | ----------------------- | ------------- | ----------- | ----------------- | -------------- |
+| Texture1D                       | SRV                  | -            | 1                       | -             | -           | -                 | -              |
+| RWTexture1D                     | UAV                  | -            | 1                       | -             | -           | -                 | -              |
+| RasterizerOrderedTexture1D      | UAV                  | yes          | 1                       | -             | -           | -                 | -              |
+| Texture1DArray                  | SRV                  | -            | 1                       | -             | -           | -                 | yes            |
+| RWTexture1DArray                | UAV                  | -            | 1                       | -             | -           | -                 | yes            |
+| RasterizerOrderedTexture1DArray | UAV                  | yes          | 1                       | -             | -           | -                 | yes            |
+| Texture2D                       | SRV                  | -            | 2                       | -             | -           | -                 | -              |
+| RWTexture2D                     | UAV                  | -            | 2                       | -             | -           | -                 | -              |
+| RasterizerOrderedTexture2D      | UAV                  | yes          | 2                       | -             | -           | -                 | -              |
+| Texture2DArray                  | SRV                  | -            | 2                       | -             | -           | -                 | yes            |
+| RWTexture2DArray                | UAV                  | -            | 2                       | -             | -           | -                 | yes            |
+| RasterizerOrderedTexture2DArray | UAV                  | yes          | 2                       | -             | -           | -                 | yes            |
+| Texture3D                       | SRV                  | -            | 3                       | -             | -           | -                 | -              |
+| RWTexture3D                     | UAV                  | -            | 3                       | -             | -           | -                 | -              |
+| RasterizerOrderedTexture3D      | UAV                  | yes          | 3                       | -             | -           | -                 | -              |
+| TextureCUBE                     | SRV                  | -            | 3                       | yes           | -           | -                 | -              |
+| TextureCUBEArray                | SRV                  | -            | 3                       | yes           | -           | -                 | yes            |
+| Texture2DMS                     | SRV                  | -            | 2                       | -             | yes         | -                 | -              |
+| Texture2DMSArray                | SRV                  | -            | 2                       | -             | yes         | -                 | yes            |
+| RWTexture2DMS                   | UAV                  | -            | 2                       | -             | yes         | -                 | -              |
+| RWTexture2DMSArray              | UAV                  | -            | 2                       | -             | yes         | -                 | yes            |
+| FeedbackTexture2D               | SRV                  | -            | 2                       | -             | -           | yes               | -              |
+| FeedbackTexture2DArray          | SRV                  | -            | 2                       | -             | -           | yes               | yes            |
+| TypedBuffer                     | SRV                  | -            | -                       | -             | -           | yes               | yes            |
+| RawBuffer                       | SRV                  | -            | -                       | -             | -           | yes               | yes            |
+| StructuredBuffer                | SRV                  | -            | -                       | -             | -           | yes               | yes            |
+
 
 ## Detailed design
 
