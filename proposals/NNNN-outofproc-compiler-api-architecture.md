@@ -176,6 +176,59 @@ process crashes, the rest of the compiler processes will continue on.
 Error information is communicated back over the IPC mechanism to the caller
 and the application will choose how to handle it.
 
+### IPC communication data
+
+A simple IPC payload would be a JSON formatted string value. This gives the
+most flexiblity. Existing clang tooling (clangd) uses [json-rpc](https://www.jsonrpc.org/specification)
+to communicate between tooling apis and its server component. This out of 
+process architecture can leverage existing code in the llvm repo that knows
+how to work with JSON and json-rpc formatted messages.
+
+### Examples of JSON
+#### JSON Request
+```json
+{
+    "json-rpc":"2.0",
+    "method":"compile",
+    "params":{
+        "arg":"value",
+        "arg2":"value2",
+        "arg3":"value3",
+    },
+    "id":1
+}
+```
+#### JSON Response
+```json
+{
+    "json-rpc":"1.0",
+    "result":{
+        "res":"value",
+        "re2":"value2",
+    },
+    "id":1
+}
+```
+#### JSON Response (error)
+```json
+{
+    "json-rpc":"1.0",
+    "error":{
+        "res":"value",
+        "re2":"value2",
+    },
+    "id":1
+}
+```
+
+### The worker process
+The compiler driver code for DXC lives in clang-dxc.exe.  This module would be
+extended with additional commandline arguments to control its launch behaviors.
+Additional params will be used to configure the process startup logic to setup
+an IPC mechanism and communicate back to the worker thread that launched it.
+
+Using this same module keeps a single binary for all compilation.
+
 ## Alternatives considered
 
 > Caller creates a factory object first and uses that to create compiler
