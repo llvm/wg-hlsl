@@ -1,0 +1,8 @@
+mutation($id: ID!, $body: String!) {    
+    updateIssue(input:  {
+       id: $id,
+       body: $body
+    }){
+        clientMutationId
+    }
+}
