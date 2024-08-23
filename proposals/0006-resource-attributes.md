@@ -70,9 +70,9 @@ would be `2DArray`, and `hlsl::texture_type` would be `MS`.
 | RWTexture2DMSArray              | UAV                  | -            | 2                       | -             | yes         | -                 | yes            |
 | FeedbackTexture2D               | SRV                  | -            | 2                       | -             | -           | yes               | -              |
 | FeedbackTexture2DArray          | SRV                  | -            | 2                       | -             | -           | yes               | yes            |
-| TypedBuffer                     | SRV                  | -            | -                       | -             | -           | yes               | yes            |
-| RawBuffer                       | SRV                  | -            | -                       | -             | -           | yes               | yes            |
-| StructuredBuffer                | SRV                  | -            | -                       | -             | -           | yes               | yes            |
+| TypedBuffer                     | SRV                  | -            | -                       | -             | -           | -                 | -              |
+| RawBuffer                       | SRV                  | -            | -                       | -             | -           | -                 | -              |
+| StructuredBuffer                | SRV                  | -            | -                       | -             | -           | -                 | -              |
 
 
 ## Detailed design
