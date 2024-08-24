@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List
+from typing import Iterable, List
 import unittest
 from issue import Category, Issue, IssueSection, Issues, parse_data, IssueData
 
@@ -113,32 +113,38 @@ class Test_Issues(unittest.TestCase):
         self.assertEqual("test#1", issue1.getIssueReference(issue3))
 
     def test_MilestoneAndWorkstreamsIdentified(self):
-        self.assertEqual(set(["test/issues/1"]), self.issues.milestones.keys())
+        self.assertEqual(set(
+            ["test/issues/1"]), set([i.issue_resourcePath for i in self.issues.milestones]))
         self.assertEqual(set(["test/issues/2", "test/issues/3", "test/issues/4", "test/issues/5"]),
-                         self.issues.workstreams.keys())
+                         set([i.issue_resourcePath for i in self.issues.workstreams]))
 
     def test_UpdateMilestone(self):
-        milestone = self.issues.milestones["test/issues/1"]
+        milestone = getByResourcePath(self.issues.milestones, "test/issues/1")
+        self.assertEqual("test/issues/1", milestone.issue_resourcePath)
 
         milestone.update(self.issues)
 
         self.assertEqual(["About the milestone.", "## Workstreams",
-                          "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "### Super slow workstream (#3)", "- [ ] item3",
+                          "### Super fast workstream (#2)", "- [ ] item1", "- [ ] item2", "", "### Super slow workstream (#3)", "- [ ] item3", "",
                           "### Unlisted Workstream (#5)", "- [ ] item5"],
                          milestone.body.splitlines())
 
     def test_UpdateWorkstream(self):
-        workstream = self.issues.workstreams["test/issues/2"]
+        workstream = getByResourcePath(self.issues.workstreams, "test/issues/2")
         workstream.update(self.issues)
 
         self.assertEqual(["About the workstream.", "## Milestones", "### The First Milestone (#1)",
-                         "- [ ] item1", "- [ ] item2"], workstream.body.splitlines())        
+                         "- [ ] item1", "- [ ] item2"], workstream.body.splitlines())
 
     def test_UpdateEmptyWorkstream(self):
-        issue = self.issues.workstreams["test/issues/4"]
+        issue = getByResourcePath(self.issues.workstreams, "test/issues/4")
         issue.update(self.issues)
 
-        self.assertEqual(["Some stuff that isn't a milestone list"], issue.body.splitlines())
+        self.assertEqual(
+            ["Some stuff that isn't a milestone list"], issue.body.splitlines())
+        
+def getByResourcePath(issues:Iterable[Issue], resourcePath: str):
+    return next(i for i in issues if i.issue_resourcePath == resourcePath)
 
 
 if __name__ == '__main__':
