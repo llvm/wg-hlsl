@@ -14,7 +14,8 @@ issues are used.
 
 ### Requirements
 
-This was tested against Python 3.10.11 with no additional modules installed.
+This was tested against Python 3.12.5 with the modules listed in requrements.txt
+installed.
 
 ### Generate a PAT
 
@@ -26,15 +27,19 @@ commit it).
 
 ### Running
 
-* Running `python hlslpm.py` will cause the script to do everything apart from
-write the results back to github.
+Run `python hlslpm.py` to display built-in help.
 
-* Running `python hlslpm.py --save` will cause the script to write out the
-  before and after contents of the issues under the 'output' directory. Diffing
-  these directories allows inspection of the changes that would be made.
+### Update Issues subcommand
 
-* Running `python hlslpm.py --update` will cause the script to update the github
-  issues that have changed.
+* Running `python hlslpm.py update-issues` will cause the script to do
+  everything apart from write the results back to github.
+
+* Running `python hlslpm.py update-issues --save` will cause the script to write
+  out the before and after contents of the issues under the 'output' directory.
+  Diffing these directories allows inspection of the changes that would be made.
+
+* Running `python hlslpm.py update-issues --update` will cause the script to
+  update the github issues that have changed.
 
 
 ## Implementation Notes
