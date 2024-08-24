@@ -38,6 +38,7 @@ class GH:
                               'projectV2', 'items')
             for node in items['nodes']:
                 yield Issue(
+                    title=maybe_get(node, 'content', 'title'),
                     item_id=node['id'],
                     item_updatedAt=to_datetime(maybe_get(node, 'updatedAt')),
                     category=Category(
@@ -50,7 +51,7 @@ class GH:
 
             pageInfo = maybe_get(items, 'pageInfo')
 
-    def get_issues(self, issues: List[Issue]) -> Generator[Issue, Any, None]:
+    def populate_issues_title(self, issues: List[Issue]):
         query = read_file_relative_to_this_script("gql/get_issue_text.gql")
         chunk_size = 50
 
@@ -63,7 +64,6 @@ class GH:
 
             nodes = maybe_get(response, "data", "nodes")
             for (issue, node) in zip(chunk, nodes):
-                issue.title = node["title"]
                 issue.body = node["body"]
                 yield issue
 
@@ -123,7 +123,7 @@ if __name__ == '__main__':
         interesting = [i for i in items_summary if i.category ==
                        Category.ProjectMilestone or i.category == Category.Workstream]
 
-        interesting = [i for i in gh.get_issues(interesting)]
+        gh.populate_issues_title(interesting)
 
         milestones = [i for i in interesting if i.category ==
                       Category.ProjectMilestone]
@@ -140,8 +140,8 @@ if __name__ == '__main__':
             print(workstream.title)
 
     if False:
-        issues = [i for i in gh.get_issues(
-            [Issue(issue_id="I_kwDOMbLzis6Rpmkm")])]
+        issues = [Issue(issue_id="I_kwDOMbLzis6Rpmkm")]
+        gh.populate_issues_title(issues)
 
         for i in issues:
             print(f"Title: {i.title}")

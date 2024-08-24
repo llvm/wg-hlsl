@@ -87,9 +87,8 @@ class Test_Issues(unittest.TestCase):
                 for i in self.issues:
                     yield i
 
-            def get_issues(self, issues):
-                for i in issues:
-                    yield i
+            def populate_issues_title(self, issues):
+                pass
 
         gh = GH(list(self.test_issues.values()))
 

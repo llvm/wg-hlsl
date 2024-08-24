@@ -323,6 +323,7 @@ class Issues:
     all_issues: Dict[str, Issue]
     milestones: List[Issue]
     workstreams: List[Issue]
+    tracked_issues_not_in_project: List[str]
 
     def __init__(self, gh):
         def is_interesting(i: Issue):
@@ -333,7 +334,7 @@ class Issues:
 
         interesting = [i for i in self.all_issues.values()
                        if is_interesting(i)]
-        interesting = [i for i in gh.get_issues(interesting)]
+        gh.populate_issues_title(interesting)
 
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
