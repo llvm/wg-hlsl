@@ -51,7 +51,7 @@ class GH:
 
             pageInfo = maybe_get(items, 'pageInfo')
 
-    def populate_issues_title(self, issues: List[Issue]):
+    def populate_issues_body(self, issues: List[Issue]):
         query = read_file_relative_to_this_script("gql/get_issue_text.gql")
         chunk_size = 50
 
@@ -123,7 +123,7 @@ if __name__ == '__main__':
         interesting = [i for i in items_summary if i.category ==
                        Category.ProjectMilestone or i.category == Category.Workstream]
 
-        gh.populate_issues_title(interesting)
+        gh.populate_issues_body(interesting)
 
         milestones = [i for i in interesting if i.category ==
                       Category.ProjectMilestone]
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     if False:
         issues = [Issue(issue_id="I_kwDOMbLzis6Rpmkm")]
-        gh.populate_issues_title(issues)
+        gh.populate_issues_body(issues)
 
         for i in issues:
             print(f"Title: {i.title}")

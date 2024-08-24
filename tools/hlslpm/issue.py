@@ -334,7 +334,7 @@ class Issues:
 
         interesting = [i for i in self.all_issues.values()
                        if is_interesting(i)]
-        gh.populate_issues_title(interesting)
+        gh.populate_issues_body(interesting)
 
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
