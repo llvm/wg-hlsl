@@ -6,6 +6,7 @@ from typing import List
 from issue import Issue, Issues
 import github
 from updateMilestoneField import updateMilestoneField_addArgs
+from report import report_addArgs
 
 
 def saveIssues(basePath, issues: List[Issue]):
@@ -71,6 +72,7 @@ if __name__ == '__main__':
         required=True, title="subcommands", description="valid subcommands", help="additional help")
     updateIssues_addArgs(subparsers)
     updateMilestoneField_addArgs(subparsers)
+    report_addArgs(subparsers)
 
     args = parser.parse_args()
 
