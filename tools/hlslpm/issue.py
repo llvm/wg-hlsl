@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, date
 from enum import Enum
 import re
-from typing import Dict, List, Optional, Self, Union
-import json
+from typing import Dict, List, Optional, Self
 
 class Category(Enum):
     NoCategory = None
