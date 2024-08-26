@@ -63,7 +63,7 @@ class Test_Issues(unittest.TestCase):
         test_issues = [(1, Category.ProjectMilestone, date(2024, 1, 1), "[milestone] The First Milestone", ["About the milestone.", "## Workstreams",
                         "### WorkstreamA (#2)", "foo", "bar", "### Workstream B(#3)", "com", "baz"]),
                        (2, Category.Workstream, None, "[workstream] Super fast workstream",
-                        ["About the workstream.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item1", "- [ ] item2"]),
+                        ["About the workstream.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item1", "- [ ] item2", "", "### Random Stuff(??)", "Foo"]),
                        (3, Category.Workstream, None, "[workstream] Super slow workstream",
                         ["Taking it easy.", "## Milestones", "### Milestone 1 (#1)", "- [ ] item3"]),
                        (4, Category.Workstream, None,
@@ -133,7 +133,7 @@ class Test_Issues(unittest.TestCase):
         workstream.update(self.issues)
 
         self.assertEqual(["About the workstream.", "## Milestones", "### The First Milestone (#1)",
-                         "- [ ] item1", "- [ ] item2"], workstream.body.splitlines())
+                         "- [ ] item1", "- [ ] item2", "", "### Random Stuff(??)", "Foo"], workstream.body.splitlines())
 
     def test_UpdateEmptyWorkstream(self):
         issue = getByResourcePath(self.issues.workstreams, "test/issues/4")

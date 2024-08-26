@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, date
 from enum import Enum
 import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Self, Union
 import json
 
 class Category(Enum):
@@ -27,7 +27,7 @@ class IssueSection:
         if not self.title:
             return None
 
-        m = re.match(r".*\((.+)\)", self.title)
+        m = re.match(r".*\((.*#\d+)\)", self.title)
         if not m:
             return None
         
@@ -201,15 +201,22 @@ class Issue:
         return section
 
 
-    def buildSectionTitle(self, issue):
-        m = re.match(r"\[.*\](.*)", issue.title)
-        if m:
-            title = m[1].strip()
-        else:
-            title = issue.title
+    def buildSectionTitle(self, issue:Self):
+        try:
+            if issue.title == None:
+                return "Issue has no title - maybe draft?"
 
-        return f"{title} ({issue.getIssueReference(self)})"
-    
+            m = re.match(r"\[.*\](.*)", issue.title)
+            if m:
+                title = m[1].strip()
+            else:
+                title = issue.title
+
+            return f"{title} ({issue.getIssueReference(self)})"
+        except:
+            print(f"Exception working on issue {issue} {issue.issue_id} {issue.issue_resourcePath}")
+            raise
+                                                    
     def getContentsFor(self, issue) -> List[str]:
         (_, data, _) = split_body(self.body)
         data = parse_data(data)
