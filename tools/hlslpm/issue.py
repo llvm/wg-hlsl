@@ -203,9 +203,6 @@ class Issue:
 
     def buildSectionTitle(self, issue:Self):
         try:
-            if issue.title == None:
-                return "Issue has no title - maybe draft?"
-
             m = re.match(r"\[.*\](.*)", issue.title)
             if m:
                 title = m[1].strip()
