@@ -27,7 +27,7 @@ class IssueSection:
         if not self.title:
             return None
 
-        m = re.match(".*\((.+)\)", self.title)
+        m = re.match(r".*\((.+)\)", self.title)
         if not m:
             return None
         

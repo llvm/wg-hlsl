@@ -65,7 +65,6 @@ class GH:
             nodes = maybe_get(response, "data", "nodes")
             for (issue, node) in zip(chunk, nodes):
                 issue.body = node["body"]
-                yield issue
 
     def set_issue_body(self, id, body):
         query = read_file_relative_to_this_script("gql/set_issue_body.gql")
