@@ -25,8 +25,8 @@ def updateIssues_addArgs(subparsers):
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--save', action='store_true',
                         help="Saves before/after issues")
-    group.add_argument('--update', action='store_true',
-                        help="Update github issues")
+    group.add_argument('--commit', action='store_true',
+                        help="Commit changes to the github issues")
     parser.set_defaults(func=updateIssues)
 
 

@@ -38,8 +38,8 @@ Run `python hlslpm.py` to display built-in help.
   out the before and after contents of the issues under the 'output' directory.
   Diffing these directories allows inspection of the changes that would be made.
 
-* Running `python hlslpm.py update-issues --update` will cause the script to
-  update the github issues that have changed.
+* Running `python hlslpm.py update-issues --commit` will cause the script to
+  commit the changes to modified github issues.
 
 
 ## Implementation Notes
