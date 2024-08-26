@@ -1,6 +1,6 @@
 <!-- {% raw %} -->
 
-# Support for in-process, Out-of-process, or both for the c style compiler api
+# Out-of-process compiler api architecture
 
 * Proposal: [NNNN](NNNN-outofproc-compiler-api-architecture.md)
 * Author(s): [Cooper Partin](https://github.com/coopp)
@@ -17,7 +17,7 @@ shaders.  A C style api will be built to enable applications to compile
 a shader from their own processes in addition to being able to launching the
 clang process.
 
-This document is to propose a detailed architecture for the approved 
+This document is to propose a more detailed architecture for the approved 
 Proposal: [0005](0005-inproc-outofproc-compiler-api-support.md).
 
 ## Proposed solution
@@ -29,9 +29,10 @@ multiple-core processors. A separate compiler process is created for each
 available processor. For example, if the system has four processors, then four
 compiler processes are created.
 
-The process pool will be associated to an instance of the compiler library
-and will live as long as that instance is alive.  Compilation requests will
-be blocked waiting for available workers in the pool.
+The process pool is owned by a singleton object and shared between each api
+instance created in the calling process. Compilation requests are blocking
+calls. The call will be blocked either waiting for an available worker process
+to become available or already dispatched work to be completed.
 
 Communication with the process pool will be done using a named pipe IPC
 mechanism. Pipe names will be unique to the process that is being communicated
@@ -39,15 +40,15 @@ with. Results are sent back over the IPC mechanism.
 
 ## Detailed design
 
-A generic compiler api will be used to help frame the out of process
-architecture.  The full HLSL compiler api has not been fully designed but the
-concepts illustrated here with this example are relavant to any api performing
+A generic compiler api signature will be used in this document to help frame
+the out of process architecture.  The full HLSL compiler api has not been fully
+designed but the concepts illustrated here are relavant to any api performing
 work in a separte process.
 
 ### Out-of-process system initialization
 
-The out of process system will be initialized on the first creation of a 
-library instance. All calls into the library flow through that system.
+The out of process system is initialized on the first creation of a 
+library instance. Api calls into the library flow through a singleton object.
 
 Instances of the compiler library are created using a creation api entrypoint.
 Library instances must be destroyed using destroy/dispose api entrypoint.
@@ -71,40 +72,29 @@ CompilerInstance clang_createCompiler();
 void clang_disposeCompiler(CompilerInstance instance);
 ```
 
-Clients that intend to compile using multiple threads will be required to
-create a new api instance per thread. Api calls are synchronous and blocking.
-
+Api calls are synchronous and blocking.
 
 ### Singleton initialization and system overview
-A singleton manages all state and request traffic from the calling process
-using the api. The singleton owns a work dispatching system that operates on a
-process pool. Each process in the pool is a worker process that is monitored by
-a dedicated thread. One thread to one process.  The thread communicates to its
-owned worker process and the singleton's dispatching system. Named pipes are 
-used to communicate with woker processes. All work belonging to the api is
-dispatched to the worker process. When a worker process completes work, it
-exits. The monitoring thread spawns a new process for any exited process to
-replenish the process pool.  This includes crashed processes.
+On first creation of a compiler api instance, the singleton object is created.
 
-On first creation of a compiler instance the following initialization will
-occur.
+The singleton object manages all state and request traffic from the calling
+process. The singleton contains a work dispatching system that interfaces with a
+process pool. Each worker process in the pool is monitored by a dedicated
+thread. One thread to one process.
 
-* Create and configure a dispatcher that is able to take api calls and package
-them into messages to be sent to the worker process pool.
-* Create and configure a worker process pool that creates a thread for each
-worker process in the process pool.
-    * Each thread connects to the worker process using named pipes enabling
-    communication between the thread and its worker process.
-    * Each thread configures the worker process to hook stdout/stderr and pipe
-    the traffic to a file specified by the thread. This file will be sent back as
-    additional status information about the compile operation.
+Worker process monitoring threads use named pipes as IPC to communicate with
+workers and a different method (TBD) to communicate with the singleton's
+dispatching system.
 
-At this point there is a dispatcher connected to a worker pool waiting for
-work. 
+Worker processes exit unconditionally after completing work. The monitoring
+thread spawns a new process for any exited process to replenish the process
+pool. Exited processes include crashed processes.  Processes that crash are
+detected by the monitoring thread allowing error information to be communicated
+back through the system.
 
 ### Calling apis
-Compiler instances are retuired parameters to apis that perform operations like
-compiling.  This ensure that the work being performed is tied to an instance.
+Compiler instances are required inputs to compiler api calls. This ensures that
+the work being performed is associated to an instance.
 
 #### Example entry point that takes a compiler instance
 ```c++
@@ -136,23 +126,24 @@ CompilerResult clang_compile(
 ```
 
 The start of the api call begins at the api entrypoint.  This is where the
-system will use the compiler instance and parameters to determine the best
-way to dispatch the work to a worker process.
+system uses the compiler instance as a context for the work and the parameters
+to determine the best way to dispatch the work to a worker process.
 
-#### The API entrypoint will...
+### Roles in the system
+#### The API entrypoint
 * Package api parameters into the required messsage format
 * Send a message with params to the Api call dispatcher
 * Wait for completion
 * Unpack results
 * Return results
 
-#### The API call Dispatcher will...
+#### The API call Dispatcher
 * Wait for an open worker process
 * Send a message with params to the worker thread in the thread pool
 * Wait for completion
 * Return results to the API entrypoint
 
-#### The worker process monitoring thread will...
+#### The worker process monitoring thread
 * Send a message with params to its monitored worker process over IPC
 * Wait for completion
 * Read file that contains the captured stdout/stderr traffic and packlage it as
@@ -160,11 +151,11 @@ status result data.
 * Return results to the api call dispatcher
 * Spawn a new worker process
 
-#### The Worker Process will...
+#### The Worker Process
 * Unpack the message and params from its monitoring thread and call into a
  compiler implementation.
 * Wait for completion
-* Exit process cleanly / Process crash
+* Exit process cleanly / or crash
     * In both cases, the process will be exited. The monitoring thread will
     always ensure that the contents of the stdout/stderr data is sent back to
     the caller.
@@ -178,13 +169,20 @@ and the application will choose how to handle it.
 
 ### IPC communication data
 
-A simple IPC payload would be a JSON formatted string value. This gives the
-most flexiblity. Existing clang tooling (clangd) uses [json-rpc](https://www.jsonrpc.org/specification)
-to communicate between tooling apis and its server component. This out of 
-process architecture can leverage existing code in the llvm repo that knows
-how to work with JSON and json-rpc formatted messages.
+A JSON message-based protocol similar to [json-rpc](https://www.jsonrpc.org/specification)
+is used for packaging parameters and communicating with other processes.
+This will provide the most flexiblity. Existing clang tooling (clangd) already
+use json-rpc. 
 
-### Examples of JSON
+Using the json-rpc protocol enables reuse of existing code in the llvm repo
+that supports working withg json-rpc formatted messages. 
+
+> Some investigation may be needed to see if using 100% stock json-rpc protocol
+can be used or a rpc-json-like protocol needs to be defined. The json-prc
+notification system may not work well with how include handlers may need to be
+implemented.
+
+### Examples of JSON-RPC messages
 #### JSON Request
 ```json
 {
@@ -201,7 +199,7 @@ how to work with JSON and json-rpc formatted messages.
 #### JSON Response
 ```json
 {
-    "json-rpc":"1.0",
+    "json-rpc":"2.0",
     "result":{
         "res":"value",
         "re2":"value2",
@@ -212,7 +210,7 @@ how to work with JSON and json-rpc formatted messages.
 #### JSON Response (error)
 ```json
 {
-    "json-rpc":"1.0",
+    "json-rpc":"2.0",
     "error":{
         "res":"value",
         "re2":"value2",
@@ -222,12 +220,12 @@ how to work with JSON and json-rpc formatted messages.
 ```
 
 ### The worker process
-The compiler driver code for DXC lives in clang-dxc.exe.  This module would be
-extended with additional commandline arguments to control its launch behaviors.
+The compiler driver code for DXC lives in clang-dxc.exe.  This module will be
+extended with additional commandline arguments and launch behaviors.
 Additional params will be used to configure the process startup logic to setup
-an IPC mechanism and communicate back to the worker thread that launched it.
+the required IPC for communicating back to the thread that launched it.
 
-Using this same module keeps a single binary for all compilation.
+Using this same module keeps a single shipping binary for all compilation.
 
 ## Alternatives considered
 
