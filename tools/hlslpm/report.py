@@ -25,6 +25,9 @@ def report(args):
     r = Reporter(gh, issues)
     lines += r.generateWorkstreamsReport()
 
+    lines += ["", "", "---", "---", "", ""]
+    lines += r.generateMilestonesReport()
+
     output = mdformat.text("\n".join(lines))
 
     print("Writing report...")
@@ -44,6 +47,9 @@ class Reporter:
 
     def generateWorkstreamsReport(self) -> Iterable[str]:
         return itertools.chain(*[self.generateWorkstreamReport(w) for w in self.issues.workstreams])
+    
+    def generateMilestonesReport(self) -> Iterable[str]:
+        return itertools.chain(*[self.generateMilestoneReport(w) for w in self.issues.milestones])
 
     def generateWorkstreamReport(self, workstreamIssue: Issue) -> Iterable[str]:
         lines = []
@@ -51,11 +57,15 @@ class Reporter:
         lines.append(f"# {issue_link(workstreamIssue)}")
 
         lines += self.generateTrackedIssueList(workstreamIssue)
-
         lines += self.generateWorkstreamMismatchReport(workstreamIssue)
-
         lines += self.generateUnlinkedWorkstreamReport(workstreamIssue)
 
+        return lines
+    
+    def generateMilestoneReport(self, milestoneIssue: Issue) -> Iterable[str]:
+        lines = []
+        lines.append(f"# {issue_link(milestoneIssue)}")
+        lines += self.generateTrackedIssueList(milestoneIssue)
         return lines
 
     def generateTrackedIssueList(self, startIssue: Issue) -> Iterable[str]:
@@ -160,6 +170,6 @@ def issue_link(issue: Issue, contextIssue: Optional[Issue] = None) -> str:
         contextIssue)}](https://github.com/{issue.issue_resourcePath}))"
 
     if issue.issue_state == IssueState.Closed:
-        issueText = f"~~{issueText}~~"
+        issueText = f"DONE: {issueText}"
 
     return issueText
