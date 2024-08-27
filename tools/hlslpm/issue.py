@@ -27,11 +27,10 @@ class IssueSection:
         if not self.title:
             return None
 
-        m = re.match(r".*\((.*#\d+)\)", self.title)
-        if not m:
-            return None
+        if m := re.match(r".*\((.*#\d+)\)", self.title):
+            return m[1]
         
-        return m[1]
+        return None
     
 
 class IssueData:
