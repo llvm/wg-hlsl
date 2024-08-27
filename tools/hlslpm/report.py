@@ -20,11 +20,11 @@ def report(args):
 
     print("Analyzing...")
 
-
     r = Reporter(gh, issues)
 
     write_report(r.generateWorkstreamsReport(), "output/report-workstreams.md")
     write_report(r.generateMilestonesReport(), "output/report-milestones.md")
+    write_report(r.generateWarningsReport(), "output/report-warnings.md")
 
 
 def write_report(lines, filename):
@@ -48,9 +48,12 @@ class Reporter:
 
     def generateWorkstreamsReport(self) -> Iterable[str]:
         return itertools.chain(*[self.generateWorkstreamReport(w) for w in self.issues.workstreams])
-    
+
     def generateMilestonesReport(self) -> Iterable[str]:
         return itertools.chain(*[self.generateMilestoneReport(w) for w in self.issues.milestones])
+
+    def generateWarningsReport(self) -> Iterable[str]:
+        return itertools.chain(*[self.generateWorkstreamWarningsReport(w) for w in self.issues.workstreams])
 
     def generateWorkstreamReport(self, workstreamIssue: Issue) -> Iterable[str]:
         lines = []
@@ -58,11 +61,17 @@ class Reporter:
         lines.append(f"# {issue_link(workstreamIssue)}")
 
         lines += self.generateTrackedIssueList(workstreamIssue)
-        lines += self.generateWorkstreamMismatchReport(workstreamIssue)
-        lines += self.generateUnlinkedWorkstreamReport(workstreamIssue)
 
         return lines
-    
+
+    def generateWorkstreamWarningsReport(self, workstreamIssue: Issue) -> Iterable[str]:
+        lines = self.generateWorkstreamMismatchReport(
+            workstreamIssue) + self.generateUnlinkedWorkstreamReport(workstreamIssue)
+        if len(lines) > 0:
+            lines = [f"# {issue_link(workstreamIssue)}"] + lines
+
+        return lines
+
     def generateMilestoneReport(self, milestoneIssue: Issue) -> Iterable[str]:
         lines = []
         lines.append(f"# {issue_link(milestoneIssue)}")
@@ -157,10 +166,9 @@ def visit_all(issue: Issue, visitor: Callable[[Issue, int, bool], None]):
 
         visitor(issue, depth, False)
 
-
-        def state_key(issue:Issue):
+        def state_key(issue: Issue):
             return issue.issue_state.name
-        
+
         for i in sorted(issue.tracked_issues, key=state_key, reverse=True):
             visit_worker(i, depth + 1)
 
