@@ -9,7 +9,7 @@ import mdformat
 
 def report_addArgs(subparsers):
     parser: ArgumentParser = subparsers.add_parser(
-        'report', aliases=['r'], help="Generate output/report.md")
+        'report', aliases=['r'], help="Generate output/report-*.md")
     parser.set_defaults(func=report)
 
 
@@ -20,18 +20,19 @@ def report(args):
 
     print("Analyzing...")
 
-    lines = []
 
     r = Reporter(gh, issues)
-    lines += r.generateWorkstreamsReport()
 
-    lines += ["", "", "---", "---", "", ""]
-    lines += r.generateMilestonesReport()
+    write_report(r.generateWorkstreamsReport(), "output/report-workstreams.md")
+    write_report(r.generateMilestonesReport(), "output/report-milestones.md")
 
+
+def write_report(lines, filename):
     output = mdformat.text("\n".join(lines))
 
-    print("Writing report...")
-    filename = os.path.normpath("output/report.md")
+    filename = os.path.normpath(filename)
+    print(f"Writing {filename}...")
+
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w') as f:
         f.write(output)
@@ -156,7 +157,11 @@ def visit_all(issue: Issue, visitor: Callable[[Issue, int, bool], None]):
 
         visitor(issue, depth, False)
 
-        for i in issue.tracked_issues:
+
+        def state_key(issue:Issue):
+            return issue.issue_state.name
+        
+        for i in sorted(issue.tracked_issues, key=state_key, reverse=True):
             visit_worker(i, depth + 1)
 
     visit_worker(issue, 0)
