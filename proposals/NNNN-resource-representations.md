@@ -107,7 +107,7 @@ unreliable:
 1. Some of the features described were future directions at the time of writing
    that don't exactly map to what we have today, such as the non-legacy
    ``cbufferLoad`` and ``GetBufferBasePtr``
-2. Many features, especially form SM6.6 and above, are not documented there at
+2. Many features, especially from SM6.6 and above, are not documented there at
    all.
 
 We'll need to validate what we're doing against the existing implementation in
