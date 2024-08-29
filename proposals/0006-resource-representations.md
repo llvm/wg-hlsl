@@ -2,10 +2,10 @@
 
 # Resource Representations in Clang and LLVM
 
-* Proposal: [NNNN](NNNN-resource-representations.md)
+* Proposal: [0006](0006-resource-representations.md)
 * Author(s): [Justin Bogner](https://github.com/bogner)
 * Sponsor: [Justin Bogner](https://github.com/bogner)
-* Status: **Under Consideration**
+* Status: **Accepted**
 * Impacted Project(s): Clang
 * Related Docs: [DXILResources.html]
 
