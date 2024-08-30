@@ -1,38 +1,39 @@
 # Main entry point for tool that mangages the HLSL Project on llvm.
 
 import sys
-import argparse
+from argparse import ArgumentParser
 import os
 from typing import List
 from issue import Issue, Issues
 import github
 
 
-def saveIssues(basePath, issues:List[Issue]):
+def saveIssues(basePath, issues: List[Issue]):
     for issue in issues:
-        filename = os.path.normpath(os.path.join(basePath, issue.issue_resourcePath.strip("/")))
+        filename = os.path.normpath(os.path.join(
+            basePath, issue.issue_resourcePath.strip("/")))
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
         with open(filename, 'w') as f:
             f.write(issue.body)
 
 
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description="HLSL Project Manager")
-    parser.add_argument('--save', action='store_true', help="Saves before/after issues")
-    parser.add_argument('--update', action='store_true', help="Update github issues")
-
-    args = parser.parse_args()
-
-    if args.save and args.update:
-        print("Only one of --save or --update can be specified")
+def updateIssues_addArgs(subparsers):
+    parser: ArgumentParser = subparsers.add_parser(
+        'update-issues', aliases=['ui'])
     
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--save', action='store_true',
+                        help="Saves before/after issues")
+    group.add_argument('--commit', action='store_true',
+                        help="Commit changes to the github issues")
+    parser.set_defaults(func=updateIssues)
 
+
+def updateIssues(args):
     print("Fetching data...")
     gh = github.GH()
     issues = Issues(gh)
-
 
     tracked = issues.milestones + issues.workstreams
 
@@ -58,8 +59,16 @@ if __name__ == '__main__':
 
             if args.update:
                 gh.set_issue_body(id, bodyAfter[id])
-        
 
 
+if __name__ == '__main__':
 
+    parser = ArgumentParser(description="HLSL Project Manager")
 
+    subparsers = parser.add_subparsers(
+        required=True, title="subcommands", description="valid subcommands", help="additional help")
+    updateIssues_addArgs(subparsers)
+
+    args = parser.parse_args()
+
+    args.func(args)
