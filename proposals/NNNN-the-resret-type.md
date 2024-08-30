@@ -23,7 +23,7 @@ to make some decisions about how the types will map.
 
 The LLVM intrinsics that map to specific DXIL operations aren't constrained to
 fit in a stable binary format, so we have a fair amount of flexibility in how
-wedefine them. We want them to be easy to work with both in the sense that
+we define them. We want them to be easy to work with both in the sense that
 simple IR is more likely to optimize well and in the sense that we want it to
 be easy to use and understand them in tests.
 
