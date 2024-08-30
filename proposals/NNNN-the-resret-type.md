@@ -9,7 +9,7 @@
 
 ## Introduction
 
-In dxc a load, sampler, or gather operation returns [a `%dx.types.ResRet`
+In dxc a load, sample, or gather operation returns [a `%dx.types.ResRet`
 value][ResRet], which is a structure containing four 32-bit values of a given
 type and an `i32 status` that is used only for [CheckAccessFullyMapped].
 
