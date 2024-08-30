@@ -5,7 +5,7 @@
 * Proposal: [NNNN](NNNN-the-resret-type.md)
 * Author(s): [Author 1](https://github.com/bogner)
 * Status: **Design In Progress**
-* PRs: llvm-project/pull#104252, llvm-project/pull#106645
+* PRs: llvm/llvm-project#104252, llvm/llvm-project#106645
 
 ## Introduction
 
@@ -53,10 +53,10 @@ We have a couple of options for how to represent these return types.
    return a single float, `Buffer<float4>` would be a vector of 4 floats,
    `Buffer<double2>` a vector of two doubles, etc.
 2. A 4-element vector of the element type, matching the shape of the DXIL
-   operations for most operations (See llvm-project/pull#104252). We would want
+   operations for most operations (See llvm/llvm-project#104252). We would want
    to deviate from this for 64 bit types and return a 2-element vector for
    things like `Buffer<double2>` here.
-3. An anonymous structure of 4-elements (See llvm-project/pull#106645), or
+3. An anonymous structure of 4-elements (See llvm/llvm-project#106645), or
    2-elements in the case of doubles.
 
 The trade offs here are that (1) is the simplest representation in IR but the
