@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, date
 from enum import Enum
 import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Self, Union
 import json
 
 class Category(Enum):
@@ -27,11 +27,10 @@ class IssueSection:
         if not self.title:
             return None
 
-        m = re.match(".*\((.+)\)", self.title)
-        if not m:
-            return None
+        if m := re.match(r".*\((.*#\d+)\)", self.title):
+            return m[1]
         
-        return m[1]
+        return None
     
 
 class IssueData:
@@ -201,15 +200,19 @@ class Issue:
         return section
 
 
-    def buildSectionTitle(self, issue):
-        m = re.match(r"\[.*\](.*)", issue.title)
-        if m:
-            title = m[1].strip()
-        else:
-            title = issue.title
+    def buildSectionTitle(self, issue:Self):
+        try:
+            m = re.match(r"\[.*\](.*)", issue.title)
+            if m:
+                title = m[1].strip()
+            else:
+                title = issue.title
 
-        return f"{title} ({issue.getIssueReference(self)})"
-    
+            return f"{title} ({issue.getIssueReference(self)})"
+        except:
+            print(f"Exception working on issue {issue} {issue.issue_id} {issue.issue_resourcePath}")
+            raise
+                                                    
     def getContentsFor(self, issue) -> List[str]:
         (_, data, _) = split_body(self.body)
         data = parse_data(data)
@@ -323,6 +326,7 @@ class Issues:
     all_issues: Dict[str, Issue]
     milestones: List[Issue]
     workstreams: List[Issue]
+    tracked_issues_not_in_project: List[str]
 
     def __init__(self, gh):
         def is_interesting(i: Issue):
@@ -333,7 +337,7 @@ class Issues:
 
         interesting = [i for i in self.all_issues.values()
                        if is_interesting(i)]
-        interesting = [i for i in gh.get_issues(interesting)]
+        gh.populate_issues_body(interesting)
 
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
