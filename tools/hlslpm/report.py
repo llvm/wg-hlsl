@@ -137,7 +137,7 @@ class Reporter:
         workstreamIssues = [i.issue_id for i
                             in self.issues.all_issues.values()
                             if i.workstream == workstreamIssue.workstream
-                            and i.issue_state == IssueState.Open]
+                            ]
 
         unlinked = set(workstreamIssues).difference(set(linked_issues))
 
