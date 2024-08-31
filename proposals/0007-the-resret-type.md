@@ -2,7 +2,7 @@
 
 # Return Values of Loads, Samples, and Gathers
 
-* Proposal: [NNNN](NNNN-the-resret-type.md)
+* Proposal: [0007](0007-the-resret-type.md)
 * Author(s): [Justin Bogner](https://github.com/bogner)
 * Status: **Design In Progress**
 * PRs: llvm/llvm-project#104252, llvm/llvm-project#106645
