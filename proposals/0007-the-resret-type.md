@@ -72,8 +72,8 @@ pass an `i32` "status" to a separate operation, since there's only one thing
 these are used for in practice.
 
 Note that treating the return as an `i1` matches the undocumented behaviour of
-`dxc`, which will implicityly add a `CheckAccessFullyMapped` operation to the
-IR even if it wasn't present in HLSL source.
+`dxc`, which will implicitly add a `CheckAccessFullyMapped` operation to the IR
+even if it wasn't present in HLSL source.
 
 [Sampler Feedback]: https://devblogs.microsoft.com/directx/coming-to-directx-12-sampler-feedback-some-useful-once-hidden-data-unlocked/
 
