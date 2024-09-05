@@ -554,9 +554,7 @@ The additional semantic rules not already covered by the grammar are listed here
 
 | Property       | Type              | Type detail                                         |
 | -------------- | ----------------- | --------------------------------------------------- |
-| RootFlag       | i32               | D3D12_ROOT_SIGNATURE_FLAG                           |
-| Parameters     | reference to list | list of RootDescriptor/RootConstant/DescriptorTable |
-| StaticSamplers | reference to list | list of StaticSamplers                              |
+| Parameters     | reference to list | list of  D3D12_ROOT_SIGNATURE_FLAG/RootDescriptor/RootConstant/DescriptorTable/StaticSamplers |
 
 * Function RootSignature pair
 
@@ -579,15 +577,12 @@ Example for same root signature as above:
 ; placeholder - update this once detailed design complete
 !dx.rootsignatures = !{!2}
 !2 = !{ptr @main, !3 }
-!3 = !{ i32 1, !4, !10 } ; RootFlags, Parameters, StaticSamplers
-!4 = !{!5, !6} ; list of RootDescriptor/RootConstant/DescriptorTable
-!5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
-!6 = !{ !"DescriptorTable", i32 0, !7 } ;  0 = visibility, range list !7
-!7 = !{ !8, !9} ; reference 2 descriptor ranges
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
-!10 = !{!11} ; list of StaticSamplers
-!11 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
+!3 = !{ i32 1, !4, !5, !6, !7, !8 } ; RootFlags, Parameters, StaticSamplers
+!4 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
+!5 = !{ !"DescriptorTable", i32 0, !7 } ;  0 = visibility, range list !7
+!6 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
+!7 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+!8 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
 ```
 
 ### Validations during DXIL generation
