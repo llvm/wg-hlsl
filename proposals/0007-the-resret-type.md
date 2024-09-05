@@ -4,8 +4,8 @@
 
 * Proposal: [0007](0007-the-resret-type.md)
 * Author(s): [Justin Bogner](https://github.com/bogner)
-* Status: **Design In Progress**
-* PRs: llvm/llvm-project#104252, llvm/llvm-project#106645
+* Status: **Accepted**
+* PRs: llvm/llvm-project#104252
 
 ## Introduction
 
@@ -47,26 +47,13 @@ it generally treats these operations as returning 4 32-bit values. For 16-bit
 elements the values are 16-bit values, and for 64-bit values the operations
 return 4 32-bit integers and combine them with further operations.
 
-We have a couple of options for how to represent these return types.
+In LLVM IR, the load intrinsics will return the contained type of the resource.
+That is, for `Buffer<float>` this would return a single float, `Buffer<float4>`
+would be a vector of 4 floats, `Buffer<double2>` a vector of two doubles, etc.
 
-1. The contained type of the resource. That is, for `Buffer<float>` this would
-   return a single float, `Buffer<float4>` would be a vector of 4 floats,
-   `Buffer<double2>` a vector of two doubles, etc.
-2. A 4-element vector of the element type, matching the shape of the DXIL
-   operations for most operations (See llvm/llvm-project#104252). We would want
-   to deviate from this for 64 bit types and return a 2-element vector for
-   things like `Buffer<double2>` here.
-3. An anonymous structure of 4-elements (See llvm/llvm-project#106645), or
-   2-elements in the case of doubles.
-
-The trade offs here are that (1) is the simplest representation in IR but the
-most complex to validate and lower to DXIL operations, and (3) is arguably
-messier but very simple to lower to DXIL operations. Option (2) is a middle
-ground and may be the worst of both worlds.
-
-Discuss: Which is better, (1) or (3)?
-
-[BufferLoad]: https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#bufferload
+This makes lowering to DXIL operations more complicated than it would be if we
+matched the return types more closely, but it simplifies the IR sufficiently to
+be worthwhile.
 
 ### CheckAccessFullyMapped
 
@@ -84,19 +71,60 @@ simply return it as an `i1` that can be used directly rather than having to
 pass an `i32` "status" to a separate operation, since there's only one thing
 these are used for in practice.
 
-As an example, we could define two `llvm.dx.typedBufferLoad` operations:
-```tablegen
-def int_dx_typedBufferLoad
-    : DefaultAttrsIntrinsic<
-          [llvm_any_ty, LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>],
-          [llvm_any_ty, llvm_i32_ty]>;
-def int_dx_typedBufferLoad_checked
-    : DefaultAttrsIntrinsic<
-          [llvm_any_ty, LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>,
-           llvm_i1_ty],
-          [llvm_any_ty, llvm_i32_ty]>;
-```
+Note that treating the return as an `i1` matches the undocumented behaviour of
+`dxc`, which will implicitly add a `CheckAccessFullyMapped` operation to the IR
+even if it wasn't present in HLSL source.
 
 [Sampler Feedback]: https://devblogs.microsoft.com/directx/coming-to-directx-12-sampler-feedback-some-useful-once-hidden-data-unlocked/
+
+### Examples
+
+These are a few examples of what the LLVM intrinsics will look like and what
+DXIL operations they'll lower to.
+
+```llvm
+  ; Load from a Buffer<float4>
+  %val0 = call <4 x float> @llvm.dx.typedBufferLoad(
+      target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf0, i32 %ix)
+  ; =>
+  %val0 = call %dx.types.ResRet.f32 @dx.op.bufferLoad.f32(
+      i32 68, %dx.types.Handle %buf0, i32 %ix, i32 undef)
+
+  ; Load from a Buffer<float>
+  %val1 = call float @llvm.dx.typedBufferLoad(
+      target("dx.TypedBuffer", float, 0, 0, 0) %buf1, i32 %ix)
+  ; =>
+  %val1 = call %dx.types.ResRet.f32 @dx.op.bufferLoad.f32(
+      i32 68, %dx.types.Handle %buf2, i32 %ix, i32 undef)
+  ; Note: Only the 0th element of %val1 is valid
+
+  ; Load from a Buffer<float4> followed by CheckAccessFullyMapped
+  %agg2 = call {<4 x float>, i1} @llvm.dx.typedBufferLoad.checkbit(
+      target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf2, i32 %ix)
+  %val2 = extractvalue {<4 x float>, i1} %agg2, 0
+  %chk2 = extractvalue {<4 x float>, i1} %agg2, 1
+  ; =>
+  %val2 = call %dx.types.ResRet.f32 @dx.op.bufferLoad.f32(
+      i32 68, %dx.types.Handle %buf2, i32 %ix, i32 undef)
+  %bit2 = extractvalue %dx.types.ResRet.f32 %val2, 4
+  %chk2 = call i1 @dx.op.CheckAccessFullyMapped.i32(i32 71, i32 %bit2)
+
+  ; Load from a Buffer<int4>
+  %val3 = call <4 x i32> @llvm.dx.typedBufferLoad(
+      target("dx.TypedBuffer", <4 x i32>, 0, 0, 1) %buf3, i32 %ix)
+  ; =>
+  %val3 = call %dx.types.ResRet.i32 @dx.op.bufferLoad.i32(
+      i32 68, %dx.types.Handle %buf3, i32 %ix, i32 undef)
+
+  ; Load from a Buffer<double>
+  %val4 = call double @llvm.dx.typedBufferLoad(
+      target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf4, i32 %ix)
+  ; =>
+  %res4 = call %dx.types.ResRet.i32 @dx.op.bufferLoad.i32(
+      i32 68, %dx.types.Handle %buf4, i32 %ix, i32 undef)
+  %lo4 = extractvalue %dx.types.ResRet.f32 %res4, 0
+  %hi4 = extractvalue %dx.types.ResRet.f32 %res4, 1
+  %val4 = call %dx.op.MakdeDouble.f64(i32 101, i32 %lo4, i32 %hi4)
+```
 
 <!-- {% endraw %} -->
