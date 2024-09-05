@@ -79,23 +79,52 @@ even if it wasn't present in HLSL source.
 
 ### Examples
 
-These are a few examples of what the LLVM intrinsics will look like based on
-the above.
+These are a few examples of what the LLVM intrinsics will look like and what
+DXIL operations they'll lower to.
 
 ```llvm
   ; Load from a Buffer<float4>
   %val0 = call <4 x float> @llvm.dx.typedBufferLoad(
-              target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf0, i32 %ix)
+      target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf0, i32 %ix)
+  ; =>
+  %val0 = call %dx.types.ResRet.f32 @dx.op.bufferLoad.f32(
+      i32 68, %dx.types.Handle %buf0, i32 %ix, i32 undef)
 
   ; Load from a Buffer<float>
   %val1 = call float @llvm.dx.typedBufferLoad(
-              target("dx.TypedBuffer", float, 0, 0, 0) %buf1, i32 %ix)
+      target("dx.TypedBuffer", float, 0, 0, 0) %buf1, i32 %ix)
+  ; =>
+  %val1 = call %dx.types.ResRet.f32 @dx.op.bufferLoad.f32(
+      i32 68, %dx.types.Handle %buf2, i32 %ix, i32 undef)
+  ; Note: Only the 0th element of %val1 is valid
 
   ; Load from a Buffer<float4> followed by CheckAccessFullyMapped
   %agg2 = call {<4 x float>, i1} @llvm.dx.typedBufferLoad.checkbit(
-              target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf0, i32 %ix)
+      target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf2, i32 %ix)
   %val2 = extractvalue {<4 x float>, i1} %agg2, 0
   %chk2 = extractvalue {<4 x float>, i1} %agg2, 1
+  ; =>
+  %val2 = call %dx.types.ResRet.f32 @dx.op.bufferLoad.f32(
+      i32 68, %dx.types.Handle %buf2, i32 %ix, i32 undef)
+  %bit2 = extractvalue %dx.types.ResRet.f32 %val2, 4
+  %chk2 = call i1 @dx.op.CheckAccessFullyMapped.i32(i32 71, i32 %bit2)
+
+  ; Load from a Buffer<int4>
+  %val3 = call <4 x i32> @llvm.dx.typedBufferLoad(
+      target("dx.TypedBuffer", <4 x i32>, 0, 0, 1) %buf3, i32 %ix)
+  ; =>
+  %val3 = call %dx.types.ResRet.i32 @dx.op.bufferLoad.i32(
+      i32 68, %dx.types.Handle %buf3, i32 %ix, i32 undef)
+
+  ; Load from a Buffer<double>
+  %val4 = call double @llvm.dx.typedBufferLoad(
+      target("dx.TypedBuffer", <4 x float>, 0, 0, 0) %buf4, i32 %ix)
+  ; =>
+  %res4 = call %dx.types.ResRet.i32 @dx.op.bufferLoad.i32(
+      i32 68, %dx.types.Handle %buf4, i32 %ix, i32 undef)
+  %lo4 = extractvalue %dx.types.ResRet.f32 %res4, 0
+  %hi4 = extractvalue %dx.types.ResRet.f32 %res4, 1
+  %val4 = call %dx.op.MakdeDouble.f64(i32 101, i32 %lo4, i32 %hi4)
 ```
 
 <!-- {% endraw %} -->
