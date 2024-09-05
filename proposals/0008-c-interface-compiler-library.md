@@ -1156,12 +1156,12 @@ struct CompilerLibraryResult
 * A return value of false indicates there are no additional results to 
 * retrieve.
 * 
-* /param instance the compiler instance
+* \param instance the compiler instance
 *
-* /param cookie an opaque value returned from clang_compile_async that
+* \param cookie an opaque value returned from clang_compile_async that
 * identifies the operation whos results we want to retrieve.
 * 
-* /param result additional information for the compile operation.
+* \param result additional information for the compile operation.
 * clang_disposeCompilerLibraryResult must be called to free allocated
 * result memory.
 */
@@ -1173,7 +1173,7 @@ bool clang_getCompilerLibraryResult(
 /**
 * Destroy the given compiler results.
 * 
-* /param result information to destroy.
+* \param result information to destroy.
 */
 void clang_disposeCompilerLibraryResult(CompilerLibraryResult* result);
 ```
@@ -1197,22 +1197,22 @@ thread.
 * clang_disposeCompilerLibraryResult() must be called to free allocated
 * result buffers.
 *
-* /param instance the compiler instance
+* \param instance the compiler instance
 *
-* /param buffer a pointer to a buffer in memory that holds the contents of a
+* \param buffer a pointer to a buffer in memory that holds the contents of a
 * source file to compile, or a NULL pointer when the file is specified as a
 * path in the arguments array.
 *
-* /param bufferSize the size of the buffer.
+* \param bufferSize the size of the buffer.
 *
-* /param args an array of arguments to use for compilation
+* \param args an array of arguments to use for compilation
 *
-* /param numArgs the number of arguments in /p args.
+* \param numArgs the number of arguments in /p args.
 *
-* /param includeHandler a callback function for supplying additional
+* \param includeHandler a callback function for supplying additional
 * includes on-demand during compilation. This parameter is optional.
 * 
-* /param result additional result information for the compile operation.
+* \param result additional result information for the compile operation.
 * clang_disposeCompilerLibraryResult must be called to free allocated
 * result memory.
 */
@@ -1254,22 +1254,22 @@ typedef uint64_t CompilerLibraryCookie;
 * started/queued. Compile operations may have to wait for available
 * workers to perform the work.
 * 
-* /param instance the compiler instance
+* \param instance the compiler instance
 *
-* /param buffer a pointer to a buffer in memory that holds the contents of a
+* \param buffer a pointer to a buffer in memory that holds the contents of a
 * source file to compile, or a NULL pointer when the file is specified as a
 * path in the arguments array.
 *
-* /param bufferSize the size of the buffer.
+* \param bufferSize the size of the buffer.
 *
-* /param args an array of arguments to use for compilation
+* \param args an array of arguments to use for compilation
 *
-* /param numArgs the number of arguments in /p args.
+* \param numArgs the number of arguments in /p args.
 *
-* /param includeHandler a callback function for supplying additional
+* \param includeHandler a callback function for supplying additional
 * includes ondemand during compilation. This parameter is optional.
 *
-* /param cookie an opaque value returned that can be used to monitor
+* \param cookie an opaque value returned that can be used to monitor
 * or cancel the operation.  This value is also used to retrieve
 * additional result information after compilation has completed.
 * clang_disposeCompilerLibraryResult must be called to free
@@ -1295,9 +1295,9 @@ bool clang_compile_async(
 * so the return value from clang_WaitForCompilation may be
 * CompilerLibraryError_Success or CompilerLibraryError_Canceled.
 * 
-* /param instance the compiler instance
+* \param instance the compiler instance
 *
-* /param cookie an opaque value returned from clang_compile_async that
+* \param cookie an opaque value returned from clang_compile_async that
 * identifies the operation being canceled.
 * 
 */
@@ -1310,12 +1310,12 @@ const uint32_t CompilerLibraryInfiniteTimeout = -1;
 /**
 * Wait for a compilation operation to complete.
 *
-* /param instance the compiler instance
+* \param instance the compiler instance
 *
-* /param cookie an opaque value returned from clang_compile_async that
+* \param cookie an opaque value returned from clang_compile_async that
 * identifies the operation being canceled.
 * 
-* /param timeout the amount of time in milliseconds to wait for the
+* \param timeout the amount of time in milliseconds to wait for the
 * operation. CompilerLibraryError_WaitTimeout will be returned if the
 * timeout is hit before the operation has completed.
 */
