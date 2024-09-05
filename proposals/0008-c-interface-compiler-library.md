@@ -50,6 +50,8 @@ older DXC-based solutions to adopt clang as the preferred HLSL compiler.
 
 ## Detailed design
 
+[Architecture](#architecture)
+
 ### What is provided today in the DXC api?
 The current DirectX shader compiler library is a nano-COM implementation that
 supports the following features.
@@ -996,21 +998,535 @@ if (compileResult->HasOutput(DXC_OUT_OBJECT)) {
 
 ```
 
-## Alternatives considered for supporting legacy toolchains
+## Architecture
+This section describes the surface area calling pattern choices for the
+c-style api.
 
-### Alternative 1: Open Source wrapper code for IDxcCompiler interface
+### Why have a library at all?  Why not just run clang.exe yourself?
+Before diving into the library details we should discuss why we even need a
+library at all.  Why can't clients just execute clang with some options
+and compile their shaders? They can and will. Running clang.exe is a mainline
+supported scenario but we need more to support additional features like
+Include Handlers which are supported by the DXC COM-base DXC library today.
 
-This approach involves creating wrapper code released on
-https://github.com/microsoft that can be included into existing toolchain
-projects. This wrapper implementation will be a drop-in match to all of the
-existing public interfaces allowing easy adoption to using clang.
+[Include Handlers](#include-handlers) are a way for clients to hook into the
+compilation process and load include dependencies on demand as needed.
 
-The wrapper implementation will call into the new C export for compilation.
+### Where should this library be built?
 
-### Alternative 2: Build/Ship Nuget package library
+TODO: figure this out
 
-This approach combines Alternative 1 and adds compiling the wrapper code into
-formal header/libraries that can be consumed by legacy toolchains.
+### What does the new library design look like?
+The clang compiler based library is c-style only.  It will follow a create/
+destroy pattern for any objects that require lifetime management.
+
+#### Library creation and lifetime
+Instances of the compiler library are created using
+clang_createCompilerLibrary(). Library instances must be destroyed
+using clang_disposeCompilerLibrary().
+
+```c++
+/**
+* An opaque type representing the compiler library.
+*/
+typedef void* CompilerLibraryInstance;
+
+/**
+* Creates an instance of a compiler. Compiler instances must be destroyed by
+* calling clang_disposeCompilerLibrary.
+*/
+CompilerLibraryInstance clang_createCompilerLibrary();
+
+/**
+* Destroy the given compiler instance.
+*
+* Any compilations in progress associated with the specified instance
+* will be cancelled.
+*/
+void clang_disposeCompilerLibrary(CompilerLibraryInstance instance);
+```
+
+#### Errors and extended information
+Errors will be reported as error codes but additional information can be 
+gathered using clang_getCompilerLibraryResult(). Results instances must be
+destroyed using clang_disposeCompilerLibraryResult().
+
+Additional information includes captured stdout and stderr traffic emitted
+from the compiler during compilation. This is useful for seeing any warnings
+or other state output from the compiler.
+
+```c++
+/**
+ * Error codes returned by library routines.
+ *
+ * Zero (\c HlslError_Success) is the only error code indicating success.
+ * Other error codes, including not yet assigned non-zero values, indicate
+ * errors.
+ * 
+ * Check CompilerLibraryResult for additional details from library 
+ * operations. This will include additional stdout/stderr outputs
+ * that occured during the call.
+ */
+enum CompilerLibraryErrorCode {
+    /**
+     * No error.
+     */
+    CompilerLibraryError_Success = 0,
+
+    /**
+     * A generic error code.
+     *
+     * Errors of this kind can get their own specific error codes in future
+     * library versions.
+     */
+    CompilerLibraryError_Failure = 1,
+
+    /**
+     * The operation is currently in progress.
+     */
+    CompilerLibraryError_Busy = 2,
+
+    /**
+     * The operation has been canceled.
+     */
+    CompilerLibraryError_Canceled = 3,
+
+    /**
+     * The function detected that the arguments violate the function
+     * contract.
+     */
+    CompilerLibraryError_InvalidArguments = 4,
+
+    /**
+     * The function detected that the specified cookie value
+     * is invalid.
+     */
+    CompilerLibraryError_InvalidCookie = 5,
+
+    /**
+     * The timeout value for waiting for an operation to be completed
+     * has been reached.
+     */
+    CompilerLibraryError_WaitTimeout = 6,
+};
+
+/**
+ * Extended error and result information collected during library
+ * operations.
+ */
+struct CompilerLibraryResult
+{
+    /**
+     * An error code indicating success or otherwise.
+     */
+    CompilerLibraryErrorCode error_code;
+
+    /**
+     * An opaque type that matches the cookie associated
+     * with the operation.
+     */
+    CompilerLibraryCookie operation_cookie;
+
+    /**
+     * Null terminated text buffer containing the captured
+     * stdout traffic output during compilation.
+     */
+    const char* stdout_text;
+
+    /**
+     * Size of the stdout_text buffer in bytes.
+     */
+    int stdout_size_bytes;
+
+    /**
+     * Null terminated text buffer containing the captured
+     * stderr traffic output during compilation.
+     */
+    const char* stderr_text;
+
+    /**
+     * Size of the stdout_text buffer in bytes.
+     */
+    int stderr_size_bytes;
+};
+
+/**
+* Retrieve additonal compilation result information.
+*
+* A return value of false indicates there are no additional results to 
+* retrieve.
+* 
+* /param instance the compiler instance
+*
+* /param cookie an opaque value returned from clang_compile_async that
+* identifies the operation whos results we want to retrieve.
+* 
+* /param result additional information for the compile operation.
+* clang_disposeCompilerLibraryResult must be called to free allocated
+* result memory.
+*/
+bool clang_getCompilerLibraryResult(
+    CompilerLibraryInstance instance,
+    CompilerLibraryCookie cookie,
+    CompilerLibraryResult** result);
+
+/**
+* Destroy the given compiler results.
+* 
+* /param result information to destroy.
+*/
+void clang_disposeCompilerLibraryResult(CompilerLibraryResult* result);
+```
+
+### Synchronous and Asynchronous Compilation support
+There will be two different versions of the compile api. One will be a simple
+blocking call that will remain blocked until compilation is completed and the
+other will return immediately allowing the caller to monitor it from another
+thread.
+
+#### Synchronous api
+```c++
+/**
+* synchronously compile a file/shader with the given source and arguments.
+* This function blocks until the compilation completes.
+* 
+* A return value of true indicates success, false otherwise.
+* 
+* A CompilerLibraryResult is returned always which may contain additional
+* details about the compilation. 
+* clang_disposeCompilerLibraryResult() must be called to free allocated
+* result buffers.
+*
+* /param instance the compiler instance
+*
+* /param buffer a pointer to a buffer in memory that holds the contents of a
+* source file to compile, or a NULL pointer when the file is specified as a
+* path in the arguments array.
+*
+* /param bufferSize the size of the buffer.
+*
+* /param args an array of arguments to use for compilation
+*
+* /param numArgs the number of arguments in /p args.
+*
+* /param includeHandler a callback function for supplying additional
+* includes on-demand during compilation. This parameter is optional.
+* 
+* /param result additional result information for the compile operation.
+* clang_disposeCompilerLibraryResult must be called to free allocated
+* result memory.
+*/
+
+bool clang_compile(
+    CompilerLibraryInstance instance,
+    const char* buffer,
+    size_t bufferSize,
+    const char** args, size_t numArgs,
+    CompilerIncludeCallback includeHandler /*(optional)*/,
+    CompilerLibraryResult** result);
+```
+
+#### Asynchronous api
+The asynchronous api returns a cookie value. This opaque value will be used to
+monitor progress and retrieve additional result error and status information.
+
+Compilations can also be canceled by calling clang_cancel_compile and passing
+the CompilerLibraryCookie.
+
+If the caller would like to wait for the async compilation to complete matching
+a blocking behavior, they can call clang_WaitForCompilation with their
+cookie with a specified timeout value.
+
+```c++
+/**
+* An opaque type used for tracking compiler library api calls.
+* 
+* This can be used to monitor or cancel outstanding api calls.
+*/
+typedef uint64_t CompilerLibraryCookie;
+
+/**
+* Asynchronously compile a file/shader with the given source and arguments
+* and returns a cookie value that can be used to monitor or cancel the
+* operation.
+* 
+* A return value of true indicates that the async compilation has been
+* started/queued. Compile operations may have to wait for available
+* workers to perform the work.
+* 
+* /param instance the compiler instance
+*
+* /param buffer a pointer to a buffer in memory that holds the contents of a
+* source file to compile, or a NULL pointer when the file is specified as a
+* path in the arguments array.
+*
+* /param bufferSize the size of the buffer.
+*
+* /param args an array of arguments to use for compilation
+*
+* /param numArgs the number of arguments in /p args.
+*
+* /param includeHandler a callback function for supplying additional
+* includes ondemand during compilation. This parameter is optional.
+*
+* /param cookie an opaque value returned that can be used to monitor
+* or cancel the operation.  This value is also used to retrieve
+* additional result information after compilation has completed.
+* clang_disposeCompilerLibraryResult must be called to free
+* allocated result memory.
+*/
+
+bool clang_compile_async(
+    CompilerLibraryInstance instance,
+    const char* buffer,
+    size_t bufferSize,
+    const char** args, size_t numArgs,
+    CompilerIncludeCallback includeHandler /*(optional)*/,
+    CompilerLibraryCookie* cookie);
+
+/**
+* Cancel a compilation operation.
+*
+* If the caller wants to wait for the operation after
+* cancelling it, they can use the cookie value with
+* clang_WaitForCompilation().
+* 
+* An operation may complete before cancelation occurs
+* so the return value from clang_WaitForCompilation may be
+* CompilerLibraryError_Success or CompilerLibraryError_Canceled.
+* 
+* /param instance the compiler instance
+*
+* /param cookie an opaque value returned from clang_compile_async that
+* identifies the operation being canceled.
+* 
+*/
+void clang_cancel_compile(
+    CompilerLibraryInstance instance,
+    CompilerLibraryCookie cookie);
+
+const uint32_t CompilerLibraryInfiniteTimeout = -1;
+
+/**
+* Wait for a compilation operation to complete.
+*
+* /param instance the compiler instance
+*
+* /param cookie an opaque value returned from clang_compile_async that
+* identifies the operation being canceled.
+* 
+* /param timeout the amount of time in milliseconds to wait for the
+* operation. CompilerLibraryError_WaitTimeout will be returned if the
+* timeout is hit before the operation has completed.
+*/
+CompilerLibraryErrorCode clang_WaitForCompilation(
+    CompilerLibraryInstance instance,
+    CompilerLibraryCookie cookie,
+    uint32_t timeout);
+
+/**
+* Callback to retrieve a buffer for the specified include path.
+*
+* This callback is implemented and passed to compile for 
+* functions for supplying custom buffers for the specified
+* include path during compilation.
+*
+* \param path include path
+*
+* \param buffer the buffer with contents for the specified include path. This
+* buffer is owned by the caller.
+*
+* \param bufferSize [out] The size of the buffer in bytes
+*
+* \returns a bool indicating if the contents of the buffer have been filled
+* successfully.
+*/
+typedef bool (*CompilerIncludeCallback) (
+    const wchar_t* path,
+    char** buffer,
+    size_t* bufferSize);
+```
+
+### Include handlers
+Include handler support works very similar to the DXC compiler library except
+the handler is now a callback function instead of an interface.  The callback
+function is passed in as an optional parameter to the compile entrypoints.
+
+```c++
+/**
+* Callback to retrieve a buffer for the specified include path.
+*
+* This callback is implemented and passed to compile for 
+* functions for supplying custom buffers for the specified
+* include path during compilation.
+*
+* \param path include path
+*
+* \param buffer the buffer with contents for the specified include path. This
+* buffer is owned by the caller.
+*
+* \param bufferSize [out] The size of the buffer in bytes
+*
+* \returns a bool indicating if the contents of the buffer have been filled
+* successfully.
+*/
+typedef bool (*CompilerIncludeCallback) (
+    const wchar_t* path,
+    char** buffer,
+    size_t* bufferSize);
+
+```
+
+### clang Library Api code snippets
+The following snippet shows how a shader is compiled using the library.
+NOTE: RAII wrappers could be created and used to auto-free returned objects,
+but they are not used here to show raw usage of the api.
+
+#### Synchronous Compilation of a shader
+```c++
+inline std::vector<char> ReadEntireFile(char const* filename)
+{
+  std::ifstream fs(filename, std::ios_base::binary | std::ios_base::in);
+  if (!fs.is_open())
+      throw std::runtime_error("Failed to open file");
+
+  fs.seekg(0, std::ios_base::end);
+  auto length = fs.tellg();
+  fs.seekg(0, std::ios_base::beg);
+
+  std::vector<char> data;
+  data.resize(static_cast<size_t>(length));
+
+  fs.read(reinterpret_cast<char*>(data.data()), length);
+  return data;
+}
+
+int main()
+{
+  CompilerLibraryInstance compiler = clang_createCompilerLibrary();
+  if (compiler)
+  {
+    std::vector<char> source = ReadEntireFile("shader.hlsl");
+    std::vector<const char*> arguments = { "-E", "VSMain", "-T", "vs_6_6" };
+
+    // Compile (using synchronous api call)
+    CompilerLibraryResult* result = nullptr;
+    if (clang_compile(
+        compiler,
+        source.data(), source.size(),
+        arguments.data(), arguments.size(),
+        nullptr,
+        &result))
+    {
+        std::cout << "Compile succeeded!\n";
+    }
+    else
+    {
+        std::cout << "Compile failed with error " << result->error_code << "\n";
+    }
+
+    // Look at the results to get more information
+    if (result->stdout_text)
+        std::cout << "Compile Outputs:\n" << result->stdout_text << "\n";
+
+    if (result->stderr_text)
+        std::cout << "Compile Error Outputs:\n" << result->stderr_text << "\n";
+
+    clang_disposeCompilerLibraryResult(result);
+    clang_disposeCompilerLibrary(compiler);
+  }
+}
+
+```
+
+#### ASynchronous Compilation of a shader
+```c++
+int main()
+{
+  // Async compilation
+  struct CompileShaderEntry
+  {
+      const char* ShaderFile = nullptr;
+      CompilerLibraryCookie LibraryCookie = 0;
+  };
+
+  CompilerLibraryInstance compiler = clang_createCompilerLibrary();
+  if (compiler)
+  {
+    constexpr size_t numShaders = 3;
+    CompileShaderEntry shaders[numShaders] = { {"shader1.hlsl"},{"shader2.hlsl"},{"shader3.hlsl"} };
+
+    // Kick off a collection of shaders for compilation asynchronously
+    for (auto& shader : shaders)
+    {
+      std::vector<char> source = ReadEntireFile(shader.ShaderFile);
+      std::vector<const char*> arguments = { "-E", "VSMain", "-T", "vs_6_6", "-WX", "-Zi" };
+
+      // Compile (using asynchronous api call)
+      if (clang_compile_async(
+          compiler,
+          source.data(), source.size(),
+          arguments.data(), arguments.size(),
+          nullptr,
+          &shader.LibraryCookie))
+      {
+          std::cout << "Compile started! cookie = " << shader.LibraryCookie << " returned for tracking..\n";
+      }
+      else
+      {
+          // Async compilation could not be started for some reason.
+          CompilerLibraryResult* asyncFailresult = nullptr;
+          clang_getCompilerLibraryResult(
+            compiler, shader.LibraryCookie, &asyncFailresult);
+          std::cout << "Compile failed to start!, Error = " << asyncFailresult->error_code << "\n";
+          clang_disposeCompilerLibraryResult(asyncFailresult);
+      }
+    }
+
+    // This example loops all compilations in flight and waits for each to
+    // complete.
+    // Any timeout failures detected will result in cancelation of the
+    // compilation.
+    // This is for demonstration of the clang_cancel_compile function purposes
+    // only.
+    constexpr uint32_t WaitTimeOut = 6000; // arbitrary wait time here..(could be infinite)
+    for (auto& shader : shaders)
+    {
+      CompilerLibraryErrorCode waitResult;
+
+      // Wait for each compilation to complete.
+      waitResult = clang_WaitForCompilation(compiler, shader.LibraryCookie, WaitTimeOut);
+      if (waitResult == CompilerLibraryError_WaitTimeout)
+      {
+          std::cout << "Compilation is taking longer than " << WaitTimeOut << " milliseconds!\n";
+
+          // Let's not wait anymore and just cancel the compilation to
+          // demonstrate how that works.
+          std::cout << "Canceling compilation for " << shader.ShaderFile << "\n";
+          clang_cancel_compile(compiler, shader.LibraryCookie);
+      }
+      else
+      {
+          // Shader compilation has completed, look at the error code and any
+          // results to get more information about the compilation.
+          CompilerLibraryResult* result = nullptr;
+          clang_getCompilerLibraryResult(compiler, shader.LibraryCookie, &result);
+          if (result->error_code != CompilerLibraryError_Success)
+              std::cout << "Compile failed!, Error = " << result->error_code << "\n";
+
+          if (result->stdout_text)
+              std::cout << "Compile Outputs:\n" << result->stdout_text << "\n";
+
+          if (result->stderr_text)
+              std::cout << "Compile Error Outputs:\n" << result->stderr_text << "\n";
+
+          clang_disposeCompilerLibraryResult(result);
+      }
+    }
+    clang_disposeCompilerLibrary(compiler);
+  }
+}
+```
 
 ## Resources
 
