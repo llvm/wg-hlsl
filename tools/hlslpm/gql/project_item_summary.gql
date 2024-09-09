@@ -1,0 +1,17 @@
+query($after: String) {
+    organization(login: "llvm") {
+        projectV2(number: 4) {
+            items(first: 100, after: $after) {
+                nodes {
+                    updatedAt id                     
+                    category:fieldValueByName(name: "Category") { 
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    target:fieldValueByName(name: "Target") { 
+                        ... on ProjectV2ItemFieldDateValue { date } }
+                    content { ... on Issue { id updatedAt resourcePath title } }
+                }
+                pageInfo { endCursor hasNextPage }
+            }
+        }
+    }
+}
