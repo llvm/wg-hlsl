@@ -554,7 +554,7 @@ The additional semantic rules not already covered by the grammar are listed here
 
 | Property       | Type              | Type detail                                         |
 | -------------- | ----------------- | --------------------------------------------------- |
-| Root elements  | reference to list | list of  D3D12_ROOT_SIGNATURE_FLAG/RootDescriptor/RootConstant/DescriptorTable/StaticSamplers |
+| Root elements  | reference to list | list of root elements|
 
 * Function RootSignature pair
 
