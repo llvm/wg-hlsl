@@ -10,9 +10,9 @@
 
 we need to be able to scalarize data structures, call instructions, and vector
 operations like math ops, logical ops, bitcasts, loads, and stores. The goal of
- this proposal is to present a solution for scalarizing vector operation and
- call instructions via LLVM's pass manager. This proposal will not cover data
- layout transformations.
+this proposal is to present a solution for scalarizing vector operation and
+call instructions via LLVM's pass manager. This proposal will not cover data
+layout transformations.
 
 ## Motivation
 
@@ -37,19 +37,19 @@ that end it makes the most sense to use the Scalarizer pass.
 
 * [Scalarizer.cpp](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Transforms/Scalar/Scalarizer.cpp)
 
-The `Scalarizer` pass is a `FunctionPass`. As such it won't transform global 
-data structures. The `scalarizer` pass has two flags relevant to our use case: 
-`-scalarize-load-store` and `-scalarize-variable-insert-extract`. These flags 
-will handle the `BitCastInst`,`CallInst`, `LoadInst` and `StoreInst`, and 
+The `Scalarizer` pass is a `FunctionPass`. As such it won't transform global
+data structures. The `scalarizer` pass has two flags relevant to our use case:
+`-scalarize-load-store` and `-scalarize-variable-insert-extract`. These flags
+will handle the `BitCastInst`,`CallInst`, `LoadInst` and `StoreInst`, and
 `GetElementPtrInst` cases.
 
-The `AddrSpaceCastInst` case is unique to DXC. DXC was using `AddrSpaceCastInst` 
-to fix up bad codgen to avoid undefined behavior or generating ilegal DXIL. 
+The `AddrSpaceCastInst` case is unique to DXC. DXC was using `AddrSpaceCastInst`
+to fix up bad codgen to avoid undefined behavior or generating ilegal DXIL.
 Any remaining `AddrSpaceCastInst` should be handled by the O1 optimization
 pipeline.
 
 `MemIntrinsic` is the odd case out. Clang does not currently emit memcpy for
-the same cases as DXC. In DXC operations like memcpy and memset most easily 
+the same cases as DXC. In DXC operations like memcpy and memset most easily
 happen in global scope.
 
 In my observation these cases get converted into cbuffer. Since we don't have
@@ -66,11 +66,11 @@ The team determined it was best for this pass to run in the DirectX backend.
 That allows The DirectX backend to be agnostic to the frontend.
 The team also determined the pass should run as late as possible. This has two
 benefits. First, code size: if scalarization happens too early then things like
-the `-combiner-alias-analysis` pass limits are reached. For this particular 
-pass and potentially others if the limits are reached it does not perfom a 
-transformation. That means there is the potential for less efficent code 
-generation if we scalarize to soon as some ooptimizations that benefit from 
-less IR wont run. Second, scalarization for DXIL should be considered a 
+the `-combiner-alias-analysis` pass limits are reached. For this particular
+pass and potentially others if the limits are reached it does not perfom a
+transformation. That means there is the potential for less efficent code
+generation if we scalarize to soon as some ooptimizations that benefit from
+less IR wont run. Second, scalarization for DXIL should be considered a
 legalization step. To that end it should happen at or right before
 `DXILOpLowering`.
 
@@ -80,6 +80,7 @@ it only converts the scalarized llvm intrinsics meaning there is no way for it
 to know about DXIL OPs.
 
 ### Proposal: Ways to add the Scalarizer pass
+
 The Scalarizer pass has been converted to the new pass manager (new PM). That
 is a problem for us because the new PM is only experimental in the backend.
 The Direct X backend is still on the legacy PM. Further, new PM isn't
