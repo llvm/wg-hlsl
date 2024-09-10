@@ -37,11 +37,16 @@ that end it makes the most sense to use the Scalarizer pass.
 
 * [Scalarizer.cpp](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Transforms/Scalar/Scalarizer.cpp)
 
-The `Scalarizer` pass is a `FunctionPass`. As such it won't transform global
-data structures. The `scalarizer` pass has two flags relevant to our use case:
-`-scalarize-load-store` and `-scalarize-variable-insert-extract`. These flags
-will handle the `BitCastInst`,`CallInst`, `LoadInst` and `StoreInst`, and
-`GetElementPtrInst` cases.
+The `Scalarizer` pass is a `FunctionPass`. The pass does not sovle all our
+requirements. For example, it won't transform vectors into a DXIL legal Scalar
+form. This is mostly of concern for data structures defined globally.
+The `scalarizer` pass has two flags relevant to our use case:
+
+* `-scalarize-load-store`
+* `-scalarize-variable-insert-extract`.
+
+These flags will handle the `BitCastInst`, `CallInst`, `LoadInst` and
+`StoreInst`, and `GetElementPtrInst` cases.
 
 The `AddrSpaceCastInst` case is unique to DXC. DXC was using `AddrSpaceCastInst`
 to fix up bad codgen to avoid undefined behavior or generating ilegal DXIL.
