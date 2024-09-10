@@ -18,7 +18,10 @@ a shader from their own processes in addition to being able to launching the
 clang process.
 
 This document is to propose a more detailed architecture for the approved 
-Proposal: [0005](0005-inproc-outofproc-compiler-api-support.md).
+proposal: [0005](0005-inproc-outofproc-compiler-api-support.md).
+
+The c api [0008](0008-c-interface-compiler-library.md) for compiling a shader
+will be implemented using this out of process architecture.
 
 ## Proposed solution
 
@@ -34,48 +37,18 @@ instance created in the calling process. Compilation requests are blocking
 calls. The call will be blocked either waiting for an available worker process
 to become available or already dispatched work to be completed.
 
+The c api implementation will include additional support code that implements
+required synchrounous and asynchrous behaviors.
+
 Communication with the process pool will be done using a named pipe IPC
 mechanism. Pipe names will be unique to the process that is being communicated
 with. Results are sent back over the IPC mechanism.
 
 ## Detailed design
 
-A generic compiler api signature will be used in this document to help frame
-the out of process architecture.  The full HLSL compiler api has not been fully
-designed but the concepts illustrated here are relavant to any api performing
-work in a separte process.
-
 ### Out-of-process system initialization
 
-The out of process system is initialized on the first creation of a 
-library instance. Api calls into the library flow through a singleton object.
-
-Instances of the compiler library are created using a creation api entrypoint.
-Library instances must be destroyed using destroy/dispose api entrypoint.
-
-#### Example Creation api
-```c++
-/**
-* An opaque type representing the compiler library.
-*/
-typedef void* CompilerInstance;
-
-/**
-* Creates an instance of a compiler. Compiler instances must be destroyed by
-* calling clang_disposeCompiler.
-*/
-CompilerInstance clang_createCompiler();
-
-/**
-* Destroy the give compiler instance.
-*/
-void clang_disposeCompiler(CompilerInstance instance);
-```
-
-Api calls are synchronous and blocking.
-
-### Singleton initialization and system overview
-On first creation of a compiler api instance, the singleton object is created.
+On first creation of a compiler api instance, a singleton object is created.
 
 The singleton object manages all state and request traffic from the calling
 process. The singleton contains a work dispatching system that interfaces with a
@@ -95,35 +68,6 @@ back through the system.
 ### Calling apis
 Compiler instances are required inputs to compiler api calls. This ensures that
 the work being performed is associated to an instance.
-
-#### Example entry point that takes a compiler instance
-```c++
-/**
-* Compile with the given shader source and arguments.
-* 
-* /param instance the compiler instance
-* 
-* /param buffer a pointer to a buffer in memory that holds the contents of a
-* source file to compile, or a NULL pointer when the file is specified as a
-* path in the arguments array.
-*
-* /param bufferSize the size of the buffer.
-*
-* /param args an array of arguments to use for compilation
-*
-* /param numArgs the number of arguments in /p args.
-* 
-* /param includeHandler a callback function for supplying additional
-* includes ondemand during compilation. This parameter is optional.
-*/
-
-CompilerResult clang_compile(
-    CompilerInstance instance,
-    const char* buffer,
-    size_t bufferSize,
-    const char** args, size_t numArgs,
-    CompilerIncludeCallback includeHandler /*(optional)*/);
-```
 
 The start of the api call begins at the api entrypoint.  This is where the
 system uses the compiler instance as a context for the work and the parameters
@@ -182,12 +126,13 @@ can be used or a rpc-json-like protocol needs to be defined. The json-prc
 notification system may not work well with how include handlers may need to be
 implemented.
 
-### Examples of JSON-RPC messages
+### JSON-RPC messages (generic)
+
 #### JSON Request
 ```json
 {
     "json-rpc":"2.0",
-    "method":"compile",
+    "method":"methodname",
     "params":{
         "arg":"value",
         "arg2":"value2",
@@ -219,8 +164,57 @@ implemented.
 }
 ```
 
+### Example of JSON-RPC compilation messages
+
+```
+Syntax:
+--> data sent to server
+<-- data coming from server
+```
+
+### Example: compile, no include handler, success
+```json
+--> {"jsonrpc": "2.0", "method": "compile",
+     "params": {"arg1": 23, "arg2": 42}, "id": 1}
+
+<-- {"jsonrpc": "2.0", "result": {"stdout": "somepath", "stderr": "somepath"},
+     "id": 1}
+```
+
+### Example: compile, no include handler, failure
+```json
+--> {"jsonrpc": "2.0", "method": "compile",
+     "params": {"arg1": 23, "arg2": 42}, "id": 1}
+
+<-- {"jsonrpc": "2.0", "error": {"code": -2, "message": "compile failed"},
+     "data": {"stdout": "somepath", "stderr": "somepath"}, "id": 1}
+```
+
+### Example: compile, include handler supplied, success
+```json
+**** start compilation ****
+--> {"jsonrpc": "2.0", "method": "compile", "params": {"arg1": 23, "arg2": 42},
+     "includehandler", "true", "id": 1}
+
+**** include needed, so response indicates this and supplies a path ****
+<-- {"jsonrpc": "2.0", "result": {"needinclude": "true", "path": "somepath"}, "id": 1}
+
+**** continue compilation, supplying include data ****
+--> {"jsonrpc": "2.0", "method": "continuecompile", "params": {"path": "somepath"}, "id": 2}
+
+**** include needed, so response indicates this and supplies a path ****
+<-- {"jsonrpc": "2.0", "result": {"needinclude": "true", "path": "somepath2"}, "id": 2}
+
+**** continue compilation, supplying include data ****
+--> {"jsonrpc": "2.0", "method": "continuecompile", "params": {"path": "somepath"}, "id": 3}
+
+**** compilation completed ***
+<-- {"jsonrpc": "2.0", "result": {"stdout": "somepath", "stderr": "somepath"},
+     "id": 3}
+```
+
 ### The worker process
-The compiler driver code for DXC lives in clang-dxc.exe.  This module will be
+The compiler driver code for DXC lives in clang.exe.  This module will be
 extended with additional commandline arguments and launch behaviors.
 Additional params will be used to configure the process startup logic to setup
 the required IPC for communicating back to the thread that launched it.
