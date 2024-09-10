@@ -37,8 +37,8 @@ instance created in the calling process. Compilation requests are blocking
 calls. The call will be blocked either waiting for an available worker process
 to become available or already dispatched work to be completed.
 
-The c api implementation will include additional support code that implements
-required synchrounous and asynchrous behaviors.
+The c api implementation built on top of this architecture will provide support
+code that implements required synchrounous and asynchrous behaviors.
 
 Communication with the process pool will be done using a named pipe IPC
 mechanism. Pipe names will be unique to the process that is being communicated
@@ -73,6 +73,8 @@ The start of the api call begins at the api entrypoint.  This is where the
 system uses the compiler instance as a context for the work and the parameters
 to determine the best way to dispatch the work to a worker process.
 
+A dispatching system will handle IPC message requests/response logic.
+
 ### Roles in the system
 #### The API entrypoint
 * Package api parameters into the required messsage format
@@ -90,8 +92,8 @@ to determine the best way to dispatch the work to a worker process.
 #### The worker process monitoring thread
 * Send a message with params to its monitored worker process over IPC
 * Wait for completion
-* Read file that contains the captured stdout/stderr traffic and packlage it as
-status result data.
+* Read file that contains the captured stdout/stderr traffic and package the
+contents as status/result data.
 * Return results to the api call dispatcher
 * Spawn a new worker process
 
@@ -119,7 +121,7 @@ This will provide the most flexiblity. Existing clang tooling (clangd) already
 use json-rpc. 
 
 Using the json-rpc protocol enables reuse of existing code in the llvm repo
-that supports working withg json-rpc formatted messages. 
+that supports working with json-rpc formatted messages. 
 
 > Some investigation may be needed to see if using 100% stock json-rpc protocol
 can be used or a rpc-json-like protocol needs to be defined. The json-prc
@@ -133,34 +135,24 @@ implemented.
 {
     "json-rpc":"2.0",
     "method":"methodname",
-    "params":{
-        "arg":"value",
-        "arg2":"value2",
-        "arg3":"value3",
-    },
+    "params":{ "arg":"value",  "arg2":"value2", "arg3":"value3", },
     "id":1
 }
 ```
-#### JSON Response
+#### JSON Response (success) - contains result data
 ```json
 {
     "json-rpc":"2.0",
-    "result":{
-        "res":"value",
-        "re2":"value2",
-    },
+    "result":{ "res":"value" },
     "id":1
 }
 ```
-#### JSON Response (error)
+#### JSON Response (error) - contains error code
 ```json
 {
-    "json-rpc":"2.0",
-    "error":{
-        "res":"value",
-        "re2":"value2",
-    },
-    "id":1
+    "jsonrpc": "2.0",
+     "error": {"code": -32601, "message": "Method not found"},
+     "id": "1"
 }
 ```
 
@@ -190,7 +182,7 @@ Syntax:
      "data": {"stdout": "somepath", "stderr": "somepath"}, "id": 1}
 ```
 
-### Example: compile, include handler supplied, success
+### Example: compile, include handler, success
 ```json
 **** start compilation ****
 --> {"jsonrpc": "2.0", "method": "compile", "params": {"arg1": 23, "arg2": 42},
