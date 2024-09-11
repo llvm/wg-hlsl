@@ -184,7 +184,6 @@ TODO: Figure out the lifetime of these files.  How will they get cleaned up or
       the c api as buffers.
 ```
 
-
 ### JSON-RPC messages (generic)
 
 #### JSON Request
@@ -192,7 +191,7 @@ TODO: Figure out the lifetime of these files.  How will they get cleaned up or
 {
     "json-rpc":"2.0",
     "method":"methodname",
-    "params":{ "arg":"value",  "arg2":"value2", "arg3":"value3", },
+    "params":{ "arg":"value",  "arg2":"value2", "arg3":"value3" },
     "id":1
 }
 ```
@@ -229,7 +228,7 @@ Syntax:
 ```
 
 ### Example: compile, no include handler, success
-```json
+```
 --> {"jsonrpc": "2.0", "method": "compile",
      "params": {"arg1": 23, "arg2": 42}, "id": 1}
 
@@ -238,7 +237,7 @@ Syntax:
 ```
 
 ### Example: compile, no include handler, failure
-```json
+```
 --> {"jsonrpc": "2.0", "method": "compile",
      "params": {"arg1": 23, "arg2": 42}, "id": 1}
 
@@ -301,7 +300,7 @@ RESPONSE - "result", compilation succeeded/failed.
 The following is a JSON-RPC example of this pattern.
 
 ### Example: compile, include handler, success
-```json
+```
 **** start compilation ****
 --> {"jsonrpc": "2.0", "method": "compile", "params": {"arg1": 23, "arg2": 42},
      "includehandler", "true", "id": 1}
