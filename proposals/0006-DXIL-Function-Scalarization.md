@@ -1,9 +1,9 @@
 # DXIL Function Scalarization
 
-* Proposal: [NNNN](NNNN-DXIL-Scalarization.md)
+* Proposal: [0006](0006-DXIL-Function-Scalarization.md)
 * Author(s): [Farzon Lotfi](https://github.com/farzonl)
 * Sponsor: [Farzon Lotfi](https://github.com/farzonl)
-* Status: **Under Consideration**
+* Status: **Accepted**
 * Impacted Projects: Clang
 
 ## Introduction
@@ -37,7 +37,7 @@ that end it makes the most sense to use the Scalarizer pass.
 
 * [Scalarizer.cpp](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Transforms/Scalar/Scalarizer.cpp)
 
-The `Scalarizer` pass is a `FunctionPass`. The pass does not sovle all our
+The `Scalarizer` pass is a `FunctionPass`. The pass does not solve all our
 requirements. For example, it won't transform vectors into a DXIL legal Scalar
 form. This is mostly of concern for data structures defined globally.
 The `scalarizer` pass has two flags relevant to our use case:
@@ -49,16 +49,22 @@ These flags will handle the `BitCastInst`, `CallInst`, `LoadInst` and
 `StoreInst`, and `GetElementPtrInst` cases.
 
 The `AddrSpaceCastInst` case is unique to DXC. DXC was using `AddrSpaceCastInst`
-to fix up bad codgen to avoid undefined behavior or generating ilegal DXIL.
+to fix up bad codgen to avoid undefined behavior or generating illegal DXIL.
 Any remaining `AddrSpaceCastInst` should be handled by the O1 optimization
 pipeline.
 
 `MemIntrinsic` is the odd case out. Clang does not currently emit memcpy for
-the same cases as DXC. In DXC operations like memcpy and memset most easily
-happen in global scope.
+the same cases as DXC. Further, DXC's emits of `memcpy`, `memset`, and `memmove`
+aren't something that will be carried forward because clang will do
+scalarization late and DXC did it early. What that means in practice is there
+won't be any `MemIntrinsic` transformations we can depend on via the
+optimization pipeline.
 
+In DXC operations like memcpy and memset most easily happen in global scope.
 In my observation these cases get converted into cbuffer. Since we don't have
-cbuffer support yet we can likely hold off on this case.
+cbuffer support yet we can likely hold off on this case. Further, a future
+Data Scalarization Proposal will iterate other cbuffer cases that can lay
+the ground work for supporting `MemIntrinsic`.
 
 The team debated how early or late this pass should run and considered three
 ways to onboard this pass. There was also a discussion on how the scalarizer
@@ -72,9 +78,9 @@ That allows The DirectX backend to be agnostic to the frontend.
 The team also determined the pass should run as late as possible. This has two
 benefits. First, code size: if scalarization happens too early then things like
 the `-combiner-alias-analysis` pass limits are reached. For this particular
-pass and potentially others if the limits are reached it does not perfom a
-transformation. That means there is the potential for less efficent code
-generation if we scalarize to soon as some ooptimizations that benefit from
+pass and potentially others if the limits are reached it does not perform a
+transformation. That means there is the potential for less efficient code
+generation if we scalarize to soon as some optimizations that benefit from
 less IR wont run. Second, scalarization for DXIL should be considered a
 legalization step. To that end it should happen at or right before
 `DXILOpLowering`.
