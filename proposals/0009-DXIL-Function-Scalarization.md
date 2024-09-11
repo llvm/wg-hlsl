@@ -1,6 +1,6 @@
 # DXIL Function Scalarization
 
-* Proposal: [0006](0006-DXIL-Function-Scalarization.md)
+* Proposal: [0009](0009-DXIL-Function-Scalarization.md)
 * Author(s): [Farzon Lotfi](https://github.com/farzonl)
 * Sponsor: [Farzon Lotfi](https://github.com/farzonl)
 * Status: **Accepted**
