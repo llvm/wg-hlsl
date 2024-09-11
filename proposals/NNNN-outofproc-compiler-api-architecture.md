@@ -33,31 +33,34 @@ available processor. For example, if the system has four processors, then four
 compiler processes are created.
 
 The process pool is owned by a singleton object and shared between each api
-instance created in the calling process. Compilation requests are blocking
-calls. The call will be blocked either waiting for an available worker process
-to become available or already dispatched work to be completed.
+instance created in the calling process. Compilation Requests are blocking
+calls followed by a single Response.
 
-The c api implementation built on top of this architecture will provide support
-code that implements required synchrounous and asynchrous behaviors.
+The c api implementation built on top of this architecture implements any 
+required synchrounous and asynchrous api behaviors. The c api call will be
+blocked either waiting for a worker process to become available or an already
+dispatched work to be completed. This behavior depends on the type of call
+used (synchronous/asynchronous).
 
-Communication with the process pool will be done using a named pipe IPC
-mechanism. Pipe names will be unique to the process that is being communicated
-with. Results are sent back over the IPC mechanism.
+Communication with the process pool occurs in-process to the application
+and the pool's monitoring threads use a named pipe IPC mechanism with a
+protocol to communicate with each monitored clang process.
 
 ## Detailed design
 
 ### Out-of-process system initialization
 
-On first creation of a compiler api instance, a singleton object is created.
+On first creation of a compiler api instance, a singleton object is created
+in-process to the caller.
 
 The singleton object manages all state and request traffic from the calling
-process. The singleton contains a work dispatching system that interfaces with a
-process pool. Each worker process in the pool is monitored by a dedicated
+process. The singleton contains an api dispatching system that interfaces with
+a process pool. Each worker process in the pool is monitored by a dedicated
 thread. One thread to one process.
 
-Worker process monitoring threads use named pipes as IPC to communicate with
+Worker monitoring threads use named pipes as IPC to communicate with their
 workers and a different method (TBD) to communicate with the singleton's
-dispatching system.
+api dispatching system.
 
 Worker processes exit unconditionally after completing work. The monitoring
 thread spawns a new process for any exited process to replenish the process
@@ -65,39 +68,87 @@ pool. Exited processes include crashed processes.  Processes that crash are
 detected by the monitoring thread allowing error information to be communicated
 back through the system.
 
+The worker process (Clang.exe) will be updated to include additional command
+options that indicate it should be launched as a worker and establish the IPC
+mechanism with a monitoring thread owned by the Compiler Process Pool.
+
+## Architecture Diagram
+```mermaid
+flowchart TD
+    subgraph CompilerProcessPool["Compiler Process Pool"]
+      subgraph MonitorThread1["Monitor Thread (1)"]
+        subgraph JsonRPC ["IPC Dispatcher"]
+        end
+      end
+      subgraph MonitorThread2["Monitor Thread (2)"]
+        subgraph JsonRPC2 ["IPC Dispatcher"]
+        end
+      end
+    end
+
+    ClangProcess1["clang.exe (1)"]
+    ClangProcess2["clang.exe (2)"]
+
+    ApiBehaviorLogic("Api Behavior Logic<br/>(implements sync/async, packs/unpacks parameters)")
+    ApiCallDispatcher{"Api Dispatcher<br/>(find available process and dispatch work)"}
+
+    CompilerApi[Compiler Api] -->|"Compile/CompileAsync( )"| ApiBehaviorLogic
+
+    ApiBehaviorLogic <--> |"dispatch and monitor call"| ApiCallDispatcher
+
+    ProcessBoundary[---- Process Boundary ----]    
+
+    ApiCallDispatcher -->JsonRPC<--> | json-rpc<br/>protocol | ProcessBoundary --> ClangProcess1 --> db[("compiled<br/>shader")]
+
+    ApiCallDispatcher --> JsonRPC2<-->| json-rpc<br/>protocol | ProcessBoundary --> ClangProcess2 --> db2[("compiled<br/>shader")]
+```
+
 ### Calling apis
 Compiler instances are required inputs to compiler api calls. This ensures that
 the work being performed is associated to an instance.
 
-The start of the api call begins at the api entrypoint.  This is where the
-system uses the compiler instance as a context for the work and the parameters
-to determine the best way to dispatch the work to a worker process.
+The api call begins in the api entrypoint implementation which calls into some
+logic that implements sync/async behaviors. This Api Behvaior logic packages
+the call with parameters and works with the the Api Dispatcher to find an
+available worker process (clang.exe) to perform the work.  If a worker is not 
+available the Api Behavior logic will queue the compilation and block the
+entrypoint for synchronous calls waiting for the next available worker to be
+freed up or for Asynchronous calls return immediately giving the caller enough
+context to monitor or cancel the compilation.
 
-A dispatching system will handle IPC message requests/response logic.
+The api implementation, dispatcher and process pool all live in-process to
+the calling application.
+
+The dispatching system uses IPC and a message protocal to communicate with
+each worker process.
 
 ### Roles in the system
+
 #### The API entrypoint
+
 * Package api parameters into the required messsage format
 * Send a message with params to the Api call dispatcher
-* Wait for completion
+* Wait for completion/implements api call behaviors
 * Unpack results
 * Return results
 
 #### The API call Dispatcher
-* Wait for an open worker process
-* Send a message with params to the worker thread in the thread pool
+
+* Find/Wait for an open worker process by calling into the Process Pool
+* Send a message with params to the Process pool to be picked up by a worker
+  monitoring thread which will dispatch the work to a clang process.
 * Wait for completion
 * Return results to the API entrypoint
 
-#### The worker process monitoring thread
+#### The Process Pool (worker process monitoring thread)
+
 * Send a message with params to its monitored worker process over IPC
 * Wait for completion
-* Read file that contains the captured stdout/stderr traffic and package the
-contents as status/result data.
 * Return results to the api call dispatcher
 * Spawn a new worker process
 
-#### The Worker Process
+#### The Worker Process (clang.exe)
+
 * Unpack the message and params from its monitoring thread and call into a
  compiler implementation.
 * Wait for completion
@@ -115,18 +166,24 @@ and the application will choose how to handle it.
 
 ### IPC communication data
 
-A JSON message-based protocol similar to [json-rpc](https://www.jsonrpc.org/specification)
+A JSON message-based protocol [json-rpc](https://www.jsonrpc.org/specification)
 is used for packaging parameters and communicating with other processes.
-This will provide the most flexiblity. Existing clang tooling (clangd) already
-use json-rpc. 
+This protocol provides the most flexiblity for implementing apis over an IPC
+mechanism. Existing clang tooling (clangd) already use json-rpc and have some
+code that could be leveraged/shared for this implementation.
 
-Using the json-rpc protocol enables reuse of existing code in the llvm repo
-that supports working with json-rpc formatted messages. 
+Large amounts of data will be communicated as file paths to files containing
+their contents. This reduces the need to have a complex marshalling layer or
+deal with the management of a shared memory system.
 
-> Some investigation may be needed to see if using 100% stock json-rpc protocol
-can be used or a rpc-json-like protocol needs to be defined. The json-prc
-notification system may not work well with how include handlers may need to be
-implemented.
+The following examples for compilation show stdout and stderr being captured
+as a file and their paths being returned.
+```
+TODO: Figure out the lifetime of these files.  How will they get cleaned up or
+      will they just become allocations in-process to the caller to return via
+      the c api as buffers.
+```
+
 
 ### JSON-RPC messages (generic)
 
@@ -152,11 +209,18 @@ implemented.
 {
     "jsonrpc": "2.0",
      "error": {"code": -32601, "message": "Method not found"},
-     "id": "1"
+     "id": 1
 }
 ```
 
-### Example of JSON-RPC compilation messages
+### Protocol communication with example JSON-RPC messages
+A simple compilation with no include handler callback provided will be
+implemented as a single `Request` followed by a single `Response`.
+
+```
+REQUEST  - "compile"
+RESPONSE - "result", compilation succeeded/failed.
+```
 
 ```
 Syntax:
@@ -181,6 +245,60 @@ Syntax:
 <-- {"jsonrpc": "2.0", "error": {"code": -2, "message": "compile failed"},
      "data": {"stdout": "somepath", "stderr": "somepath"}, "id": 1}
 ```
+
+Include handlers add some additional complexity but still keep to the
+`Request`/`Reponse` pair design.  If an include handler callback is provided
+to the c api, a special proxy implementaiton of that callback is created and 
+connected to the IPC messaging system and lives in the clang.exe process.
+This proxy callback will be used during compilation when an include is
+requested.  Calling the proxy callback will result in IPC communication with
+the Api Dispatcher in the form of a `Response` indicating an include is needed.
+
+A compilation is started using a single "compile" `Request` and additional state
+is provided that indicates include handler support is available.
+
+Compilation proceeds and blocks the originating `Request` until the first need
+an include handler is encountered. The proxy callback is called as the include
+handler and the implementation sends a `Response` back to the Api Dispatcher
+indicating that include handler information is needed. This will close the
+originating "compile" `Request`/`Response` pair.
+
+The Api Dispatcher code (in the caller's process) sees this `Response` and
+immediately calls the c api provided include handler callback. The results are
+collected and new "continue compilation" `Request` is dispatched.
+
+The worker process (currently waiting for another `Request` to continue)
+recieves the `Request` with include handler data as parameters and proceeds
+with compilation.
+
+This `Request`/`Response` pattern continues until the compilation is completed.
+Compilation is always concluded with a final `Response` closing the
+`Request`/`Response` pair.
+
+```
+REQUEST  - "compile" (include handler support is enabled)
+
+( compiler needs an include, calls IPC wrapped included handler callback )
+
+RESPONSE - "needinclude"
+
+( originating caller's callback gets called and results are collected and
+passed into a new request to continue compilation )
+
+REQUEST - "continuecompile" (include handler result passed as params)
+RESPONSE - "needinclude"
+
+( originating caller's callback gets called and results are collected and
+passed into a new request to continue compilation )
+
+REQUEST  - "continuecompile"
+
+( no more includes are encountered and compilation reaches the end )
+
+RESPONSE - "result", compilation succeeded/failed.
+```
+
+The following is a JSON-RPC example of this pattern.
 
 ### Example: compile, include handler, success
 ```json
@@ -223,3 +341,4 @@ instances.
 [Chris Bieneman](https://github.com/llvm-beanz)
 
 <!-- {% endraw %} -->
+
