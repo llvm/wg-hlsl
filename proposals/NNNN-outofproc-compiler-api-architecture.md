@@ -86,8 +86,19 @@ flowchart TD
       end
     end
 
-    ClangProcess1["clang.exe (1)"]
-    ClangProcess2["clang.exe (2)"]
+    subgraph Process1["process 1"]
+        ClangProcess1["clang.exe (1)"]
+        db[("compiled<br/>shader")]
+    end
+
+    subgraph Process2["process 2"]
+        ClangProcess2["clang.exe (2)"]
+        db2[("compiled<br/>shader")]
+    end
+
+
+    style Process1 stroke-dasharray:10,10
+    style Process2 stroke-dasharray:10,10
 
     ApiBehaviorLogic("Api Behavior Logic<br/>(implements sync/async, packs/unpacks parameters)")
     ApiCallDispatcher{"Api Dispatcher<br/>(find available process and dispatch work)"}
@@ -96,11 +107,9 @@ flowchart TD
 
     ApiBehaviorLogic <--> |"dispatch and monitor call"| ApiCallDispatcher
 
-    ProcessBoundary[---- Process Boundary ----]    
+    ApiCallDispatcher -->JsonRPC<--> | json-rpc<br/>protocol | ClangProcess1 --> db
 
-    ApiCallDispatcher -->JsonRPC<--> | json-rpc<br/>protocol | ProcessBoundary --> ClangProcess1 --> db[("compiled<br/>shader")]
-
-    ApiCallDispatcher --> JsonRPC2<-->| json-rpc<br/>protocol | ProcessBoundary --> ClangProcess2 --> db2[("compiled<br/>shader")]
+    ApiCallDispatcher --> JsonRPC2<-->| json-rpc<br/>protocol | ClangProcess2 --> db2
 ```
 
 ### Calling apis
