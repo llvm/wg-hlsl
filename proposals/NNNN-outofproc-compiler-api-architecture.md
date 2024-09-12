@@ -340,9 +340,49 @@ the required IPC for communicating back to the thread that launched it.
 Using this same module keeps a single shipping binary for all compilation.
 
 ## Alternatives considered
+An alternate design could be to reduce the total monitor threads down by
+using one thread to monitor all clang.exe processes. This would centralize all
+rpc traffic into a single place, but could bottleneck performance if 
+operations are waiting on workers to respond.
 
-> Caller creates a factory object first and uses that to create compiler
-instances.
+## Architecture Diagram
+```mermaid
+flowchart TD
+    subgraph CompilerProcessPool["Compiler Process Pool"]
+      subgraph MonitorThread1["Monitor Thread"]
+        subgraph JsonRPC ["IPC Dispatcher"]
+        end
+      end
+    end
+
+    subgraph Process1["process 1"]
+        ClangProcess1["clang.exe (1)"]
+        db[("compiled<br/>shader")]
+    end
+
+    subgraph Process2["process 2"]
+        ClangProcess2["clang.exe (2)"]
+        db2[("compiled<br/>shader")]
+    end
+
+
+    style Process1 stroke-dasharray:10,10
+    style Process2 stroke-dasharray:10,10
+
+    ApiBehaviorLogic("Api Behavior Logic<br/>(implements sync/async, packs/unpacks parameters)")
+
+    ApiCallDispatcher["Api Dispatcher<br/>(find available process and dispatch work)"]
+
+    CompilerApi[Compiler Api] -->|"Compile/CompileAsync( )"| ApiBehaviorLogic
+
+    ApiBehaviorLogic <--> |"dispatch and monitor call"| ApiCallDispatcher
+
+    ApiCallDispatcher --> CompilerProcessPool
+
+    JsonRPC<--> | json-rpc<br/>protocol | ClangProcess1 --> db
+
+    JsonRPC<-->| json-rpc<br/>protocol | ClangProcess2 --> db2
+```
 
 ## Acknowledgments
 
