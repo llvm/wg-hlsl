@@ -59,7 +59,8 @@ compatible with the Decl. All of this analysis and validation will be executed
 inside a new function, `DiagnoseHLSLRegisterAttribute`. This function will be
 responsible for validating the semantic meaning behind the application of the
 attribute, while the rest of `handleResourceBindingAttr` is responsible for
-validating the syntax of the attribute. 
+validating the syntax of the attribute.
+
 The `register` annotation may also have a second parameter, `spaceN`, where `N` is 
 some integer. `DiagnoseHLSLRegisterAttribute` will also be responsible for validating 
 that the `space` parameter is never specified on a global constant.
