@@ -62,8 +62,9 @@ attribute, while the rest of `handleResourceBindingAttr` is responsible for
 validating the syntax of the attribute.
 
 The `register` annotation may also have a second parameter, `spaceN`, where `N` is 
-some integer. `DiagnoseHLSLRegisterAttribute` will also be responsible for validating 
-that the `space` parameter is never specified on a global constant.
+some integer between 0 and 42949672879. `DiagnoseHLSLRegisterAttribute` will also 
+be responsible for validating that the `space` parameter is never specified on a 
+global constant.
 
 ### Recognized Register Types
 
