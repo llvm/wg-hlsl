@@ -12,11 +12,13 @@ For example:
 ```
 RWBuffer<float> rwbuf: register(u0);
 ```
-In this code, the RET is `float`, and the resource type is `RWBuffer`. The
-resource type is not a `RawBuffer` variant, and so there is a distinct set
-of rules that define valid RETs for this resource type.
+In this code, the RET is `float`, and the resource type is `RWBuffer`.
+There are two types of buffers, `RawBuffer` and `TypedBuffer`. `RWBuffer`
+is a `TypedBuffer` variant, and `StructuredBuffer` is a `RawBuffer` variant.
+There is a distinct set of rules that define valid RETs for `RawBuffer` types, 
+and a separate set of rules that define valid RETs for `StructuredBuffer` types.
 
-RETs for non-`RawBuffer` variants may include:
+RETs for `TypedBuffer` variants may include:
 * basic types: 
   * 16- and 32-bit int and uint
   * half and float
@@ -26,12 +28,12 @@ RETs for non-`RawBuffer` variants may include:
 * user defined types (structs / classes), as long as:
   * all fields in the struct have the same type
   * there are at most 4 sub elements, and each sub element is at most 32 bits
-  
-Resource types are not allowed as RETs (i.e., `RWBuffer<int>` as an RET).
 
-RETs for raw buffer resources are much less constrained:
+RETs for `RawBuffer` variants are much less constrained:
 * it must be a complete type
 * cannot contain a handle or resource type
+
+Resource types are never allowed as RETs (i.e., `RWBuffer<int>` as an RET).
 
 If someone writes `RWBuffer<MyCustomType>` and MyCustomType is not a 
 valid RET, there should be infrastructure to reject this RET and emit a message 
@@ -54,8 +56,8 @@ but will not in clang-dxc, despite the fact that `double4` is an invalid RET.
 The proposed solution is to use some type_traits defined in the std library, create
 some custom type_traits that aren't defined there, and join them together to define a 
 set of conceptual constraints for any RET that is used. These conceptual constraints
-will be applied to every non-`RawBuffer` resource type that is defined, so that all
-non-`RawBuffer` HLSL resources have the same rules about which RETs are valid. 
+will be applied to every `TypedBuffer` resource type that is defined, so that all
+`TypedBuffer` HLSL resources have the same rules about which RETs are valid. 
 Validation will occur upon resource type instantiation. Additionally, certain 
 resource types are `RawBuffer` variants, such as `StructuredBuffer`. Such resource 
 types will have a `[[hlsl::raw_buffer]]` attribute in the attributed type. These
@@ -68,11 +70,11 @@ loosen constraints on viable RETs. Specifically, `__is_homogenous` and
 In `clang\lib\Sema\HLSLExternalSemaSource.cpp`, `RWBuffer` is defined, along with 
 `RasterizerOrderedBuffer` and `StructuredBuffer`. It is at this point that the 
 `type_traits` should be incorporated into these resource declarations. All of the
-non-`RawBuffer` `type_traits` will be applied on each non-`RawBuffer` HLSL resource
+`TypedBuffer` `type_traits` will be applied on each `TypedBuffer` HLSL resource
 type. For every `type_trait` that is not true for the given RET, an associated error
 message will be emitted. 
 
-The list of type_traits that define a valid non-`RawBuffer` RET are described below:
+The list of type_traits that will be available for use are described below:
 | type_trait | Description|
 |-|-|
 | `__is_complete_type` | An RET should either be a complete type, or a user defined type that has been completely defined. |
@@ -80,7 +82,8 @@ The list of type_traits that define a valid non-`RawBuffer` RET are described be
 | `__is_homogenous` | RETs may be basic types (including vector or matrix), but if they are aggregate types, then all underlying basic types should be the same type. |
 | `__is_at_most_four_elements_and_at_most_thirty_two_bits_each` | RETs should not have more than 4 elements, and each element may not exceed 32 bits in size. |
 
-Only `__is_complete_type` and `__is_intangible_type` are needed for `RawBuffer` RETs.
+All `type_traits` above must be true for `TypedBuffer`s, but only `__is_complete_type` 
+and `__is_intangible_type` are needed for `RawBuffer` RETs.
 
 * Examples:
 ```
@@ -112,7 +115,7 @@ RWBuffer<oneInt> r5; // valid - all fields are valid primitive types
 RWBuffer<a> r6; // valid - all leaf types are valid primitive types, and homogenous
 
 // diagnostic: "resource element type 'b' has incomplete definition"
-RWBuffer<b> r7;// invalid - the RET isn't complete, the definition is missing. 
+RWBuffer<b> r7; // invalid - the RET isn't complete, the definition is missing. 
 // the type_trait that would catch this is `__is_complete_type`
 
 // diagnostic: "resource element type 'c' has non-homogenous aggregate type"
