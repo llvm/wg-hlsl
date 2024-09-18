@@ -61,6 +61,11 @@ responsible for validating the semantic meaning behind the application of the
 attribute, while the rest of `handleResourceBindingAttr` is responsible for
 validating the syntax of the attribute.
 
+The `register` annotation may also have a second parameter, `spaceN`, where `N` is 
+some integer between 0 and 42949672879. `DiagnoseHLSLRegisterAttribute` will also 
+be responsible for validating that the `space` parameter is never specified on a 
+global constant.
+
 ### Recognized Register Types
 
 There are two types of register bindings, resource bindings and constant register bindings.
@@ -208,8 +213,8 @@ float f : register(i0);
 //
 ```
 
-In DXC, the analysis and diagnostic emission steps would happen in DiagnoseRegisterType(),
-under DiagnoseHLSLDecl in SemaHLSL.cpp. In clang, there is a function called in
+In DXC, the analysis and diagnostic emission steps would happen in `DiagnoseRegisterType()`,
+under `DiagnoseHLSLDecl` in `SemaHLSL.cpp`. In clang, there is a function called in
 `clang\lib\Sema\SemaDeclAttr.cpp` named `handleResourceBindingAttr` that is responsible for
 diagnosing and validating the `register` keyword when it is applied to any decl. Any time the
 `register` annotation is applied on a decl, the `AT_HLSLResourceBinding` attribute gets added
