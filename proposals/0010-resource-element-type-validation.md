@@ -16,20 +16,25 @@ In this code, the RET is `float`, and the resource type is `RWBuffer`. The
 resource type is not a `RawBuffer` variant, and so there is a distinct set
 of rules that define valid RETs for this resource type.
 
-RETs for non-`RawBuffer` variants may include basic types (ints and uints of sizes 16
-and 32, as well as half, float, vectors, and matrices of 4 elements or fewer).
-Structs that contain fields of these basic types (where all fields in the struct have
-the same type) may also be RETs. 
-Structs that either have structs as fields or arrays of structs as fields may also be
-allowed, as long as there are at most 4 sub elements, and each sub element is at most
-32 bits. Additionally, resource types are not allowed within an RET, even if the 
-underlying resource type has a primitive RET (i.e., `RWBuffer<int>` as an RET).
+RETs for non-`RawBuffer` variants may include:
+* basic types: 
+  * 16- and 32-bit int and uint
+  * half and float
+* vectors and matrices 
+  * containing 4 elements or fewer
+  * each element does not exceed 32 bits
+* user defined types (structs / classes), as long as:
+  * all fields in the struct have the same type
+  * there are at most 4 sub elements, and each sub element is at most 32 bits
+  
+Resource types are not allowed as RETs (i.e., `RWBuffer<int>` as an RET).
 
-RETs for `RawBuffer` variants are much less constrained, the only rule is that the RET
-may not be an incomplete type (a handle type or a resource type).
+RETs for raw buffer resources are much less constrained:
+* it must be a complete type
+* cannot contain a handle or resource type
 
 If someone writes `RWBuffer<MyCustomType>` and MyCustomType is not a 
-valid RET, there there should be infrastructure to reject this RET and emit a message 
+valid RET, there should be infrastructure to reject this RET and emit a message 
 explaining why it was rejected as an RET.
 
 ## Motivation
