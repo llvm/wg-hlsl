@@ -34,7 +34,7 @@ def write_report(lines, filename):
     print(f"Writing {filename}...")
 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    with open(filename, 'w') as f:
+    with open(filename, 'w', encoding='utf-8') as f:
         f.write(output)
 
 
@@ -180,9 +180,11 @@ def issue_link(issue: Issue, contextIssue: Optional[Issue] = None) -> str:
         contextIssue = issue
 
     issueText = f"{issue.title} ([{issue.getIssueReference(
-        contextIssue)}](https://github.com/{issue.issue_resourcePath}))"
+        contextIssue)}](https://github.com{issue.issue_resourcePath}))"
 
     if issue.issue_state == IssueState.Closed:
-        issueText = f"DONE: {issueText}"
+        issueText = f"✅{issueText}"
+    else:
+        issueText = f"🟦{issueText}"
 
     return issueText
