@@ -15,6 +15,11 @@ class Category(Enum):
     WorkstreamMilestone = "Workstream Milestone"
     ProjectMilestone = "Project Milestone"
 
+class IssueState(Enum):
+    NoIssueState = None
+    Closed = "CLOSED"
+    Open = "OPEN"
+
 
 class IssueSection:
     title: str = None
@@ -49,9 +54,14 @@ class Issue:
     item_updatedAt: Optional[datetime] = field(default=None)
     category: Optional[Category] = field(default=None)
     target_date: Optional[date] = field(default=None)
+    workstream: Optional[str] = field(default=None)
+    projectMilestone: Optional[str] = field(default=None)
     issue_updatedAt: Optional[datetime] = field(default=None)
+    issue_state: Optional[IssueState] = field(default=None)
     title: Optional[str] = field(default=None)
     body: Optional[str] = field(default=None)
+    tracked_issues: List[Self] = field(default_factory=list)
+    tracked_by_issues: List[Self] = field(default_factory=list)
 
     def getResourcePathBase(self):
         m = re.match(r"(.*)/\d+", self.issue_resourcePath)
@@ -60,15 +70,15 @@ class Issue:
         
         return m[1]
 
-    def getIssueReference(self, contextIssue):
-        contextBase = contextIssue.getResourcePathBase()
+    def getIssueReference(self, contextIssue=None):
+        contextBase = contextIssue.getResourcePathBase() if contextIssue else None
         selfBase = self.getResourcePathBase()
 
         if contextBase == selfBase:
             reference = self.issue_resourcePath[len(selfBase):]  
             return reference.replace("/", "#")
         else:
-            m = re.match(r"(.*)/issues/(\d+)", self.issue_resourcePath)
+            m = re.match(r"/(.*)/issues/(\d+)", self.issue_resourcePath)
             if not m:
                 raise Exception(f"Unabled to parse issue resourcePath '{self.issue_resourcePath}'.")
             return f"{m[1]}#{m[2]}"
@@ -324,6 +334,7 @@ def rebuild_data(data: IssueData) -> List[str]:
 
 class Issues:
     all_issues: Dict[str, Issue]
+    all_issues_by_id: Dict[str, Issue]
     milestones: List[Issue]
     workstreams: List[Issue]
     tracked_issues_not_in_project: List[str]
@@ -334,6 +345,8 @@ class Issues:
 
         self.all_issues = dict([(i.issue_resourcePath, i)
                                for i in gh.project_items_summary()])
+        
+        self.all_issues_by_id = dict([(i.issue_id,i) for i in self.all_issues.values() if i.issue_id != None])
 
         interesting = [i for i in self.all_issues.values()
                        if is_interesting(i)]
@@ -341,6 +354,22 @@ class Issues:
 
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
+
+        issuesTracked = gh.get_issues_tracked(self.all_issues_by_id.keys())
+        self.tracked_issues_not_in_project = []
+        for (id, trackedIssueIds) in issuesTracked:
+            thisIssue = self.all_issues_by_id[id]
+            trackedIssues = []
+            for trackedIssueId in trackedIssueIds:
+                if trackedIssueId in self.all_issues_by_id:
+                    trackedIssues.append(self.all_issues_by_id[trackedIssueId])
+                else:
+                    self.tracked_issues_not_in_project.append(trackedIssueId)
+
+            thisIssue.tracked_issues = trackedIssues
+            for issue in trackedIssues:
+                issue.tracked_by_issues.append(thisIssue)
+            
     
     def findIssue(self, contextIssue:Issue, reference:str):
         if not reference:
@@ -349,3 +378,27 @@ class Issues:
         reference = contextIssue.convertReferenceToResourcePath(reference)        
         return self.all_issues[reference]
     
+
+if __name__ == '__main__':     
+    import github   
+    issues = Issues(github.GH())
+
+    if True:
+        for i in issues.tracked_issues_not_in_project:
+            print(i)
+    
+
+    if False:
+        seen = set()
+
+        def show(issue:Issue, level=0):
+            print(f"{' '*level}  {issue.title} {issue.issue_resourcePath} {issue.workstream} {issue.category}")
+            if issue.issue_id in seen:
+                return
+            seen.add(issue.issue_id)
+            for trackedIssue in issue.tracked_issues:
+                show(trackedIssue, level+1)
+
+        roots = [i for i in issues.all_issues.values() if len(i.tracked_by_issues) == 0 and len(i.tracked_issues) > 0]
+        for i in roots:
+            show(i)

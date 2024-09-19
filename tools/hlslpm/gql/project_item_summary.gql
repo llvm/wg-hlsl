@@ -8,7 +8,11 @@ query($after: String) {
                         ... on ProjectV2ItemFieldSingleSelectValue { name } }
                     target:fieldValueByName(name: "Target") { 
                         ... on ProjectV2ItemFieldDateValue { date } }
-                    content { ... on Issue { id updatedAt resourcePath title } }
+                    workstream:fieldValueByName(name: "Workstream") {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    projectMilestone:fieldValueByName(name: "ProjectMilestone") {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    content { ... on Issue { id updatedAt resourcePath title state } }
                 }
                 pageInfo { endCursor hasNextPage }
             }
