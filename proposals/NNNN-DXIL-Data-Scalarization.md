@@ -7,20 +7,23 @@
 
 ## Introduction
 
-In Proposal [0009](0009-DXIL-Function-Scalarization.md) we covered scalarization
-of call instructions, and vector operations like math ops, logical ops,
-bitcasts, loads, and stores. The goal of this proposal is to present a solution
-for scalarizing data structures via data layout transformations. As a note,
-any case that results in an implicit cbuffer will not be covered by this
-proposal.
+In Proposal [0009] we covered scalarization of call instructions, and vector
+operations like math ops, logical ops, bitcasts, loads, and stores. Proposal
+[0009] also solves all the function scope data scalarization for us. The goal
+of this proposal is to present a solution for scalarizing data structures via
+data layout transformations. As a note, any case that results in an implicit
+cbuffer will not be covered by this proposal.
+
+[0009]: (0009-DXIL-Function-Scalarization.md)
 
 ## Motivation
 
-As mentioned in [DXIL.rst](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#vectors)
-"HLSL vectors are scalarized" and "Matrices are lowered to vectors". Therefore,
-we need to be able to scalarize these types in clang DirectX backend. Without
-scalarizing the data structures and call instructions we can't generate legal
-DXIL.
+As mentioned in [DXIL.rst] "HLSL vectors are scalarized" and "Matrices are
+lowered to vectors". Therefore, we need to be able to scalarize these types in
+clang DirectX backend. Without scalarizing the data structures and call
+instructions we can't generate legal DXIL.
+
+[DXIL.rst]: https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#vectors
 
 ## Background
 
@@ -42,19 +45,15 @@ scalarization can then be broken down into three cases:
 
 ## Proposal
 
-In Proposal [0009](0009-DXIL-Function-Scalarization.md) we introduced the scalarizer
-pass this solves all the function scope data scalarization for us. What is left
-are the global scope cases. As mentioned in the intro the implicit cbuffer
-cases are not in scope for this work. What that leaves us with are the
-`groupshared` and `static` cases.
+We need to implement a solution to handle `groupshared` and `static`.
 
 To simplify things for upstream this proposal will make a deviation from `DXC`
 and use the same layout transformations for  both `groupshared` and `static`
 vectors. Both layouts are legal so this shouldn't cause any problems. The plan
-will be to create two new pass. The first pass will convert vectors to arrays
+will be to create two new passes. The first pass will convert vectors to arrays
 and potentially create multi-dimensional arrays. The second pass will flatten
 these arrays into one dimension. These two passes will run successively.
 
-While these two pass could have an agnostic order; they will run after the scalarizer
+While these two passes could have an agnostic order; they will run after the scalarizer
 pass. The pass will also only operate on global data since the only cases not
 handled by the scalarizer pass are the global scope data cases.
