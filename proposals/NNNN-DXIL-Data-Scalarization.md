@@ -53,9 +53,7 @@ and use the same layout transformations for  both `groupshared` and `static`
 vectors. Both layouts are legal so this shouldn't cause any problems. The plan
 will be to create two new pass. The first pass will convert vectors to arrays
 and potentially create multi-dimensional arrays. The second pass will flatten
-these arrays into one dimension. These two passes will run successively and
-potentially share data about which arrays need to be  flattened via pass
-preservation.
+these arrays into one dimension. These two passes will run successively.
 
 While these two pass could have an agnostic order; they will run after the scalarizer
 pass. The pass will also only operate on global data since the only cases not
