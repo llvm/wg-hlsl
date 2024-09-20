@@ -63,6 +63,9 @@ class Issue:
     tracked_issues: List[Self] = field(default_factory=list)
     tracked_by_issues: List[Self] = field(default_factory=list)
 
+    def __repr__(self):
+        return f"{self.getIssueReference()}"
+    
     def getResourcePathBase(self):
         m = re.match(r"(.*)/\d+", self.issue_resourcePath)
         if not m:
