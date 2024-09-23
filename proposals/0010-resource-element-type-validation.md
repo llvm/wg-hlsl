@@ -16,7 +16,7 @@ In this code, the RET is `float`, and the resource type is `RWBuffer`.
 There are two types of buffers, RawBuffers and TypedBuffers. `RWBuffer`
 is a TypedBuffer variant, and `StructuredBuffer` is a RawBuffer variant.
 There is a distinct set of rules that define valid RETs for RawBuffer types, 
-and a separate set of rules that define valid RETs for `StructuredBuffer` types.
+and a separate set of rules that define valid RETs for TypedBuffer types.
 These rules also depend on the target IR, SPIR-V or DXIL.
 
 RETs for TypedBuffer variants may include:
