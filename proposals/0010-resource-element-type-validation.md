@@ -184,7 +184,7 @@ struct vector_type_info<T __attribute__((ext_vector_type(N)))> {
   constexpr static unsigned Size = N;
 };
 
-bool is_spirv_target = ...;
+const bool is_spirv_target = getASTContext().getTargetInfo().getTriple().isSPIRV();
 
 template<typename T>
 concept is_valid_line_vector = sizeof(T) <= 16 && vector_type_info<T>::Size <= 4;
