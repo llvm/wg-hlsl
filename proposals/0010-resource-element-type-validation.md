@@ -138,28 +138,26 @@ RWBuffer<oneInt> r4; // valid
 RWBuffer<oneInt> r5; // valid - all fields are valid primitive types
 RWBuffer<a> r6; // valid - all leaf types are valid primitive types, and homogenous
 
-// diagnostic: "resource element type 'b' has incomplete definition"
 RWBuffer<b> r7; // invalid - the RET isn't complete, the definition is missing. 
 // the type_trait that would catch this is `__is_complete_type`
 
-// diagnostic: "resource element type 'c' has non-homogenous aggregate type"
 RWBuffer<c> r8; // invalid - struct `oneInt` has int types, and this is not homogenous with the float1 contained in `c`. 
 // the type_trait that would catch this is `__builtin_is_homogenous`
 
 StructuredBuffer<c> r8Structured; // valid
 
-// diagnostic: "resource element type 'f' cannot be grouped into 4 32-bit quantities"
 RWBuffer<d> r9; // invalid - the struct f cannot be grouped into 4 32-bit quantities.
 // no type_trait would catch this, but it would be caught by a concept failure, using the sizeof builtin.
 
 StructuredBuffer<d> r9Structured; // valid
 
-// diagnostic: "resource element type 'RWBuffer<int>' has intangible type"
 RWBuffer<RWBuffer<int> > r10; // invalid - the RET has a handle with unknown size, thus it is an intangible RET.
 // the type trait that would catch this is `!__is_intangible`
 ```
 
-Below is a sample implementation of the `RWBuffer` resource type, which is a typed buffer variant.
+Below is a sample C++ implementation of the `RWBuffer` resource type, which is a typed buffer variant.
+This code would exist within `HLSLExternalSemaSource.cpp`, as a substitute for the existing definition
+of `RWBuffer`
 ```
 #include <type_traits>
 
