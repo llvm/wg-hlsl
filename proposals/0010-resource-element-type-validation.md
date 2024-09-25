@@ -67,12 +67,13 @@ invalid RET for typed buffers.
 ## Proposed solution
 
 The proposed solution is to use C++20 concepts to validate the element type.
-A new built-in, `__builtin_is_homogenous`, will be added in order to express constraints
-that can't currently be expressed in pure HLSL code. Standard clang diagnostics for 
-unsatisfied constraints will be used to report any invalid element types. Concepts
-required will differ depending on whether the resource is a typed buffer or a raw buffer.
-Until concepts are formally supported by HLSL, the concepts and constraints 
-will be expressed directly in the AST via the HLSL external sema source.
+A new built-in, `__builtin_hlsl_is_line_vector_layout_compatible`, will be added in 
+order to express constraints that can't currently be expressed in pure HLSL code.
+Standard clang diagnostics for unsatisfied constraints will be used to report any 
+invalid element types. Concepts required will differ depending on whether the 
+resource is a typed buffer or a raw buffer. Until concepts are formally supported 
+by HLSL, the concepts and constraints will be expressed directly in the AST via 
+the HLSL external sema source.
 
 ## Detailed design
 
@@ -91,18 +92,16 @@ The list of type traits that will be available for use are described below:
 |-|-|
 | `__is_complete_type` | An RET should either be a complete type, or a user defined type that has been completely defined. |
 | `__is_intangible` | An RET should be an arithmetic type, or a bool, or a vector or matrix or UDT containing such types. This is equivalent to validating that the RET is not intangible. |
-| `__builtin_is_homogenous` | A typed buffer RET with the DXIL IR target should never have two different subelement types. |
+| `__builtin_hlsl_is_line_vector_layout_compatible` | A typed buffer RET with the DXIL IR target should never have two different subelement types. Line vector layout compatible also requires at most 4 elements, and a total size of at most 16 bytes |
 
 For the SPIR-V IR target, only `__is_complete_type` and `!__is_intangible` 
 need to be true. When the target IR is DXIL, and the resource is a typed buffer variant,
-`__builtin_is_homogenous` will be used to ensure homogeneity. 
+`__builtin_hlsl_is_line_vector_layout_compatible` will be used to ensure homogeneity. 
 It will use `BuildFlattenedTypeList` to retrieve a small vector of the subelement types.
 From this subvector, the first element will be compared to all elements in the vector,
-and any mismatches will return false.
-Typed buffer RETs with the DXIL IR target will need have a vector length that is
-at most 4, and the total size in bytes is at most 16. However, type traits are not
-needed to verify these, since they can be checked directly using template techniques
-and the `sizeof` builtin.
+and any mismatches will return false. Typed buffer RETs with the DXIL IR target will 
+also need to have at most 4 subelements, and the total size in bytes cannot exceed 16,
+which will also be verified by `__builtin_hlsl_is_line_vector_layout_compatible`.
 
 * Examples:
 ```
@@ -139,12 +138,12 @@ RWBuffer<b> r7; // invalid - the RET isn't complete, the definition is missing.
 // the type trait that would catch this is `__is_complete_type`
 
 RWBuffer<c> r8; // invalid - struct `oneInt` has int types, and this is not homogenous with the float1 contained in `c`. 
-// the type trait that would catch this is `__builtin_is_homogenous`
+// the type trait that would catch this is __builtin_hlsl_is_line_vector_layout_compatible
 
 StructuredBuffer<c> r8Structured; // valid
 
 RWBuffer<d> r9; // invalid - the struct d exceeds 16 bytes.
-// no type trait would catch this, but it would be caught by a concept failure, using the sizeof builtin.
+// This would be caught by __builtin_hlsl_is_line_vector_layout_compatible
 
 StructuredBuffer<d> r9Structured; // valid
 
@@ -153,7 +152,7 @@ RWBuffer<RWBuffer<int> > r10; // invalid - the RET has a handle with unknown siz
 
 struct EightHalves { half x[8] };  // sizeof(EightHalves) == 16
 RWBuffer<EightHalves> b; // invalid - EightHalves has 8 subelements, which exceeds the limit of 4.
-// This would be caught using a template that extracts the element count of the RET's vector, and comparing against 4.
+// This would be caught by __builtin_hlsl_is_line_vector_layout_compatible
 ```
 
 Below is a sample C++ implementation of the `RWBuffer` resource type, which is a typed buffer variant.
@@ -164,47 +163,23 @@ of `RWBuffer`
 
 namespace hlsl {
 
-template<typename T>
-struct is_vector_type {
-  constexpr static bool value = false;
-};
-
-template <typename T, unsigned N>
-struct is_vector_type<T __attribute__((ext_vector_type(N)))> {
-  constexpr static bool value = true;
-};
-
-template <typename T>
-struct vector_type_info;
-
-template <typename T, unsigned N>
-struct vector_type_info<T __attribute__((ext_vector_type(N)))> {
-  using Type = T;
-  constexpr static unsigned Size = N;
-};
-
 const bool is_spirv_target = getASTContext().getTargetInfo().getTriple().isSPIRV();
 
 template<typename T>
-concept is_valid_line_vector = sizeof(T) <= 16 && vector_type_info<T>::Size <= 4;
-template<typename T>
-concept is_valid_vector_RET_for_typed_buffer = is_spirv_target || (is_valid_line_vector<T> && __builtin_is_homogenous(T))
+concept is_valid_RET_for_typed_buffer = is_spirv_target || __builtin_hlsl_is_line_vector_layout_compatible(T)
 
-template<typename T> requires (!is_vector_type<T>::value || is_valid_vector_RET_for_typed_buffer<T>)
+template<typename T> requires is_valid_RET_for_typed_buffer<T>
  && __is_complete_type(T) && !__is_intangible(T)
 struct RWBuffer {
     T Val;
 };
 
-template<typename T, int N>
-using vector = T __attribute__((ext_vector_type(N)));
-}
+// doesn't need is_valid_RET_for_typed_buffer, because this is a raw buffer
+template<typename T> requires __is_complete_type(T) && !__is_intangible(T)
+struct StructuredBuffer {
+    T Val;
+};
 
-using namespace hlsl;
-
-void fn() {
-    RWBuffer<vector<float, 8>> Buf; // failure, caught by is_valid_line_vector being false within is_valid_vector_RET_for_typed_buffer
-}
 ```
 
 ## Alternatives considered (Optional)
