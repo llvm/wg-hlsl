@@ -66,31 +66,28 @@ invalid RET for typed buffers.
 
 ## Proposed solution
 
-The proposed solution is to use some type_traits defined in the std library, create
-some custom builtins to use as type_traits, and join them together to define a 
-set of conceptual constraints for any RET that is used. These conceptual constraints
-will be applied to every typed buffer resource type that is defined, so that all
-typed buffer HLSL resources have the same rules about which RETs are valid. 
-Validation will occur upon resource type instantiation. Additionally, certain 
-resource types are raw buffer variants, such as `StructuredBuffer`. These resource 
-types will have a different set of type-traits applied, which will loosen constraints
-on viable RETs. The type traits will be validated as `concepts`, which is a feature 
-introduced in C++20 to statically validate a type.
+The proposed solution is to use C++20 concepts to validate the element type.
+A new built-in, `__builtin_is_homogenous`, will be added in order to express constraints
+that can't currently be expressed in pure HLSL code. Standard clang diagnostics for 
+unsatisfied constraints will be used to report any invalid element types. Concepts
+required will differ depending on whether the resource is a typed buffer or a raw buffer.
+Until concepts are formally supported by HLSL, the concepts and constraints 
+will be expressed directly in the AST via the HLSL external sema source.
 
 ## Detailed design
 
 In `clang\lib\Sema\HLSLExternalSemaSource.cpp`, `RWBuffer` is defined, along with 
 `RasterizerOrderedBuffer` and `StructuredBuffer`. It is at this point that the 
-`type_traits` should be incorporated into these resource declarations. A concept 
-containing the relevant `type_traits` will be applied to each resource declaration,
+type traits should be incorporated into these resource declarations. A concept 
+containing the relevant type traits will be applied to each resource declaration,
 and there wil be sufficient context to determine the target IR.
-If DXIL is given, then all of the typed buffer `type_traits` will be applied on each
-typed buffer HLSL resource type. Otherwise, the raw buffer type_traits will be 
-applied to each resource type. If a `type_trait` is not true for the given 
+If DXIL is given, then all of the typed buffer type traits will be applied on each
+typed buffer HLSL resource type. Otherwise, the raw buffer type traits will be 
+applied to each resource type. If a type trait is not true for the given 
 RET, a corresponding error message will be emitted.
 
-The list of type_traits that will be available for use are described below:
-| type_trait | Description|
+The list of type traits that will be available for use are described below:
+| type trait | Description|
 |-|-|
 | `__is_complete_type` | An RET should either be a complete type, or a user defined type that has been completely defined. |
 | `__is_intangible` | An RET should be an arithmetic type, or a bool, or a vector or matrix or UDT containing such types. This is equivalent to validating that the RET is not intangible. |
@@ -103,7 +100,7 @@ It will use `BuildFlattenedTypeList` to retrieve a small vector of the subelemen
 From this subvector, the first element will be compared to all elements in the vector,
 and any mismatches will return false.
 Typed buffer RETs with the DXIL IR target will need have a vector length that is
-at most 4, and the total size in bytes is at most 16. However, type_traits are not
+at most 4, and the total size in bytes is at most 16. However, type traits are not
 needed to verify these, since they can be checked directly using template techniques
 and the `sizeof` builtin.
 
@@ -139,20 +136,24 @@ RWBuffer<oneInt> r5; // valid - all fields are valid primitive types
 RWBuffer<a> r6; // valid - all leaf types are valid primitive types, and homogenous
 
 RWBuffer<b> r7; // invalid - the RET isn't complete, the definition is missing. 
-// the type_trait that would catch this is `__is_complete_type`
+// the type trait that would catch this is `__is_complete_type`
 
 RWBuffer<c> r8; // invalid - struct `oneInt` has int types, and this is not homogenous with the float1 contained in `c`. 
-// the type_trait that would catch this is `__builtin_is_homogenous`
+// the type trait that would catch this is `__builtin_is_homogenous`
 
 StructuredBuffer<c> r8Structured; // valid
 
-RWBuffer<d> r9; // invalid - the struct f cannot be grouped into 4 32-bit quantities.
-// no type_trait would catch this, but it would be caught by a concept failure, using the sizeof builtin.
+RWBuffer<d> r9; // invalid - the struct d exceeds 16 bytes.
+// no type trait would catch this, but it would be caught by a concept failure, using the sizeof builtin.
 
 StructuredBuffer<d> r9Structured; // valid
 
 RWBuffer<RWBuffer<int> > r10; // invalid - the RET has a handle with unknown size, thus it is an intangible RET.
 // the type trait that would catch this is `!__is_intangible`
+
+struct EightHalves { half x[8] };  // sizeof(EightHalves) == 16
+RWBuffer<EightHalves> b; // invalid - EightHalves has 8 subelements, which exceeds the limit of 4.
+// This would be caught using a template that extracts the element count of the RET's vector, and comparing against 4.
 ```
 
 Below is a sample C++ implementation of the `RWBuffer` resource type, which is a typed buffer variant.
