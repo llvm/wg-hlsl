@@ -13,8 +13,8 @@ For example:
 RWBuffer<float> rwbuf: register(u0);
 ```
 In this code, the RET is `float`, and the resource type is `RWBuffer`.
-There are two types of buffers, raw buffers and typed buffers. Below is a 
-list of all buffers and their corresponding variants
+All resources can be placed in two categories, raw buffers and typed buffers. 
+Below is a description of all resources and their corresponding categories
 * raw buffers
   * [Append|Consume|RW]StructuredBuffer
   * [RW]ByteAddressBuffer
@@ -22,32 +22,19 @@ list of all buffers and their corresponding variants
   * [RW]Buffer
   * [Feedback]Texture*
 
-There is a distinct set of rules that define valid RETs for raw buffer types, 
-and a separate set of rules that define valid RETs for typed buffer types.
-These rules also depend on the target IR, SPIR-V or DXIL.
+There is a distinct set of rules that define valid RETs for raw buffer resources, 
+and a separate set of rules that define valid RETs for typed buffer resources.
 
-RETs for typed buffer variants with a DXIL target IR may include:
-* basic types: 
-  * 16, 32, and 64-bit int and uint
-  * half, float, and double
-* vectors and matrices 
-  * containing 4 elements or fewer
-  * total size may not exceed 128 bits
-* user defined types (structs / classes), as long as:
-  * all fields in the struct have the same type
-  * there are at most 4 sub elements
-  * total size may not exceed 128 bits
+RETs for typed buffer resources:
+* Are not intangible (e.g., isn't a resource type)
+* Must be vectors or scalars of arithmetic types, not bools nor enums nor arrays
+* The type should be line-vector layout compatible (homogenous, at most 4 elements, and at most 128 bits in size) 
 
 RETs for raw buffer variants are much less constrained:
-* it must be a complete type
-* cannot contain a handle (such as resource types)
+* Are not intangible (e.g., isn't a resource type)
+* All constituent types must be arithmetic types or bools or enums
 
 Resource types are never allowed as RETs (i.e., `RWBuffer<int>` as an RET).
-Texture resources conform to the rules for typed buffers.
-If the target is SPIR-V, then only the set of rules for raw buffers apply. Typed buffers
-like `RWBuffer` may have RETs that exceed 128 bits, for example, if the target 
-IR is SPIR-V. The typed buffer rules above are only enforced when the IR target is DXIL.
-
 If someone writes `RWBuffer<MyCustomType>` and MyCustomType is not a 
 valid RET, there should be infrastructure to reject this RET and emit a message 
 explaining why it was rejected as an RET.
@@ -55,7 +42,7 @@ explaining why it was rejected as an RET.
 ## Motivation
 Currently, there is an allow list of valid RETs. It must be modified with respect 
 to this spec. Anything that is not a valid RET will be rejected. The allow list isn't
-broad enough, because it doesn't include the case where the RET is user-defined. 
+broad enough, because there is no case where the RET is user-defined for a raw buffer.
 Ideally, a user should be able to determine how any user-defined structure is invalid 
 as an RET. Some system should be in place to more completely enforce the rules for 
 valid and invalid RETs, as well as provide useful information on why they are invalid.
@@ -66,119 +53,152 @@ invalid RET for typed buffers.
 
 ## Proposed solution
 
-The proposed solution is to use C++20 concepts to validate the element type.
-A new built-in, `__builtin_hlsl_is_line_vector_layout_compatible`, will be added in 
-order to express constraints that can't currently be expressed in pure HLSL code.
-Standard clang diagnostics for unsatisfied constraints will be used to report any 
-invalid element types. Concepts required will differ depending on whether the 
-resource is a typed buffer or a raw buffer. Until concepts are formally supported 
-by HLSL, the concepts and constraints will be expressed directly in the AST via 
-the HLSL external sema source.
+The proposed solution is to modify the declaration of each resource declared in 
+`clang\lib\Sema\HLSLExternalSemaSource.cpp` and insert into each representative
+AST node a concept. The AST node will be created as if the C++20 `concept` keyword
+was parsed and applied to the declaration. The concept will be used to validate the
+given RET, and will emit errors when the given RET is invalid.
+
+Specifically, a new built-in, `__builtin_hlsl_is_line_vector_layout_compatible`, 
+will be added in order to express the extra typed buffer constraint. This builtin
+will be added to each AST node that requires that constraint. The builtin is 
+described below.Standard clang diagnostics for unsatisfied constraints will be 
+used to report any invalid element types. Concepts required will differ depending
+on whether the resource is a typed buffer or a raw buffer. Until concepts are 
+formally supported by HLSL, the concepts and constraints will be expressed 
+directly in the AST via the HLSL external sema source.
 
 ## Detailed design
 
 In `clang\lib\Sema\HLSLExternalSemaSource.cpp`, `RWBuffer` is defined, along with 
 `RasterizerOrderedBuffer` and `StructuredBuffer`. It is at this point that the 
-type traits should be incorporated into these resource declarations. A concept 
-containing the relevant type traits will be applied to each resource declaration,
-and there wil be sufficient context to determine the target IR.
-If DXIL is given, then all of the typed buffer type traits will be applied on each
-typed buffer HLSL resource type. Otherwise, the raw buffer type traits will be 
-applied to each resource type. If a type trait is not true for the given 
-RET, a corresponding error message will be emitted.
+concept would be incorporated into these resource declarations. A concept representing
+the relevant constraints will be applied to each resource declaration. If a concept
+is not true for the given RET, a corresponding error message will be emitted.
 
-The list of type traits that will be available for use are described below:
+The list of builtins to be used as type traits that will be available for
+concept definition are described below:
 | type trait | Description|
 |-|-|
-| `__is_complete_type` | An RET should either be a complete type, or a user defined type that has been completely defined. |
-| `__is_intangible` | An RET should be an arithmetic type, or a bool, or a vector or matrix or UDT containing such types. This is equivalent to validating that the RET is not intangible. |
-| `__builtin_hlsl_is_line_vector_layout_compatible` | A typed buffer RET with the DXIL IR target should never have two different subelement types. Line vector layout compatible also requires at most 4 elements, and a total size of at most 16 bytes |
+| `__is_intangible` | An RET should be an arithmetic type, bool, enum, or a vector or matrix or UDT containing such types. This is equivalent to validating that the RET is not intangible. This will error when given an incomplete type. |
+| `__builtin_hlsl_is_line_vector_layout_compatible` | A typed buffer RET with the DXIL IR target should never have two different subelement types. Line vector layout compatible also requires at most 4 elements, and a total size of at most 16 bytes. |
 
-For the SPIR-V IR target, only `__is_complete_type` and `!__is_intangible` 
-need to be true. When the target IR is DXIL, and the resource is a typed buffer variant,
-`__builtin_hlsl_is_line_vector_layout_compatible` will be used to ensure homogeneity. 
+For raw buffers, only `!__is_intangible` needs to be true. 
+For typed buffers, `__builtin_hlsl_is_line_vector_layout_compatible` 
+also needs to be true. This builtin will be used to ensure homogeneity. 
 It will use `BuildFlattenedTypeList` to retrieve a small vector of the subelement types.
 From this subvector, the first element will be compared to all elements in the vector,
-and any mismatches will return false. Typed buffer RETs with the DXIL IR target will 
+and any mismatches will return false. Typed buffer RETs will 
 also need to have at most 4 subelements, and the total size in bytes cannot exceed 16,
 which will also be verified by `__builtin_hlsl_is_line_vector_layout_compatible`.
+Finally, there will be an additional check that there are no bools or enums present
+in any component of the type.
 
-* Examples:
+* Examples of RET validation results:
 ```
-// targeting DXIL
+
 struct oneInt {
-	int i;
+    int i;
 };
+
 struct twoInt {
    int aa;
    int ab;
 };
-struct a {
-   oneInt bx;
-   int i;
+
+struct threeInts {
+  oneInt o;
+  twoInt t;
 };
-struct b;
-struct c {
-  oneInt ca;
-  float1 cb;
+
+struct oneFloat {
+    float f;
 };
-struct d {
+struct notComplete;
+struct depthDiff {
+  int i;
+  oneInt o;
+  oneFloat f;
+};
+
+struct notHomogenous{     
+  int i;
+  float f;
+};
+
+struct EightElements {
   twoInt x[2];
   twoInt y[2];
 };
+
+struct EightHalves {
+half x[8]; 
+};
+
+struct intVec {
+  int2 i;
+};
+
+struct oneIntWithVec {
+  int i;
+  oneInt i2;
+  int2 i3;
+};
+
+struct weirdStruct {
+  int i;
+  intVec iv;
+};
+
 RWBuffer<double2> r0; // valid - RET fits in 4 32-bit quantities
 RWBuffer<int> r1; // valid
 RWBuffer<float> r2; // valid
 RWBuffer<float4> r3; // valid
-RWBuffer<oneInt> r4; // valid
-RWBuffer<oneInt> r5; // valid - all fields are valid primitive types
-RWBuffer<a> r6; // valid - all leaf types are valid primitive types, and homogenous
-
-RWBuffer<b> r7; // invalid - the RET isn't complete, the definition is missing. 
-// the type trait that would catch this is `__is_complete_type`
-
-RWBuffer<c> r8; // invalid - struct `oneInt` has int types, and this is not homogenous with the float1 contained in `c`. 
-// the type trait that would catch this is __builtin_hlsl_is_line_vector_layout_compatible
-
-StructuredBuffer<c> r8Structured; // valid
-
-RWBuffer<d> r9; // invalid - the struct d exceeds 16 bytes.
+RWBuffer<notComplete> r4; // invalid - the RET isn't complete, the definition is missing. 
+// the type trait that would catch this is the negation of `__is_intangible`
+RWBuffer<oneInt> r5; // valid - all leaf types are valid primitive types, and homogenous
+RWBuffer<oneFloat> r6; // valid
+RWBuffer<twoInt> r7; // valid
+RWBuffer<threeInts> r8; // valid
+RWBuffer<notHomogenous> r9; // invalid, all template type components must have the same type, DXC fails
+StructuredBuffer<notHomogenous> r9Structured; // valid
+RWBuffer<depthDiff> r10; // invalid, all template type components must have the same type, DXC fails
+RWBuffer<EightElements> r11; // invalid, > 4 elements and > 16 bytes, DXC fails 
 // This would be caught by __builtin_hlsl_is_line_vector_layout_compatible
-
-StructuredBuffer<d> r9Structured; // valid
-
-RWBuffer<RWBuffer<int> > r10; // invalid - the RET has a handle with unknown size, thus it is an intangible RET.
-// the type trait that would catch this is `!__is_intangible`
-
-struct EightHalves { half x[8] };  // sizeof(EightHalves) == 16
-RWBuffer<EightHalves> b; // invalid - EightHalves has 8 subelements, which exceeds the limit of 4.
+StructuredBuffer<EightElements> r9Structured; // valid
+RWBuffer<EightHalves> r12; // invalid, > 4 elements, DXC fails
 // This would be caught by __builtin_hlsl_is_line_vector_layout_compatible
+StructuredBuffer<EightHalves> r12Structured; // valid
+RWBuffer<oneIntWithVec> r13; // valid
+RWBuffer<weirdStruct> r14; // valid
+RWBuffer<RWBuffer<int> > r15; // invalid - the RET has a handle with unknown size, thus it is an intangible RET.
+// the type trait that would catch this is the negation of `__is_intangible`
 ```
 
 Below is a sample C++ implementation of the `RWBuffer` resource type, which is a typed buffer variant.
-This code would exist within `HLSLExternalSemaSource.cpp`, as a substitute for the existing definition
-of `RWBuffer`
+This code would exist within an hlsl header, but concepts are not implemented in HLSL. However, the AST node
+associated with RWBuffers is constructed as if this code was read and parsed by the compiler.
 ```
 #include <type_traits>
 
 namespace hlsl {
 
-const bool is_spirv_target = getASTContext().getTargetInfo().getTriple().isSPIRV();
 
 template<typename T>
-concept is_valid_RET_for_typed_buffer = is_spirv_target || __builtin_hlsl_is_line_vector_layout_compatible(T)
 
-template<typename T> requires is_valid_RET_for_typed_buffer<T>
- && __is_complete_type(T) && !__is_intangible(T)
+template<typename T> requires __builtin_hlsl_is_line_vector_layout_compatible(T)
+ && !__is_intangible(T) && !isa<bool> && !isa<enum>
 struct RWBuffer {
     T Val;
 };
 
-// doesn't need is_valid_RET_for_typed_buffer, because this is a raw buffer
-template<typename T> requires __is_complete_type(T) && !__is_intangible(T)
+// doesn't need __builtin_hlsl_is_line_vector_layout_compatible, because this is a raw buffer
+// also, raw buffers allow bools and enums as constituent types
+template<typename T> requires !__is_intangible(T)
 struct StructuredBuffer {
     T Val;
 };
+}
 
 ```
 
@@ -196,4 +216,6 @@ Damyan Pepper
 Chris Bieneman
 Greg Roth
 Sarah Spall
+Tex Riddell
+Justin Bogner
 <!-- {% endraw %} -->
