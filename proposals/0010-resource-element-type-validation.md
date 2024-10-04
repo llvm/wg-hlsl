@@ -57,10 +57,13 @@ The proposed solution is to modify the declaration of each resource declared in
 `clang\lib\Sema\HLSLExternalSemaSource.cpp` and insert into each representative
 AST node a concept. The AST node will be created as if the C++20 `concept` keyword
 was parsed and applied to the declaration. The concept will be used to validate the
-given RET, and will emit errors when the given RET is invalid.
+given RET, and will emit errors when the given RET is invalid. Although concepts are
+not currently supported in HLSL, we expect support to be added at some point in the
+future. Meanwhile, because LLVM does support concepts, we can make use of
+them when constructing the AST in Sema.
 
-Specifically, a new built-in, `__builtin_hlsl_is_line_vector_layout_compatible`, 
-will be added in order to express the extra typed buffer constraint. This builtin
+A new built-in, `__builtin_hlsl_is_line_vector_layout_compatible`, will be 
+added in order to express the extra typed buffer constraint. This builtin
 will be added to each AST node that requires that constraint. The builtin is 
 described below.Standard clang diagnostics for unsatisfied constraints will be 
 used to report any invalid element types. Concepts required will differ depending
@@ -176,18 +179,19 @@ RWBuffer<RWBuffer<int> > r15; // invalid - the RET has a handle with unknown siz
 ```
 
 Below is a sample C++ implementation of the `RWBuffer` resource type, which is a typed buffer variant.
-This code would exist within an hlsl header, but concepts are not implemented in HLSL. However, the AST node
+This code would exist within an hlsl header, but concepts are not implemented in HLSL. Instead, the AST node
 associated with RWBuffers is constructed as if this code was read and parsed by the compiler.
 ```
 #include <type_traits>
 
 namespace hlsl {
 
+template<typename RET>
+concept TypedResourceElementType = 
+    __builtin_hlsl_is_line_vector_layout_compatible<RET>() &&
+    !std::is_enum_v<RET> && !std::is_same_v<RET, bool>;
 
-template<typename T>
-
-template<typename T> requires __builtin_hlsl_is_line_vector_layout_compatible(T)
- && !__is_intangible(T) && !isa<bool> && !isa<enum>
+template<typename T> requires !__is_intangible(T) && TypedResourceElementType<T>
 struct RWBuffer {
     T Val;
 };
@@ -212,10 +216,10 @@ check all possible valid resource element types, rather than just checking that 
 This is unneeded because all primitive non-intangible types are valid RETs.
 
 ## Acknowledgments (Optional)
-Damyan Pepper
-Chris Bieneman
-Greg Roth
-Sarah Spall
-Tex Riddell
-Justin Bogner
+* Damyan Pepper
+* Chris Bieneman
+* Greg Roth
+* Sarah Spall
+* Tex Riddell
+* Justin Bogner
 <!-- {% endraw %} -->
