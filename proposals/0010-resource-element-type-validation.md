@@ -3,11 +3,11 @@
 * Sponsor: Joshua Batista
 * Status: **Under Consideration**
 * Impacted Project(s): (LLVM)
-
 * Issues: [#75676](https://github.com/llvm/llvm-project/issues/75676)
 
 ## Introduction
 Resources are often used in HLSL, with various resource element types (RETs).
+
 For example:
 ```
 RWBuffer<float> rwbuf: register(u0);
@@ -97,9 +97,8 @@ which will also be verified by `__builtin_hlsl_is_line_vector_layout_compatible`
 Finally, there will be an additional check that there are no bools or enums present
 in any component of the type.
 
-* Examples of RET validation results:
+### Examples of RET validation results:
 ```
-
 struct oneInt {
     int i;
 };
