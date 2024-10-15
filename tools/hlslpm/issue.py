@@ -357,6 +357,8 @@ class Issues:
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
 
+        self.milestones.sort(key=lambda i: i.target_date);
+
         issuesTracked = gh.get_issues_tracked(self.all_issues_by_id.keys())
         self.tracked_issues_not_in_project = []
         for (id, trackedIssueIds) in issuesTracked:
