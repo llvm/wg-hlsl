@@ -6,6 +6,14 @@ from enum import Enum
 import re
 from typing import Dict, List, Optional, Self
 
+class Status(Enum):
+    NoStatus = None
+    Designing = "Designing"
+    Planning = "Planning"
+    Ready = "Ready"
+    Active = "Active"
+    NeedsReview = "Needs Review"
+
 class Category(Enum):
     NoCategory = None
     Item = "Item"
@@ -51,6 +59,7 @@ class Issue:
     issue_resourcePath: Optional[str] = field(default=None)
     item_id: Optional[str] = field(default=None)
     item_updatedAt: Optional[datetime] = field(default=None)
+    status: Optional[Status] = field(default=None)
     category: Optional[Category] = field(default=None)
     target_date: Optional[date] = field(default=None)
     workstream: Optional[str] = field(default=None)

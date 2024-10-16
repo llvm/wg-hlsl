@@ -3,7 +3,7 @@ import itertools
 import os
 from typing import Callable, Iterable, List, Optional, Set
 import github
-from issue import Issue, IssueState, Issues
+from issue import Issue, IssueState, Issues, Status
 import mdformat
 
 
@@ -47,13 +47,30 @@ class Reporter:
         self.issues = issues
 
     def generateWorkstreamsReport(self) -> Iterable[str]:
-        return itertools.chain(*[self.generateWorkstreamReport(w) for w in self.issues.workstreams])
+        return itertools.chain(
+            self.generateKey(),
+            *[self.generateWorkstreamReport(w) for w in self.issues.workstreams])
 
     def generateMilestonesReport(self) -> Iterable[str]:
-        return itertools.chain(*[self.generateMilestoneReport(w) for w in self.issues.milestones])
+        return itertools.chain(
+            self.generateKey(),
+            *[self.generateMilestoneReport(w) for w in self.issues.milestones])
 
     def generateWarningsReport(self) -> Iterable[str]:
-        return itertools.chain(*[self.generateWorkstreamWarningsReport(w) for w in self.issues.workstreams])
+        return itertools.chain(
+            self.generateKey(),
+            *[self.generateWorkstreamWarningsReport(w) for w in self.issues.workstreams])
+
+    def generateKey(self) -> Iterable[str]:
+        lines = []
+        lines.append("Status key: ")
+
+        statuses: List[Status] = [Status.NoStatus, Status.Designing, Status.Planning,
+                                  Status.Ready, Status.Active, Status.NeedsReview]
+
+        lines += [f"{StatusText[s]}: {s.value}" for s in statuses]
+        lines.append("✅: Done")
+        return lines
 
     def generateWorkstreamReport(self, workstreamIssue: Issue) -> Iterable[str]:
         lines = []
@@ -75,6 +92,7 @@ class Reporter:
     def generateMilestoneReport(self, milestoneIssue: Issue) -> Iterable[str]:
         lines = []
         lines.append(f"# {issue_link(milestoneIssue)}")
+        lines.append(f"Target Date: {milestoneIssue.target_date}")
         lines += self.generateTrackedIssueList(milestoneIssue)
         return lines
 
@@ -175,6 +193,16 @@ def visit_all(issue: Issue, visitor: Callable[[Issue, int, bool], None]):
     visit_worker(issue, 0)
 
 
+StatusText = {
+    Status.NoStatus: "⚠️",
+    Status.Active: "🏃‍➡️",
+    Status.Designing: "🤔",
+    Status.NeedsReview: "👀",
+    Status.Planning: "📅",
+    Status.Ready: "🧍"
+}
+
+
 def issue_link(issue: Issue, contextIssue: Optional[Issue] = None) -> str:
     if not contextIssue:
         contextIssue = issue
@@ -183,8 +211,8 @@ def issue_link(issue: Issue, contextIssue: Optional[Issue] = None) -> str:
         contextIssue)}](https://github.com{issue.issue_resourcePath}))"
 
     if issue.issue_state == IssueState.Closed:
-        issueText = f"✅{issueText}"
+        issueText = f"<small>✅{issueText}</small>"
     else:
-        issueText = f"🟦{issueText}"
+        issueText = f"{StatusText[issue.status]} {issueText}"
 
     return issueText
