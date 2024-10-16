@@ -5,7 +5,6 @@
 * Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
   Pepper](https://github.com/damyanp)
-* Sponsor: Damyan Pepper
 * Status: **Under Consideration**
 * Impacted Project(s): Clang
 
@@ -101,7 +100,7 @@ In HLSL, Root Signatures are specified using a domain specific language as
 documented
 [here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl).
 
-> TODO: link to Xiang's documentation that includes the grammar
+See below for the [grammar](#root-signature-grammar) of this DSL.
 
 An example root signature string (see the documentation for some more extensive
 samples):
@@ -315,7 +314,7 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 ### Validation and Diagnostics
 
 As well as validating that the root signature is syntactically correct, the
-compiler must also validate that the shader is compatible with the root. For
+compiler must also validate that the shader is compatible with the it. For
 example, it must validate that the root signature binds each register that is
 used by the shader. Note that only resources referenced by the entry point need
 to be bound:
@@ -356,8 +355,8 @@ checks are concerned.
 The root signature AST nodes are serialized / deserialized as normal bitcode.
 
 In the root signature DSL, a root signature is made up of a list of "root
-elements". The in-memory datastructures are designed around this concept where
-the RootSignature class is a vector of variants.
+elements". The in-memory datastructures are designed around this concept; the
+RootSignature class is essentially a vector of variants.
 
 Example:
 
@@ -397,7 +396,7 @@ it is a list of root elements.
 See [Metadata Schema](#metadata-schema) for details.
 
 The IR schema has been designed so that many of the things that need to be
-validated during parsing can only be represented in valid way. For example, it
+validated during parsing can only be represented in a valid way. For example, it
 is not possible to have an incorrect register type for a root parameter /
 descriptor range. However, it is possible to represent root signatures where
 registers are bound multiple times, or where there are multiple RootFlags
@@ -407,15 +406,14 @@ IR is valid.
 ### Code Generation
 
 During backend code generation, the LLVM IR metadata representation of the root
-signature is converted data structures that represent the root signature that
-are more closely aligned to the final file format. For example, root parameters
-and static samplers can be intermingled in the previous formats, but are now
-separated into separate arrays at this point to aid in serializing.
+signature is converted to data structures that are more closely aligned to the
+final file format. For example, root parameters and static samplers can be
+intermingled in the previous formats, but are now separated into separate arrays
+at this point.
 
 Example for same root signature as above:
 
 ```c++
-// placeholder - update this once detailed design complete
 rootSignature = RootSignature(
   ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
   { // parameters
@@ -434,7 +432,7 @@ At this point, final validation is performed to ensure that the root signature
 itself is valid. One key validation here is to check that each register is only
 bound once in the root signature. Even though this validation has been performed
 in the Clang frontend, we also need to support scenarios where the IR comes from
-other frontends and so the validation must be performed here as well.
+other frontends, so the validation must be performed here as well.
 
 Once the root signature itself has been validated, validation is performed
 against the shader to ensure that any registers that the shader uses are bound
@@ -481,20 +479,18 @@ The additional semantic rules not already covered by the grammar are listed here
 - Register Space
   -The range 0xFFFFFFF0 to 0xFFFFFFFF is reserved.
   
-  ```
-  "CBV(b0, space=4294967295)" is invalid due to the use of reserved space 0xFFFFFFFF.
-  ```
+  `CBV(b0, space=4294967295)` is invalid due to the use of reserved space 0xFFFFFFFF.
+  
 
 - Resource ranges must not overlap.
   
-  ```
-  "CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))" will result in an error
+  `CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))` will result in an error
   due to overlapping at b2.
-  ```
+  
 
 ### Metadata Schema
 
-* RootConstant
+#### RootConstant
 
 | Property         | Type   | Type detail             |
 | ---------------- | ------ | ----------------------- |
@@ -504,7 +500,7 @@ The additional semantic rules not already covered by the grammar are listed here
 | RegisterSpace    | i32    | i32                     |
 | Num32BitValues   | i32    | i32                     |
 
-* RootDescriptor
+#### RootDescriptor
 
 | Property            | Type   | Type detail                     |
 | ------------------- | ------ | ------------------------------- |
@@ -514,7 +510,7 @@ The additional semantic rules not already covered by the grammar are listed here
 | RegisterSpace       | i32    | i32                             |
 | RootDescriptorFlags | i32    | D3D12_ROOT_DESCRIPTOR_FLAGS     |
 
-* DescriptorRange
+#### DescriptorRange
 
 | Property             | Type   | Type detail                    |
 | -------------------- | ------ | ------------------------------ |
@@ -524,7 +520,7 @@ The additional semantic rules not already covered by the grammar are listed here
 | RegisterSpace        | i32    | i32                            |
 | DescriptorRangeFlags | i32    | D3D12_DESCRIPTOR_RANGE_FLAGS   |
 
-* DescriptorTable
+#### DescriptorTable
 
 | Property         | Type              | Type detail              |
 | ---------------- | ----------------- | ------------------------ |
@@ -532,7 +528,7 @@ The additional semantic rules not already covered by the grammar are listed here
 | ShaderVisibility | i32               | D3D12_SHADER_VISIBILITY  |
 | DescriptorRanges | Reference of list | list of DescriptorRanges |
 
-* StaticSampler
+#### StaticSampler
 
 | Property         | Type  | Type detail                |
 | ---------------- | ----- | -------------------------- |
@@ -551,20 +547,20 @@ The additional semantic rules not already covered by the grammar are listed here
 | RegisterSpace    | i32   | i32                        |
 | ShaderVisibility | i32   | D3D12_SHADER_VISIBILITY    |
 
-* RootSignature
+#### RootSignature
 
-| Property       | Type              | Type detail                                         |
-| -------------- | ----------------- | --------------------------------------------------- |
+| Property       | Type              | Type detail          |
+| -------------- | ----------------- | -------------------- |
 | Root elements  | reference to list | list of root elements|
 
-* Function RootSignature pair
+#### Function RootSignature pair
 
 | Property      | Type          |
 | ------------- | ------------- |
 | EntryFunction | Function      |
 | RootSignature | RootSignature |
 
-* RootSignature table
+#### RootSignature table
 
 Named metadata with name "dx.rootsignatures".
 
@@ -575,7 +571,6 @@ Named metadata with name "dx.rootsignatures".
 Example for same root signature as above:
 
 ```llvm
-; placeholder - update this once detailed design complete
 !dx.rootsignatures = !{!2}
 !2 = !{ptr @main, !3 }
 !3 = !{ i32 1, !4, !5, !6, !7, !8 } ; RootFlags, Parameters, StaticSamplers
@@ -708,10 +703,8 @@ Example for same root signature as above:
   
   - Comparison filter must have ComparisonFunc not equal to 0.
     
-    ```
-    When the Filter of a StaticSampler is FILTER_COMPARISON*,
+    When the Filter of a StaticSampler is `FILTER_COMPARISON*`,
     the ComparisonFunc cannot be 0.
-    ```
 
 #### Resource used in DXIL must be fully bound in root signature.
 
