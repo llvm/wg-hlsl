@@ -5,7 +5,6 @@
 * Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
   Pepper](https://github.com/damyanp)
-* Sponsor: Damyan Pepper
 * Status: **Under Consideration**
 * Impacted Project(s): Clang
 
@@ -37,9 +36,10 @@ This change proposes adding:
 ## Motivation
 
 ### What are Root Signatures?
+
 In DirectX HLSL, resources can be associated with registers.  For example:
 
-``` c++
+```c++
 StructuredBuffer<float4> b1 : register(t0);
 StructuredBuffer<float4> b2 : register(t1);
 StructuredBuffer<float4> bn[] : register(t2);
@@ -67,6 +67,7 @@ cl->SetGraphicsRootDescriptorTable(2, baseDescriptor);
 ```
 
 A single parameter that's a descriptor table:
+
 ```c++
 "DescriptorTable(SRV(t0, numDescriptors = unbounded))"
 ```
@@ -99,7 +100,7 @@ In HLSL, Root Signatures are specified using a domain specific language as
 documented
 [here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl).
 
-> TODO: link to Xiang's documentation that includes the grammar
+See below for the [grammar](#root-signature-grammar) of this DSL.
 
 An example root signature string (see the documentation for some more extensive
 samples):
@@ -250,7 +251,7 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
              (',' 'minLOD' '=' NUMBER)?
              (',' 'maxLOD' '=' NUMBER)? (',' 'space' '=' NUMBER)?
              (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
-  
+
     bReg : 'b' NUMBER
 
     tReg : 't' NUMBER
@@ -313,7 +314,7 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 ### Validation and Diagnostics
 
 As well as validating that the root signature is syntactically correct, the
-compiler must also validate that the shader is compatible with the root. For
+compiler must also validate that the shader is compatible with the it. For
 example, it must validate that the root signature binds each register that is
 used by the shader. Note that only resources referenced by the entry point need
 to be bound:
@@ -354,8 +355,8 @@ checks are concerned.
 The root signature AST nodes are serialized / deserialized as normal bitcode.
 
 In the root signature DSL, a root signature is made up of a list of "root
-elements". The in-memory datastructures are designed around this concept where
-the RootSignature class is a vector of variants.
+elements". The in-memory datastructures are designed around this concept; the
+RootSignature class is essentially a vector of variants.
 
 Example:
 
@@ -384,7 +385,7 @@ parsedRootSignature = RootSignature{
 };
 ```
 
-### Root Signatures in the LLVM IR 
+### Root Signatures in the LLVM IR
 
 During frontend code generation an IR-based representation of the root signature
 is generated from the in-memory data structures stored in the AST. This is
@@ -395,45 +396,24 @@ it is a list of root elements.
 See [Metadata Schema](#metadata-schema) for details.
 
 The IR schema has been designed so that many of the things that need to be
-validated during parsing can only be represented in valid way. For example, it
+validated during parsing can only be represented in a valid way. For example, it
 is not possible to have an incorrect register type for a root parameter /
 descriptor range. However, it is possible to represent root signatures where
 registers are bound multiple times, or where there are multiple RootFlags
 entries, so subsequent stages should not assume that any given root signature in
 IR is valid.
 
-
-> **Open Question**: what should the named metadata be?  There's options I
-> think...
-
-Example for same root signature as above:
-
-```llvm
-; placeholder - update this once detailed design complete
-!directx.rootsignatures = !{!2}
-!2 = !{ptr @main, !3 }
-!3 = !{ !4, !5, !6, !7 } ; reference 4 root parameters
-!4 = !{ !"RootFlags", i32 1 } ; root flags, 1 is numeric value of flags
-!5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
-!6 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
-!7 = !{ !"DescriptorTable", i32 0, !8, !9 } ;  0 = visibility, 2 ranges,!8 and !9
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
-```
-
-
 ### Code Generation
 
 During backend code generation, the LLVM IR metadata representation of the root
-signature is converted data structures that represent the root signature that
-are more closely aligned to the final file format. For example, root parameters
-and static samplers can be intermingled in the previous formats, but are now
-separated into separate arrays at this point to aid in serializing.
+signature is converted to data structures that are more closely aligned to the
+final file format. For example, root parameters and static samplers can be
+intermingled in the previous formats, but are now separated into separate arrays
+at this point.
 
 Example for same root signature as above:
 
 ```c++
-// placeholder - update this once detailed design complete
 rootSignature = RootSignature(
   ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
   { // parameters
@@ -452,7 +432,7 @@ At this point, final validation is performed to ensure that the root signature
 itself is valid. One key validation here is to check that each register is only
 bound once in the root signature. Even though this validation has been performed
 in the Clang frontend, we also need to support scenarios where the IR comes from
-other frontends and so the validation must be performed here as well.
+other frontends, so the validation must be performed here as well.
 
 Once the root signature itself has been validated, validation is performed
 against the shader to ensure that any registers that the shader uses are bound
@@ -470,12 +450,14 @@ checks in Sema.
 The additional semantic rules not already covered by the grammar are listed here.
 
 - For DESCRIPTOR_RANGE_FLAGS on a Sampler, only the following values are valid
+  
   - 0
   - DESCRIPTORS_VOLATILE
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV, only the following values are
    valid
+  
   - 0
   - DESCRIPTORS_VOLATILE
   - DATA_VOLATILE
@@ -489,29 +471,120 @@ The additional semantic rules not already covered by the grammar are listed here
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - StaticSampler
+  
   - Max/MinLOD cannot be NaN.
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
 
 - Register Space
   -The range 0xFFFFFFF0 to 0xFFFFFFFF is reserved.
-  ```
-  "CBV(b0, space=4294967295)" is invalid due to the use of reserved space 0xFFFFFFFF.
-  ```
+  
+  `CBV(b0, space=4294967295)` is invalid due to the use of reserved space 0xFFFFFFFF.
+  
 
 - Resource ranges must not overlap.
-  ```
-  "CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))" will result in an error
+  
+  `CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))` will result in an error
   due to overlapping at b2.
-  ```
+  
 
 ### Metadata Schema
 
-TODO
+#### RootConstant
+
+| Property         | Type   | Type detail             |
+| ---------------- | ------ | ----------------------- |
+| ParameterType    | string | "RootConstant"          |
+| ShaderVisibility | i32    | D3D12_SHADER_VISIBILITY |
+| ShaderRegister   | i32    | i32                     |
+| RegisterSpace    | i32    | i32                     |
+| Num32BitValues   | i32    | i32                     |
+
+#### RootDescriptor
+
+| Property            | Type   | Type detail                     |
+| ------------------- | ------ | ------------------------------- |
+| ParameterType       | string | "RootCBV", "RootSRV", "RootUAV" |
+| ShaderVisibility    | i32    | D3D12_SHADER_VISIBILITY         |
+| ShaderRegister      | i32    | i32                             |
+| RegisterSpace       | i32    | i32                             |
+| RootDescriptorFlags | i32    | D3D12_ROOT_DESCRIPTOR_FLAGS     |
+
+#### DescriptorRange
+
+| Property             | Type   | Type detail                    |
+| -------------------- | ------ | ------------------------------ |
+| RangeType            | string | "SRV", "UAV", "CBV", "Sampler" |
+| NumDescriptors       | i32    | i32                            |
+| BaseShaderRegister   | i32    | i32                            |
+| RegisterSpace        | i32    | i32                            |
+| DescriptorRangeFlags | i32    | D3D12_DESCRIPTOR_RANGE_FLAGS   |
+
+#### DescriptorTable
+
+| Property         | Type              | Type detail              |
+| ---------------- | ----------------- | ------------------------ |
+| ParameterType    | string            | "DescriptorTable"        |
+| ShaderVisibility | i32               | D3D12_SHADER_VISIBILITY  |
+| DescriptorRanges | Reference of list | list of DescriptorRanges |
+
+#### StaticSampler
+
+| Property         | Type  | Type detail                |
+| ---------------- | ----- | -------------------------- |
+| ParameterType    | string| "StaticSampler"            |
+| Filter           | i32   | D3D12_FILTER               |
+| AddressU         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
+| AddressV         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
+| AddressW         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
+| MipLODBias       | float | float                      |
+| MaxAnisotropy    | i32   | i32                        |
+| ComparisonFunc   | i32   | D3D12_COMPARISON_FUNC      |
+| BorderColor      | i32   | D3D12_STATIC_BORDER_COLOR  |
+| MinLOD           | float | float                      |
+| MaxLOD           | float | float                      |
+| ShaderRegister   | i32   | i32                        |
+| RegisterSpace    | i32   | i32                        |
+| ShaderVisibility | i32   | D3D12_SHADER_VISIBILITY    |
+
+#### RootSignature
+
+| Property       | Type              | Type detail          |
+| -------------- | ----------------- | -------------------- |
+| Root elements  | reference to list | list of root elements|
+
+#### Function RootSignature pair
+
+| Property      | Type          |
+| ------------- | ------------- |
+| EntryFunction | Function      |
+| RootSignature | RootSignature |
+
+#### RootSignature table
+
+Named metadata with name "dx.rootsignatures".
+
+| Property                     | Type                                |
+| ---------------------------- | ----------------------------------- |
+| Function RootSignature Pairs | list of Function RootSignature Pair |
+
+Example for same root signature as above:
+
+```llvm
+!dx.rootsignatures = !{!2}
+!2 = !{ptr @main, !3 }
+!3 = !{ i32 1, !4, !5, !6, !7, !8 } ; RootFlags, Parameters, StaticSamplers
+!4 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
+!5 = !{ !"DescriptorTable", i32 0, !7 } ;  0 = visibility, range list !7
+!6 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
+!7 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+!8 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
+```
 
 ### Validations during DXIL generation
 
 #### All the things validated in Sema.
+
   All the validation rules mentioned in [Validations In Sema](#validations-in-sema)
   need to be checked during DXIL generation as well.
   The difference between checks in Sema and DXIL generation is that Sema could
@@ -520,9 +593,11 @@ TODO
   fall within the correct range:
 
 - RootFlags
+  
   - (RootFlags & 0x80000fff) should equals 0.
 
 - Valid values for ShaderVisibility
+  
   - SHADER_VISIBILITY_ALL
   - SHADER_VISIBILITY_VERTEX
   - SHADER_VISIBILITY_HULL
@@ -533,12 +608,14 @@ TODO
   - SHADER_VISIBILITY_MESH
 
 - Valid values for RootDescriptorFlags
+  
   - 0
   - DataVolatile
   - DataStaticWihleSetAtExecute
   - DataStatic
 
 - Valid values for DescriptorRangeFlags on CBV/SRV/UAV
+  
   - 0
   - DESCRIPTORS_VOLATILE
   - DATA_VOLATILE
@@ -552,12 +629,15 @@ TODO
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - Valid values for DescriptorRangeFlags on Sampler
+  
   - 0
   - DESCRIPTORS_VOLATILE
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - StaticSampler
+  
   - Valid values for Filter
+    
     - FILTER_MIN_MAG_MIP_POINT
     - FILTER_MIN_MAG_POINT_MIP_LINEAR
     - FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT
@@ -594,15 +674,17 @@ TODO
     - FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT
     - FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR
     - FILTER_MAXIMUM_ANISOTROPIC
-
+  
   - Valid values for TextureAddress
+    
     - TEXTURE_ADDRESS_WRAP 
     - TEXTURE_ADDRESS_MIRROR  
     - TEXTURE_ADDRESS_CLAMP 
     - TEXTURE_ADDRESS_BORDER 
     - TEXTURE_ADDRESS_MIRROR_ONCE
-
+  
   - Valid values for ComparisonFunc
+    
     - 0
     - COMPARISON_NEVER 
     - COMPARISON_LESS 
@@ -612,19 +694,20 @@ TODO
     - COMPARISON_NOT_EQUAL 
     - COMPARISON_GREATER_EQUAL 
     - COMPARISON_ALWAYS
-
+  
   - Valid values for StaticBorderColor
+    
     - STATIC_BORDER_COLOR_TRANSPARENT_BLACK 
     - STATIC_BORDER_COLOR_OPAQUE_BLACK 
     - STATIC_BORDER_COLOR_OPAQUE_WHITE
-
+  
   - Comparison filter must have ComparisonFunc not equal to 0.
-      ```
-      When the Filter of a StaticSampler is FILTER_COMPARISON*,
-      the ComparisonFunc cannot be 0.
-      ```
+    
+    When the Filter of a StaticSampler is `FILTER_COMPARISON*`,
+    the ComparisonFunc cannot be 0.
 
 #### Resource used in DXIL must be fully bound in root signature.
+
 ```
   // B is bound to t1, but no root parameters cover t1.
   Buffer<float> B : register(t1);
@@ -635,6 +718,7 @@ TODO
 ```
 
 #### Root Signature Flag must match DXIL.
+
 ```
   // Used dynamic resource but missing CBVSRVUAVHeapDirectlyIndexed flag.
   [RootSignature("")]
@@ -645,6 +729,7 @@ TODO
 ```
 
 #### Textures/TypedBuffers cannot be bound to root descriptors.
+
 ```
   // B is TypedBuffer, but bound as a root descriptor.
   Buffer<float> B : register(t0);
@@ -653,7 +738,6 @@ TODO
     return B[0];
   }
 ```
-
 
 <!--
 * Is there any potential for changed behavior?
@@ -711,6 +795,7 @@ allow us to avoid parsing the root signature multiple times.
 
 As this would strictly be an optimization and isn't required for correctness,
 this is something that will be considered if profiling shows us that
+
 * multiple duplicate root signatures is a common scenario and
 * parsing them takes a significant amount of time.
 
@@ -726,9 +811,6 @@ binary dependencies are not viable, and any existing code would likely need to
 be reworked so much for portability and comformance with LLVM coding conventions
 that the effort would not be worthwhile.
 
-
-
 ## Acknowledgments (Optional)
-
 
 <!-- {% endraw %} -->
