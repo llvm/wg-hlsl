@@ -536,6 +536,7 @@ The additional semantic rules not already covered by the grammar are listed here
 
 | Property         | Type  | Type detail                |
 | ---------------- | ----- | -------------------------- |
+| ParameterType    | string| "StaticSampler"            |
 | Filter           | i32   | D3D12_FILTER               |
 | AddressU         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
 | AddressV         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
