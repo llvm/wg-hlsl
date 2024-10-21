@@ -16,10 +16,10 @@ In this code, the RET is `float`, and the resource type is `RWBuffer`.
 All resources can be placed in two categories, raw buffers and typed buffers. 
 Below is a description of all resources and their corresponding categories
 * raw buffers
-  * [Append|Consume|RW]StructuredBuffer
+  * [Append|Consume|RW|RasterizerOrdered]StructuredBuffer
   * [RW]ByteAddressBuffer
 * typed buffers
-  * [RW]Buffer
+  * [RW|RasterizerOrdered]Buffer
   * [Feedback]Texture*
 
 There is a distinct set of rules that define valid RETs for raw buffer resources, 
@@ -65,7 +65,7 @@ them when constructing the AST in Sema.
 A new built-in, `__builtin_hlsl_is_line_vector_layout_compatible`, will be 
 added in order to express the extra typed buffer constraint. This builtin
 will be added to each AST node that requires that constraint. The builtin is 
-described below.Standard clang diagnostics for unsatisfied constraints will be 
+described below. Standard clang diagnostics for unsatisfied constraints will be 
 used to report any invalid element types. Concepts required will differ depending
 on whether the resource is a typed buffer or a raw buffer. Until concepts are 
 formally supported by HLSL, the concepts and constraints will be expressed 
