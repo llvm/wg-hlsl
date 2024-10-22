@@ -84,7 +84,7 @@ concept definition are described below:
 | type trait | Description|
 |-|-|
 | `__is_intangible` | An RET should be an arithmetic type, bool, enum, or a vector or matrix or UDT containing such types. This is equivalent to validating that the RET is not intangible. This will error when given an incomplete type. |
-| `__builtin_hlsl_is_line_vector_layout_compatible` | A typed buffer RET with the DXIL IR target should never have two different subelement types. Line vector layout compatible also requires at most 4 elements, and a total size of at most 16 bytes. |
+| `__builtin_hlsl_is_line_vector_layout_compatible` | A typed buffer RET should never have two different subelement types. Line vector layout compatible also requires at most 4 elements, and a total size of at most 16 bytes. The builtin will also disallow the RET if any of its constituent types are enums or bools. |
 
 For raw buffers, only `!__is_intangible` needs to be true. 
 For typed buffers, `__builtin_hlsl_is_line_vector_layout_compatible` 
@@ -94,8 +94,8 @@ From this subvector, the first element will be compared to all elements in the v
 and any mismatches will return false. Typed buffer RETs will 
 also need to have at most 4 subelements, and the total size in bytes cannot exceed 16,
 which will also be verified by `__builtin_hlsl_is_line_vector_layout_compatible`.
-Finally, there will be an additional check that there are no bools or enums present
-in any component of the type.
+Finally, the builtin will validate that there are no bools or enums present in any 
+component of the type.
 
 ### Examples of RET validation results:
 ```
@@ -185,14 +185,13 @@ associated with RWBuffers is constructed as if this code was read and parsed by 
 
 namespace hlsl {
 
-template<typename RET>
-concept TypedResourceElementType = 
-    __builtin_hlsl_is_line_vector_layout_compatible<RET>() &&
-    !std::is_enum_v<RET> && !std::is_same_v<RET, bool>;
+template<typename T>
+concept is_valid_line_vector = 
+    __builtin_hlsl_is_line_vector_layout_compatible<T>();
 
-template<typename T> requires !__is_intangible(T) && TypedResourceElementType<T>
+template<typename element_type> requires !__is_intangible(element_type) && is_valid_line_vector<element_type>
 struct RWBuffer {
-    T Val;
+    element_type Val;
 };
 
 // doesn't need __builtin_hlsl_is_line_vector_layout_compatible, because this is a raw buffer
