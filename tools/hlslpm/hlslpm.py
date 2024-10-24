@@ -57,7 +57,7 @@ def updateIssues(args):
     for id in bodyBefore.keys():
         if bodyBefore[id] != bodyAfter[id]:
             print(
-                f"{issues.all_issues_by_id[id].getIssueReference()} body changed!")
+                f"https://github.com{issues.all_issues_by_id[id].issue_resourcePath} body changed!")
 
             if args.commit:
                 gh.set_issue_body(id, bodyAfter[id])
