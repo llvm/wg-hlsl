@@ -157,7 +157,9 @@ class Reporter:
                             if i.workstream == workstreamIssue.workstream
                             ]
 
-        unlinked = set(workstreamIssues).difference(set(linked_issues))
+        unlinked : List[str] = list(set(workstreamIssues).difference(set(linked_issues)))
+
+        unlinked.sort(reverse=True, key=lambda issue: self.issues.all_issues_by_id[issue].issue_state.name)
 
         if len(unlinked) == 0:
             return []
@@ -199,7 +201,8 @@ StatusText = {
     Status.Designing: "🤔",
     Status.NeedsReview: "👀",
     Status.Planning: "📅",
-    Status.Ready: "🧍"
+    Status.Ready: "🧍",
+    Status.Closed: "✅"
 }
 
 

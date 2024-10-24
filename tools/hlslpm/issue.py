@@ -13,6 +13,7 @@ class Status(Enum):
     Ready = "Ready"
     Active = "Active"
     NeedsReview = "Needs Review"
+    Closed = "Closed"
 
 class Category(Enum):
     NoCategory = None
