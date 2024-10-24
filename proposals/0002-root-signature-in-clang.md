@@ -393,6 +393,23 @@ stored as metadata nodes, identified by named metadata. The metadata format
 itself is a straightforward transcription of the in-memory data structure - so
 it is a list of root elements.
 
+While the attribute is attached to a function, the metadata collects all the
+root signatures together, with the initial metadata associating the root
+signatures with functions.
+
+Example for same root signature as above:
+
+```llvm
+!dx.rootsignatures = !{!2}
+!2 = !{ptr @main, !3 }
+!3 = !{ i32 1, !4, !5, !6, !7, !8 } ; RootFlags, Parameters, StaticSamplers
+!4 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
+!5 = !{ !"DescriptorTable", i32 0, !7 } ;  0 = visibility, range list !7
+!6 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
+!7 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+!8 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
+```
+
 See [Metadata Schema](#metadata-schema) for details.
 
 The IR schema has been designed so that many of the things that need to be
@@ -568,18 +585,6 @@ Named metadata with name "dx.rootsignatures".
 | ---------------------------- | ----------------------------------- |
 | Function RootSignature Pairs | list of Function RootSignature Pair |
 
-Example for same root signature as above:
-
-```llvm
-!dx.rootsignatures = !{!2}
-!2 = !{ptr @main, !3 }
-!3 = !{ i32 1, !4, !5, !6, !7, !8 } ; RootFlags, Parameters, StaticSamplers
-!4 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
-!5 = !{ !"DescriptorTable", i32 0, !7 } ;  0 = visibility, range list !7
-!6 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!7 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
-!8 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
-```
 
 ### Validations during DXIL generation
 
