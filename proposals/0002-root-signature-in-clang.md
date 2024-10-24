@@ -402,7 +402,7 @@ Example for same root signature as above:
 ```llvm
 !dx.rootsignatures = !{!2} ; list of function/root signature pairs
 !2 = !{ptr @main, !3 } ; function, root signature
-!3 = !{!4, !5, !6, !7 } ; list of root signature elements
+!3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
 !6 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
