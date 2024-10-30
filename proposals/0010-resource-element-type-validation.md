@@ -14,17 +14,25 @@ RWBuffer<float> rwbuf: register(u0);
 ```
 In this code, the element type is `float`, and the resource type is `RWBuffer`.
 `RWBuffer`, along with some other buffers and textures, fall under the "typed buffer"
-category. Below is a description of resources that are considered "typed buffers".
+category. Other buffer resources are categorized as "raw buffers". 
+Below is a description of resources that are considered "typed buffers" vs "raw buffers".
 * typed buffers
   * [RW|RasterizerOrdered]Buffer
   * [Feedback]Texture*
+* raw buffers
+  * [Append|Consume|RW|RasterizerOrdered]StructuredBuffer
+  * [RW]ByteAddressBuffer
 
-There is a distinct set of rules that define valid element types for typed buffer resources.
+There is a distinct set of rules that define valid element types for typed buffer resources
+and valid element types for raw buffer resources.
 
 Element types for typed buffer resources:
 * Are not intangible (e.g., isn't a resource type)
 * Must be vectors or scalars of arithmetic types, not bools nor enums nor arrays
 * Should be a scalar or homogenous vector of a floating-point or integer type, with a maximum of 4 components after translating 64-bit components into pairs of uint32_t components
+Element types for raw buffer resources:
+* Are not intangible (e.g., isn't a resource type)
+* All constituent types must be arithmetic types or bools or enums
 
 Resource types are never allowed as element types (i.e., `RWBuffer<int>` as an element type).
 If someone writes `RWBuffer<MyCustomType>` and MyCustomType is not a valid element type, 
@@ -32,9 +40,9 @@ there should be infrastructure to reject this element type and emit a message ex
 why it was rejected as an element type.
 
 ## Motivation
-Currently, there is an allow list of valid element types. It must be modified with respect 
-to this spec. Anything that is not a valid element type will be rejected. The allow list isn't
-broad enough, because user-defined types aren't allowed.
+Currently, there is an allow list of valid element types where element types not on the list
+are rejected. It must be modified with respect to this spec. The allow list isn't
+broad enough, because user-defined types aren't allowed for raw buffer resources.
 Ideally, a user should be able to determine exactly how any user-defined type is invalid 
 as an element type. Some system should be in place to more completely enforce the rules for 
 valid and invalid element types, as well as provide useful information on why they are invalid.
@@ -53,6 +61,9 @@ Although concepts are not currently supported in HLSL, we expect support to be
 added at some point in the future. Meanwhile, because LLVM does support concepts, 
 we can make use of them when constructing the AST in Sema.
 
+Two builtins will be used to validate typed buffer element types. Any resource 
+element type may not be intangible, so the negation of `__builtin_hlsl_is_intangible`
+will be used for both typed and raw buffer resources.
 A new built-in, `__builtin_hlsl_typed_element_compatible`, will be added in order
 to fully express the typed buffer constraint. This builtin will be placed within a
 concept constraint expression that is added to each AST node representing a typed
@@ -74,17 +85,11 @@ concept definition are described below:
 | type trait | Description|
 |-|-|
 | `!__builtin_hlsl_is_intangible ` | An element type should be an arithmetic type, bool, enum, or a vector or matrix or UDT containing such types. This is equivalent to validating that the element type is not intangible. This will error when given an incomplete type. |
-| `__builtin_hlsl_typed_element_compatible ` | A typed buffer element type should never have two different subelement types. Line vector layout compatible also requires at most 4 elements, and a total size of at most 16 bytes. The builtin will also disallow the element type if any of its constituent types are enums or bools. |
+| `__builtin_hlsl_typed_element_compatible ` | A typed buffer element type should never have two different subelement types. Compatible typed buffer element types require at most 4 elements, and a total size of at most 16 bytes. The builtin will also disallow the element type if any of its constituent types are enums or bools. |
 
 For typed buffers, `__builtin_hlsl_typed_element_compatible` and 
-`!__builtin_hlsl_is_intangible` needs to be true. `__builtin_hlsl_typed_element_compatible`
-will be used to ensure homogeneity. It will use `BuildFlattenedTypeList` to retrieve a small
-vector of the subelement types. From this subvector, the first element will be compared to 
-all elements in the vector, and any mismatches will return false. Typed buffer element types
-will also need to have at most 4 subelements, after splitting 64-bit subelements into two 32-bit
-subelements, which will also be verified by `__builtin_hlsl_is_line_vector_layout_compatible`.
-Finally, the `__builtin_hlsl_typed_element_compatible` will validate that there are no bools or
-enums present in any component of the type.
+`!__builtin_hlsl_is_intangible` needs to be true, while `!__builtin_hlsl_is_intangible` is all
+that's needed to validate element types for raw buffers. 
 
 ### Examples of Element Type validation results:
 ```
@@ -155,10 +160,10 @@ RWBuffer<notHomogenous> r9; // invalid, all template type components must have t
 StructuredBuffer<notHomogenous> r9Structured; // valid
 RWBuffer<depthDiff> r10; // invalid, all template type components must have the same type, DXC fails
 RWBuffer<EightElements> r11; // invalid, > 4 elements and > 16 bytes, DXC fails 
-// This would be caught by __builtin_hlsl_is_line_vector_layout_compatible
+// This would be caught by __builtin_hlsl_typed_element_compatible
 StructuredBuffer<EightElements> r9Structured; // valid
 RWBuffer<EightHalves> r12; // invalid, > 4 elements, DXC fails
-// This would be caught by __builtin_hlsl_is_line_vector_layout_compatible
+// This would be caught by __builtin_hlsl_typed_element_compatible
 StructuredBuffer<EightHalves> r12Structured; // valid
 RWBuffer<oneIntWithVec> r13; // valid
 RWBuffer<weirdStruct> r14; // valid
@@ -175,12 +180,19 @@ associated with RWBuffers is constructed as if this code was read and parsed by 
 namespace hlsl {
 
 template<typename T>
-concept is_valid_line_vector = 
-    __builtin_hlsl_is_line_vector_layout_compatible<T>();
+concept is_typed_element_compatible = 
+    __builtin_hlsl_typed_element_compatible(T);
 
-template<typename element_type> requires !__is_intangible(element_type) && is_valid_line_vector<element_type>
+template<typename element_type> requires !__builtin_hlsl_is_intangible(element_type) && is_typed_element_compatible<element_type>
 struct RWBuffer {
     element_type Val;
+};
+
+// doesn't need __builtin_hlsl_typed_element_compatible, because this is a raw buffer
+// also, raw buffers allow bools and enums as constituent types
+template<typename T> requires !__builtin_hlsl_is_intangible(T)
+struct StructuredBuffer {
+    T Val;
 };
 }
 
