@@ -1,4 +1,4 @@
-* Proposal: [0010](0010-resource-element-type-validation.md)
+* Proposal: [0011](0011-resource-element-type-validation.md)
 * Author(s): [Joshua Batista](https://github.com/bob80905)
 * Sponsor: Joshua Batista
 * Status: **Under Consideration**
@@ -24,7 +24,7 @@ Below is a description of resources that are considered "typed buffers" vs "raw 
   * [RW]ByteAddressBuffer
 
 There is a distinct set of rules that define valid element types for typed buffer resources
-and valid element types for raw buffer resources.
+and valid element types for `*StructuredBuffer` resources and `*ByteAddressBuffer` Load/Store operations.
 
 Element types for typed buffer resources:
 * Are not intangible (e.g., isn't a resource type)
@@ -32,9 +32,7 @@ Element types for typed buffer resources:
 * Should be a scalar or homogenous vector of a floating-point or integer type, with a maximum of 4 components after translating 64-bit components into pairs of uint32_t components
 Element types for raw buffer resources:
 * Are not intangible (e.g., isn't a resource type)
-* All constituent types must be arithmetic types or bools or enums
 
-Resource types are never allowed as element types (i.e., `RWBuffer<int>` as an element type).
 If someone writes `RWBuffer<MyCustomType>` and MyCustomType is not a valid element type, 
 there should be infrastructure to reject this element type and emit a message explaining 
 why it was rejected as an element type.
@@ -64,7 +62,7 @@ we can make use of them when constructing the AST in Sema.
 Two builtins will be used to validate typed buffer element types. Any resource 
 element type may not be intangible, so the negation of `__builtin_hlsl_is_intangible`
 will be used for both typed and raw buffer resources.
-A new built-in, `__builtin_hlsl_typed_element_compatible`, will be added in order
+A new built-in, `__builtin_hlsl_typed_resource_element_compatible`, will be added in order
 to fully express the typed buffer constraint. This builtin will be placed within a
 concept constraint expression that is added to each AST node representing a typed
 buffer resource. The builtin is described below. Standard clang diagnostics for
@@ -85,9 +83,9 @@ concept definition are described below:
 | type trait | Description|
 |-|-|
 | `!__builtin_hlsl_is_intangible ` | An element type should be an arithmetic type, bool, enum, or a vector or matrix or UDT containing such types. This is equivalent to validating that the element type is not intangible. This will error when given an incomplete type. |
-| `__builtin_hlsl_typed_element_compatible ` | A typed buffer element type should never have two different subelement types. Compatible typed buffer element types require at most 4 elements, and a total size of at most 16 bytes. The builtin will also disallow the element type if any of its constituent types are enums or bools. |
+| `__builtin_hlsl_typed_resource_element_compatible ` | A typed buffer element type should never have two different subelement types. Compatible typed buffer element types require at most 4 elements, and a total size of at most 16 bytes. The builtin will also disallow the element type if any of its constituent types are enums or bools. |
 
-For typed buffers, `__builtin_hlsl_typed_element_compatible` and 
+For typed buffers, `__builtin_hlsl_typed_resource_element_compatible` and 
 `!__builtin_hlsl_is_intangible` needs to be true, while `!__builtin_hlsl_is_intangible` is all
 that's needed to validate element types for raw buffers. 
 
@@ -160,10 +158,10 @@ RWBuffer<notHomogenous> r9; // invalid, all template type components must have t
 StructuredBuffer<notHomogenous> r9Structured; // valid
 RWBuffer<depthDiff> r10; // invalid, all template type components must have the same type, DXC fails
 RWBuffer<EightElements> r11; // invalid, > 4 elements and > 16 bytes, DXC fails 
-// This would be caught by __builtin_hlsl_typed_element_compatible
+// This would be caught by __builtin_hlsl_typed_resource_element_compatible
 StructuredBuffer<EightElements> r9Structured; // valid
 RWBuffer<EightHalves> r12; // invalid, > 4 elements, DXC fails
-// This would be caught by __builtin_hlsl_typed_element_compatible
+// This would be caught by __builtin_hlsl_typed_resource_element_compatible
 StructuredBuffer<EightHalves> r12Structured; // valid
 RWBuffer<oneIntWithVec> r13; // valid
 RWBuffer<weirdStruct> r14; // valid
@@ -180,15 +178,15 @@ associated with RWBuffers is constructed as if this code was read and parsed by 
 namespace hlsl {
 
 template<typename T>
-concept is_typed_element_compatible = 
-    __builtin_hlsl_typed_element_compatible(T);
+concept is_typed_resource_element_compatible = 
+    __builtin_hlsl_typed_resource_element_compatible(T);
 
-template<typename element_type> requires !__builtin_hlsl_is_intangible(element_type) && is_typed_element_compatible<element_type>
+template<typename element_type> requires !__builtin_hlsl_is_intangible(element_type) && is_typed_resource_element_compatible<element_type>
 struct RWBuffer {
     element_type Val;
 };
 
-// doesn't need __builtin_hlsl_typed_element_compatible, because this is a raw buffer
+// doesn't need __builtin_hlsl_typed_resource_element_compatible, because this is a raw buffer
 // also, raw buffers allow bools and enums as constituent types
 template<typename T> requires !__builtin_hlsl_is_intangible(T)
 struct StructuredBuffer {
