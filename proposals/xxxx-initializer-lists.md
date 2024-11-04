@@ -125,13 +125,13 @@ member accesses with type checking of each conversion as well. Take the
 following code and proposed AST:
 
 ```hlsl
-float4 F = 1.0.xxxx;
-struct A {
-  int A, B;
-  half C, D;
+float4 f = 1.0.xxxx;
+struct Blah {
+  int a, b;
+  half c , d;
 };
 
-A a = {F};
+Blah blah = {f};
 ```
 
 ```
