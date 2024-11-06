@@ -47,11 +47,9 @@ Because the syntax similarities the`tbuffer` declaration will also be using `HLS
 
 ### Lowering cbuffer to LLVM
 
-Constant buffers will be lowered to LLVM target type `target(dx.CBuffer, ..)`. The LLVM target types can include a list of types and a list of integer constants. Any information needed for lowering to DXIL or SPIRV needs to be encoded using these parameters.
+Constant buffers will be lowered to global variables with LLVM target type `target("dx.CBuffer", ..)`. In addition to the type name (`"dx.CBuffer"`) LLVM target types can also include a list of types and a list of integer constants. Any information needed for lowering to DXIL or SPIRV needs to be encoded using these parameters.
 
-To encode the shape of the `cbuffer` we can use the type  parameter of the LLVM target type to be a struct with all of the `cbuffer` variable declarations.
-
-To encode the `packoffset` information we can use the list of integer constant on the target type. If there is no `packoffset` specified, the list would be empty. If the `cbuffer` variables have a `packoffset`, then the target type would contain a list of constant integers where `n`-th constant would either be a non-negative number specifying the packoffset of the `n`-th variable. 
+To encode the shape of the `cbuffer` we can set the type  parameter of the LLVM target type to be a struct with all of the `cbuffer` variable declarations. The list of integer constant can be used to encode the `cbuffer` memory layout where the number of constants in the list would be equal to the number of `cbuffer` variable declarations and `n`-th constant would contain the offset `n`-th variable in bytes.
 
 **Note: `packoffset` offset must either be specified of all `cbuffer` variable declarations or on none.*
 
@@ -59,15 +57,31 @@ For example:
 
 ```c++
 cbuffer MyConstants {
-  float2 a : packoffset(c0.x);
-  int2 b : packoffset(c1.z);
+  float2 a;
+  float b[2];
+  int c;
 }
 ```
 
 Would be lowered to LLVM target type:
 
 ```
-target("dx.CBuffer", %struct.MyConstants = type { <2 x float>, <2 x i32> }, 0, 6)
+target("dx.CBuffer", %struct.MyConstants = type { <2 x float>, [2 x float], int }, 0, 16, 36)
+```
+
+In this example with `packoffset`:
+
+```c++
+cbuffer MyConstants {
+  float2 a : packoffset(c0.y);
+  int2 b : packoffset(c1.z);
+}
+```
+
+The `cbuffer` type would be lowered to:
+
+```
+target("dx.CBuffer", %struct.MyConstants = type { <2 x float>, <2 x i32> }, 4, 24)
 ```
 
 ### Lowering cbuffer variable access
@@ -91,12 +105,9 @@ Should we handle the constant buffer layout and `packoffset` info earlier?
 ## Links
 
 [Shader Constants](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-constants)<br/>
+[Packing Rules for Constant Variables](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-packing-rules)<br/>
 [HLSL Constant Buffer Layout Visualizer](https://maraneshi.github.io/HLSL-ConstantBufferLayoutVisualizer)<br/>
-[packoffset attribute](0003-packoffset.md)
+[`packoffset` Attribute](0003-packoffset.md)
 
 ## Acknowledgments (Optional)
 
-Take a moment to acknowledge the contributions of people other than the author
-and sponsor.
-
-<!-- {% endraw %} -->
