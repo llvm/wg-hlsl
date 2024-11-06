@@ -47,11 +47,7 @@ Because the syntax similarities the`tbuffer` declaration will also be using `HLS
 
 ### Lowering cbuffer to LLVM
 
-Constant buffers will be lowered to global variables with LLVM target type `target("dx.CBuffer", ..)`. In addition to the type name (`"dx.CBuffer"`) LLVM target types can also include a list of types and a list of integer constants. Any information needed for lowering to DXIL or SPIRV needs to be encoded using these parameters.
-
-To encode the shape of the `cbuffer` we can set the type  parameter of the LLVM target type to be a struct with all of the `cbuffer` variable declarations. The list of integer constant can be used to encode the `cbuffer` memory layout where the number of constants in the list would be equal to the number of `cbuffer` variable declarations and `n`-th constant would contain the offset `n`-th variable in bytes.
-
-**Note: `packoffset` offset must either be specified of all `cbuffer` variable declarations or on none.*
+Constant buffers will be lowered to global variables with LLVM target type `target("dx.CBuffer", ..)`. In addition to the type name (`"dx.CBuffer"`) LLVM target types can also include a list of types and a list of integer constants. Any information needed for lowering to DXIL or SPIRV needs to be encoded using these parameters. To encode the shape of the `cbuffer` we can set the type parameter of the LLVM target type to be a struct with all of the `cbuffer` variable declarations.
 
 For example:
 
@@ -66,29 +62,18 @@ cbuffer MyConstants {
 Would be lowered to LLVM target type:
 
 ```
-target("dx.CBuffer", %struct.MyConstants = type { <2 x float>, [2 x float], int }, 0, 16, 36)
-```
-
-In this example with `packoffset`:
-
-```c++
-cbuffer MyConstants {
-  float2 a : packoffset(c0.y);
-  int2 b : packoffset(c1.z);
-}
-```
-
-The `cbuffer` type would be lowered to:
-
-```
-target("dx.CBuffer", %struct.MyConstants = type { <2 x float>, <2 x i32> }, 4, 24)
+@MyConstants.cb = global target("dx.CBuffer", %struct.MyConstants = type { <2 x float>, [2 x float], int })
 ```
 
 ### Lowering cbuffer variable access
 
-Access to `cbuffer` variables would be lowered to LLVM in the same way and other resource types handle read-only subscript operator. The constant value access would be translated into a memory access in a specific "resource address space". This would be a simple "resource pointer arithmetic".
+The layout of constant buffers will be calculated during codegen in `CGHLSLRuntime`, which will also take into account `packoffset` attributes.
 
-Later, during lowering to DXIL, an LLVM pass would translate these specific "resource address space" memory accesses into `cbufferLoadLegacy` DXIL ops. This pass would take into account specific constant buffer layout rules and `packoffset` data, which are specific to DirectX.
+Access to `cbuffer` variables will be lowered to LLVM IR the same way as other resource types lower read-only access via subscript operator, except it will use the calculated layout offset. The constant value access would be translated into a memory access in a specific "resource address space" using the `cbuffer` global variable and offset.
+
+### DXIL Lowering
+
+Later, during lowering to DXIL, an LLVM pass would translate these specific "resource address space" memory accesses into `cbufferLoadLegacy` DXIL ops. This pass would take into account specific constant buffer layout rules (loading data one row at a time and extracing specific elements).
 
 ### Handle initialization
 
@@ -100,7 +85,7 @@ Constant buffers will be initialized the same way as other resources using the `
 
 ## Alternatives considered (Optional)
 
-Should we handle the constant buffer layout and `packoffset` info earlier?
+Should we handle the constant buffer layout and `packoffset` later? Should we encode it int into the CBuffer LLVM target type?
 
 ## Links
 
