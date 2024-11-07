@@ -30,6 +30,7 @@ Element types for typed buffer resources:
 * Are not intangible (e.g., isn't a resource type)
 * Must be vectors or scalars of arithmetic types, not bools nor enums nor arrays nor structs
 * Should be a scalar or homogenous vector of a floating-point or integer type, with a maximum of 4 components after translating 64-bit components into pairs of uint32_t components
+
 Element types for raw buffer resources:
 * Are not intangible (e.g., isn't a resource type)
 
