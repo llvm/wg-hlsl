@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 import json
 
-from issue import Category, Issue, IssueState
+from issue import Category, Issue, IssueState, Status
 
 
 class GH:
@@ -43,6 +43,7 @@ class GH:
                     title=maybe_get(node, 'content', 'title'),
                     item_id=node['id'],
                     item_updatedAt=to_datetime(maybe_get(node, 'updatedAt')),
+                    status=Status(maybe_get(node, 'status', 'name')),
                     category=Category(
                         maybe_get(node, 'category', 'name')),
                     target_date=to_date(maybe_get(node, 'target', 'date')),
@@ -121,10 +122,10 @@ class GH:
 
         f = self.projectMilestoneFieldInfo
         params = {
-            "projectId":f["projectId"],
-            "fieldId":f["fieldId"],
-            "itemId":project_item_id,
-            "projectMilestone":f["options"][projectMilestone]
+            "projectId": f["projectId"],
+            "fieldId": f["fieldId"],
+            "itemId": project_item_id,
+            "projectMilestone": f["options"][projectMilestone]
         }
 
         r = self.graphql(query, params)
@@ -142,7 +143,8 @@ class GH:
 
         result = self.graphql(query, params)
 
-        rawOptions = maybe_get(result, "data", "organization", "projectV2", "field", "options")
+        rawOptions = maybe_get(
+            result, "data", "organization", "projectV2", "field", "options")
         options = dict([(o["name"], o["id"]) for o in rawOptions])
 
         return {
