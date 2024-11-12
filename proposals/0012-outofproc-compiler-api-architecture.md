@@ -2,7 +2,7 @@
 
 # Out-of-process compiler api architecture
 
-* Proposal: [NNNN](NNNN-outofproc-compiler-api-architecture.md)
+* Proposal: [0012](0012-outofproc-compiler-api-architecture.md)
 * Author(s): [Cooper Partin](https://github.com/coopp)
 * Sponsor: [Cooper Partin](https://github.com/coopp)
 * Status: **Under Consideration**
