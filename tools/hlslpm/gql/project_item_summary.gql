@@ -3,12 +3,18 @@ query($after: String) {
         projectV2(number: 4) {
             items(first: 100, after: $after) {
                 nodes {
-                    updatedAt id                     
+                    updatedAt id
+                    status:fieldValueByName(name: "Status") {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
                     category:fieldValueByName(name: "Category") { 
                         ... on ProjectV2ItemFieldSingleSelectValue { name } }
                     target:fieldValueByName(name: "Target") { 
                         ... on ProjectV2ItemFieldDateValue { date } }
-                    content { ... on Issue { id updatedAt resourcePath title } }
+                    workstream:fieldValueByName(name: "Workstream") {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    projectMilestone:fieldValueByName(name: "ProjectMilestone") {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                    content { ... on Issue { id updatedAt resourcePath title state } }
                 }
                 pageInfo { endCursor hasNextPage }
             }

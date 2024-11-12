@@ -1,11 +1,12 @@
 # Main entry point for tool that mangages the HLSL Project on llvm.
 
-import sys
 from argparse import ArgumentParser
 import os
 from typing import List
 from issue import Issue, Issues
 import github
+from updateMilestoneField import updateMilestoneField_addArgs
+from report import report_addArgs
 
 
 def saveIssues(basePath, issues: List[Issue]):
@@ -21,12 +22,12 @@ def saveIssues(basePath, issues: List[Issue]):
 def updateIssues_addArgs(subparsers):
     parser: ArgumentParser = subparsers.add_parser(
         'update-issues', aliases=['ui'])
-    
+
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--save', action='store_true',
-                        help="Saves before/after issues")
+                       help="Saves before/after issues")
     group.add_argument('--commit', action='store_true',
-                        help="Commit changes to the github issues")
+                       help="Commit changes to the github issues")
     parser.set_defaults(func=updateIssues)
 
 
@@ -55,10 +56,12 @@ def updateIssues(args):
 
     for id in bodyBefore.keys():
         if bodyBefore[id] != bodyAfter[id]:
-            print(f"{id} changed!")
+            print(
+                f"https://github.com{issues.all_issues_by_id[id].issue_resourcePath} body changed!")
 
-            if args.update:
+            if args.commit:
                 gh.set_issue_body(id, bodyAfter[id])
+
 
 
 if __name__ == '__main__':
@@ -68,6 +71,8 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(
         required=True, title="subcommands", description="valid subcommands", help="additional help")
     updateIssues_addArgs(subparsers)
+    updateMilestoneField_addArgs(subparsers)
+    report_addArgs(subparsers)
 
     args = parser.parse_args()
 
