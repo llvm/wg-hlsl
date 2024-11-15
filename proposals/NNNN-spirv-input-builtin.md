@@ -41,66 +41,26 @@ This document explain how we plan on implementing those in Clang/LLVM.
 
 ## Proposed Solution
 
-## Static behaving like an external & LLVM
-
-The current HLSL syntax for inline SPIR-V requires those built-ins to be
-`static [const]` variables. The rational was those variables were private to
-the invocation, and thus could be written/read without any concurrency issues.
-This was fine in DXC as we had our own AST->SPIR-V lowering.
-
-In Clang/LLVM, that's different: such static variable can be optimized in many
-ways:
-aggressive ways.
- - A non-initialized `static const` is not allowed.
- - Any dead-store to a `static int` can be removed.
- - Meaning any pure computation parent to this store can be removed.
-
-Solving this can be done in 3 ways:
- - Change the spec, allowing the syntax to be less "magical": use `extern`.
- - Fixup the storage class of those variables in Clang.
- - Emit an external constructor & destructor for those preventing optimization.
-
-I'd be in favor of the first solution, which correctly expresses in HLSL what
-those built-in variables are, see this
-[spec issue](https://github.com/microsoft/hlsl-specs/issues/350).
-If we emit those as `extern [thread_local]`, everything works out of the box,
-and HLSL feels less magical.
-
-The second solution is to patch Clang to add corner cases for HLSL:
- - allow a `static const` to be left uninitialized.
- - patch the storage class from `SC_Static` to `SC_Extern`
-Advantage: we keep the spec as-is, but we add hacks in Clang.
-
-Third solution: keep the static, but add a CXXConstructor which calls a
-target-specific intrinsic `load_builtin`. Advantage is Clang already has the
-code to handle global initializers, so generating those is OK.
-For the output, we'd need to do the opposite: insert another intrinsic
-`store_builtin` at the end, which will make sure stores to the variable as not
-optimized away.
-The disadvantage is we need to emit more target-specific code in the
-entry point, meaning more maintenance.
-
 ## Frontend changes
 
-Once we solved the variable issue, we need two additional bit of information
-to emit proper SPIR-V:
- - the SPIR-V storage class: `Input` or `Output`.
- - the attached `BuiltIn` or `Location` decoration.
+Global variables marked with Inline SPIR-V will be marked using two new
+attributes:
+- `HLSLInputBuiltin`
+- `HLSLOutputBuiltin`
 
-The plan is to add:
-- 2 new attributes: `HLSLInputBuiltin` and `HLSLOutputBuiltin`
-- 2 new address spaces: `vulkan_input` and `vulkan_output`
+In addition, a new address space will be added:
+- `vulkan_private`
 
 The TD file will attach each attribute to a `SubjectList` with the following
 constraints:
 
 ```
 HLSLInputBuiltin:  S->hasGlobalStorage() &&
-                   S->getStorageClass()==StorageClass::SC_Extern &&
+                   S->getStorageClass()==StorageClass::SC_Static &&
                    S->getType().isConstQualified()
 
 HLSLOutputBuiltin: S->hasGlobalStorage() &&
-                   S->getStorageClass()==StorageClass::SC_Extern &&
+                   S->getStorageClass()==StorageClass::SC_Static &&
                    !S->getType().isConstQualified()
 
 def HLSLVkExtBuiltinInput: InheritableAttr {
@@ -118,42 +78,80 @@ def HLSLVkExtBuiltinOutput: InheritableAttr {
 }
 ```
 
-When this attribute is encountered, the global variable address space is
-changed to either `vulkan_input` or `vulkan_output`.
-Then, a `MDNode` is attached: `spirv.Decorations`, adding the `BuiltIn`
-decoration using the int argument of the attribute.
+When this attribute is encountered, several changes will occur:
+- The address space will be set to `vulkan_private`
+- a constructor will be added.
+- a destructor will be added.
 
-Finally, for input/output parameters, we will; skip the attribute, but create
-the same global variable with corresponding `vulkan_` address space, and
-the `spirv.Decorations` metadata.
+The construction will call a target-specific intrinsic: `spv_load_builtin`.
+This builtin takes the SPIR-V built-in ID as parameter, and returns the
+value of the corresponding built-in.
 
-The `llvm::Value` passed to the function will be a load from this global
-variable.
+The destructor will call another intrinsic: `spv_store_builtin`. This builtin
+takes the SPIR-V built-in ID, as well as a value to store as parameter.
 
+And lastly, to support input parameters with semantics, the same intrinsic
+will be called in the generated entrypoint wrapper function.
 
-## What if we don't change the spec and keep static
+Because the 2 new intrinsics will be marked as `MemWrite` or `MemRead`, LLVM
+won't be able to optimize them away, and the initial/final load/store will
+be kept.
 
-The change mentioned above assumes we move to an `external`. In case we decide
-not to change the HLSL spec, this still holds.
-What changes is:
- - Attr.td: constraint will need to check `SC_Static`
- - global variable: a construction **will** be required OR storage class
-   is changed to `SC_External` internally.
- - Sema has to be updated to allow `const static int MyVar;` to be legal.
+Corresponding code could be:
+
+```
+[[vk::ext_builtin_input(/* GlobalInvocationId */ 28)]]
+static const uint3 myBuiltIn;
+
+void main(uint3 thread_id_from_param : SV_DispatchThreadID) {
+  [...]
+}
+
+constructor_myBuiltIn() {
+  myBuiltIn = spv_load_builtin(28);
+}
+
+destructor_myBuiltIn() {
+  spv_store_builtin(28, myBuiltIn);
+}
+
+void entrypoint() {
+  constructor_myBuiltIn();
+
+  uint3 input_param1 = spv_load_builtin(28);
+  main(input_param1)
+
+  destructor_myBuiltIn();
+}
+```
+
+The emitted global variable for inline SPIR-V will be in the global scope,
+meaning it will require the `Private` storage class in SPIR-V.
+Because of that, globals linked to the added attributes will require a new
+address space `vulkan_private`.
 
 ## Backend changes
 
-The SPIR-V backend already supports the `spirv.Decorations` metadata, so this
-part works already.
+Backend will translate the new `vulkan_privatge` address space to
+`StorageClass::Private`.
 
-What's required is to add the translation from the `LangAS` `vulkan_input` and
-`vulkan_output` to `Input` and `Output` storage class. This is quite trivial
-as we already rely on the address space to determine the `OpVariable` storage
-classes.
+The backend will also need to implement 2 new intrinsics:
+```
+llvm_any_ty spv_load_builtin(i32 built_in_id);
+spv_store_builtin(i32 built_in_id, llvm_any_ty);
+```
+
+Both will use the GlobalRegistry to get/create a builtin global variable with
+the correct decoration. A call to the `load` will generate an Input builtin,
+while a call to the `store` will generate an `Output` builtin.
+
+Only the first lowering of each intrinsic will generate a builtin.
+
+The load intrinsic will then add an `OpLoad`, while the store an `OpStore`.
 
 ## Draft PR
 
-https://github.com/llvm/llvm-project/pull/115187
+https://github.com/llvm/llvm-project/pull/116393
 
 
 
