@@ -401,7 +401,7 @@ Example for same root signature as above:
 
 ```llvm
 !dx.rootsignatures = !{!2} ; list of function/root signature pairs
-!2 = !{ptr @main, !3 } ; function, root signature
+!2 = !{ ptr @main, !3 } ; function, root signature
 !3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
@@ -530,7 +530,7 @@ reference to a root signature (the second operand).
 #### Root Signature
 
 ```LLVM
-!3 = !{!4, !5, !6, !7 }
+!3 = !{ !4, !5, !6, !7 }
 ```
 
 The root signature itself consists of a list of references to root signature
@@ -562,8 +562,8 @@ before generating the metadata.
 
 Operands:
 
-* i32: the root signature flags ([D3D12_ROOT_SIGNATURE_FLAGS](d3d12_root_signature_flags))
-
+* i32: the root signature flags
+  ([D3D12_ROOT_SIGNATURE_FLAGS][d3d12_root_signature_flags])
 
 #### Root Constants
 
@@ -622,7 +622,7 @@ Operands:
 * i32: number of descriptors in the range
 * i32: base shader register
 * i32: register space
-* i32: descriptor range flgs ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
+* i32: descriptor range flags ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
 
 #### Static Samplers
 
@@ -631,19 +631,19 @@ Operands:
 ```
 
 Operands:
-* i32: Filter ([D3D12_FILTER](d3d12_filter))
-* i32: AddressU ([D3D12_TEXTURE_ADDRESS_MODE](d3d12_texture_address_mode))
-* i32: AddressV ([D3D12_TEXTURE_ADDRESS_MODE](d3d12_texture_address_mode))
-* i32: AddressW ([D3D12_TEXTURE_ADDRESS_MODE](d3d12_texture_address_mode))
+* i32: Filter ([D3D12_FILTER][d3d12_filter])
+* i32: AddressU ([D3D12_TEXTURE_ADDRESS_MODE][d3d12_texture_address_mode])
+* i32: AddressV ([D3D12_TEXTURE_ADDRESS_MODE][d3d12_texture_address_mode])
+* i32: AddressW ([D3D12_TEXTURE_ADDRESS_MODE][d3d12_texture_address_mode])
 * float: MipLODBias
 * i32: MaxAnisotropy
-* i32: ComparisonFunc ([D3D12_COMPARISON_FUNC](d3d12_comparison_func))
-* i32: BorderColor ([D3D12_STATIC_BORDER_COLOR](d3d12_static_border_color))
+* i32: ComparisonFunc ([D3D12_COMPARISON_FUNC][d3d12_comparison_func])
+* i32: BorderColor ([D3D12_STATIC_BORDER_COLOR][d3d12_static_border_color])
 * float: MinLOD
 * float: MaxLOD
 * i32: ShaderRegister
 * i32: RegisterSpace
-* i32: ShaderVisibility ([D3D12_SHADER_VISIBILITY](d3d12_shader_visibility))
+* i32: ShaderVisibility ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
 
 
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
