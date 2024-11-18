@@ -209,7 +209,7 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
         'DATA_VOLATILE' |
         'DATA_STATIC' |
         'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-        'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS'                          
+        'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS'
 
     CBV : 'CBV' '(' bReg (',' 'numDescriptors' '=' NUMBER)?
           (',' 'space' '=' NUMBER)?
@@ -329,7 +329,7 @@ float4 eg1() : SV_TARGET { return a[0]; }
 
 // invalid: b is bound to t1 that is not bound in the root signature.
 [RootSignature("SRV(t0)")]
-float4 eg2() : SV_TARGET { return b[0]; } 
+float4 eg2() : SV_TARGET { return b[0]; }
 ```
 
 ## Proposed solution
@@ -393,6 +393,24 @@ stored as metadata nodes, identified by named metadata. The metadata format
 itself is a straightforward transcription of the in-memory data structure - so
 it is a list of root elements.
 
+While the attribute is attached to a function, the metadata collects all the
+root signatures together, with the initial metadata associating the root
+signatures with functions.
+
+Example for same root signature as above:
+
+```llvm
+!dx.rootsignatures = !{!2} ; list of function/root signature pairs
+!2 = !{ ptr @main, !3 } ; function, root signature
+!3 = !{ !4, !5, !6, !7 } ; list of root signature elements
+!4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
+!5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
+!6 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
+!7 = !{ !"DescriptorTable", i32 0, !8, !9 } ;  0 = visibility, range list !8, !9
+!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
+!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+```
+
 See [Metadata Schema](#metadata-schema) for details.
 
 The IR schema has been designed so that many of the things that need to be
@@ -445,19 +463,19 @@ elimation has completed.
 
 #### All the values should be legal.
 
-Most values like ShaderVisibility/ParameterType are covered by syntactical 
+Most values like ShaderVisibility/ParameterType are covered by syntactical
 checks in Sema.
 The additional semantic rules not already covered by the grammar are listed here.
 
 - For DESCRIPTOR_RANGE_FLAGS on a Sampler, only the following values are valid
-  
+
   - 0
   - DESCRIPTORS_VOLATILE
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV, only the following values are
    valid
-  
+
   - 0
   - DESCRIPTORS_VOLATILE
   - DATA_VOLATILE
@@ -471,115 +489,172 @@ The additional semantic rules not already covered by the grammar are listed here
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - StaticSampler
-  
+
   - Max/MinLOD cannot be NaN.
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
 
 - Register Space
   -The range 0xFFFFFFF0 to 0xFFFFFFFF is reserved.
-  
+
   `CBV(b0, space=4294967295)` is invalid due to the use of reserved space 0xFFFFFFFF.
-  
+
 
 - Resource ranges must not overlap.
-  
+
   `CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))` will result in an error
   due to overlapping at b2.
-  
+
 
 ### Metadata Schema
 
-#### RootConstant
+#### Named Root Signature table
 
-| Property         | Type   | Type detail             |
-| ---------------- | ------ | ----------------------- |
-| ParameterType    | string | "RootConstant"          |
-| ShaderVisibility | i32    | D3D12_SHADER_VISIBILITY |
-| ShaderRegister   | i32    | i32                     |
-| RegisterSpace    | i32    | i32                     |
-| Num32BitValues   | i32    | i32                     |
-
-#### RootDescriptor
-
-| Property            | Type   | Type detail                     |
-| ------------------- | ------ | ------------------------------- |
-| ParameterType       | string | "RootCBV", "RootSRV", "RootUAV" |
-| ShaderVisibility    | i32    | D3D12_SHADER_VISIBILITY         |
-| ShaderRegister      | i32    | i32                             |
-| RegisterSpace       | i32    | i32                             |
-| RootDescriptorFlags | i32    | D3D12_ROOT_DESCRIPTOR_FLAGS     |
-
-#### DescriptorRange
-
-| Property             | Type   | Type detail                    |
-| -------------------- | ------ | ------------------------------ |
-| RangeType            | string | "SRV", "UAV", "CBV", "Sampler" |
-| NumDescriptors       | i32    | i32                            |
-| BaseShaderRegister   | i32    | i32                            |
-| RegisterSpace        | i32    | i32                            |
-| DescriptorRangeFlags | i32    | D3D12_DESCRIPTOR_RANGE_FLAGS   |
-
-#### DescriptorTable
-
-| Property         | Type              | Type detail              |
-| ---------------- | ----------------- | ------------------------ |
-| ParameterType    | string            | "DescriptorTable"        |
-| ShaderVisibility | i32               | D3D12_SHADER_VISIBILITY  |
-| DescriptorRanges | Reference of list | list of DescriptorRanges |
-
-#### StaticSampler
-
-| Property         | Type  | Type detail                |
-| ---------------- | ----- | -------------------------- |
-| ParameterType    | string| "StaticSampler"            |
-| Filter           | i32   | D3D12_FILTER               |
-| AddressU         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
-| AddressV         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
-| AddressW         | i32   | D3D12_TEXTURE_ADDRESS_MODE |
-| MipLODBias       | float | float                      |
-| MaxAnisotropy    | i32   | i32                        |
-| ComparisonFunc   | i32   | D3D12_COMPARISON_FUNC      |
-| BorderColor      | i32   | D3D12_STATIC_BORDER_COLOR  |
-| MinLOD           | float | float                      |
-| MaxLOD           | float | float                      |
-| ShaderRegister   | i32   | i32                        |
-| RegisterSpace    | i32   | i32                        |
-| ShaderVisibility | i32   | D3D12_SHADER_VISIBILITY    |
-
-#### RootSignature
-
-| Property       | Type              | Type detail          |
-| -------------- | ----------------- | -------------------- |
-| Root elements  | reference to list | list of root elements|
-
-#### Function RootSignature pair
-
-| Property      | Type          |
-| ------------- | ------------- |
-| EntryFunction | Function      |
-| RootSignature | RootSignature |
-
-#### RootSignature table
-
-Named metadata with name "dx.rootsignatures".
-
-| Property                     | Type                                |
-| ---------------------------- | ----------------------------------- |
-| Function RootSignature Pairs | list of Function RootSignature Pair |
-
-Example for same root signature as above:
-
-```llvm
+```LLVM
 !dx.rootsignatures = !{!2}
-!2 = !{ptr @main, !3 }
-!3 = !{ i32 1, !4, !5, !6, !7, !8 } ; RootFlags, Parameters, StaticSamplers
-!4 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
-!5 = !{ !"DescriptorTable", i32 0, !7 } ;  0 = visibility, range list !7
-!6 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!7 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
-!8 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
 ```
+
+A named metadata node, `dx.rootsignatures` is used to identify the root
+signature table. The table itself is a list of references to function/root
+signature pairs.
+
+#### Function/Root Signature Pair
+
+```LLVM
+!2 = !{ptr @main, !3 }
+```
+
+The function/root signature associates a function (the first operand) with a
+reference to a root signature (the second operand).
+
+#### Root Signature
+
+```LLVM
+!3 = !{ !4, !5, !6, !7 }
+```
+
+The root signature itself consists of a list of references to root signature
+elements.
+
+#### Root Signature Elements
+
+Root signature elements are identified by the first operand, which is a string.
+The following root signature elements are defined:
+
+* Root flags ("RootFlags")
+* Root constants ("RootConstants")
+* Root descriptors ("RootCBV", "RootSRV", "RootUAV")
+* Descriptor tables ("DescriptorTable")
+* Static samplers ("StaticSampler")
+
+As in the [string representation](#root-signature-grammar) of the root
+signature, the elements can appear in any order. This does mean that invalid
+root signatures can be represented in the metadata (eg multiple root flags). As
+a result of this anything that takes the metadata as input must validate the
+incoming metadata, even if the HLSL frontend happens to perform validation
+before generating the metadata.
+
+#### Root Flags
+
+```LLVM
+!4 = { !"RootFlags", i32 1 }
+```
+
+Operands:
+
+* i32: the root signature flags
+  ([D3D12_ROOT_SIGNATURE_FLAGS][d3d12_root_signature_flags])
+
+#### Root Constants
+
+```LLVM
+!123 = { !"RootConstants", i32 0, i32 1, i32 2, i32 3 }
+```
+
+Operands:
+* i32: shader visibility ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
+* i32: shader register
+* i32: register space
+* i32: number 32 bit values
+
+#### Root descriptors
+
+Root descriptors come in three flavors, but they have the same structure. The
+flavors are:
+
+* Root constant buffer view ("RootCBV")
+* Root shader resource view ("RootSRV")
+* Root unordered access view ("RootUAV")
+
+```LLVM
+!5 = { !"RootCBV", i32 0, i32 1, i32 0, i32 0 }
+```
+
+Operands:
+* i32: shader visibility  ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
+* i32: shader register
+* i32: register space
+* i32: root descriptor flags ([D3D12_ROOT_DESCRIPTOR_FLAGS][d3d12_root_descriptor_flags])
+
+#### Descriptor Tables
+
+Descriptor tables are made up of descriptor ranges.
+
+```LLVM
+!7 = { !"DescriptorTable", i32 0, !8, !9 }
+```
+
+Operands:
+
+* i32: shader visibility  ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
+* remaining operands are references to descriptor ranges
+
+##### Descriptor Ranges
+
+```LLVM
+!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 }
+!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 }
+```
+
+Operands:
+
+* string: type of range - "SRV", "UAV", "CBV" or "Sampler"
+* i32: number of descriptors in the range
+* i32: base shader register
+* i32: register space
+* i32: descriptor range flags ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
+
+#### Static Samplers
+
+```LLVM
+!6 = !{ !"StaticSampler", i32 1, i32 0, ... }; remaining operands omitted for space
+```
+
+Operands:
+* i32: Filter ([D3D12_FILTER][d3d12_filter])
+* i32: AddressU ([D3D12_TEXTURE_ADDRESS_MODE][d3d12_texture_address_mode])
+* i32: AddressV ([D3D12_TEXTURE_ADDRESS_MODE][d3d12_texture_address_mode])
+* i32: AddressW ([D3D12_TEXTURE_ADDRESS_MODE][d3d12_texture_address_mode])
+* float: MipLODBias
+* i32: MaxAnisotropy
+* i32: ComparisonFunc ([D3D12_COMPARISON_FUNC][d3d12_comparison_func])
+* i32: BorderColor ([D3D12_STATIC_BORDER_COLOR][d3d12_static_border_color])
+* float: MinLOD
+* float: MaxLOD
+* i32: ShaderRegister
+* i32: RegisterSpace
+* i32: ShaderVisibility ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
+
+
+[d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
+[d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
+[d3d12_root_descriptor_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_descriptor_flags
+[d3d12_descriptor_range_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_descriptor_range_flags
+[d3d12_filter]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_filter
+[d3d12_texture_address_mode]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_texture_address_mode
+[d3d12_comparison_func]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_comparison_func
+[d3d12_static_border_color]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_static_border_color
+
 
 ### Validations during DXIL generation
 
@@ -589,15 +664,15 @@ Example for same root signature as above:
   need to be checked during DXIL generation as well.
   The difference between checks in Sema and DXIL generation is that Sema could
   rely on syntactical checks to validate values in many cases.
-  However, in DXIL generation, all values need to be checked to ensure they 
+  However, in DXIL generation, all values need to be checked to ensure they
   fall within the correct range:
 
 - RootFlags
-  
+
   - (RootFlags & 0x80000fff) should equals 0.
 
 - Valid values for ShaderVisibility
-  
+
   - SHADER_VISIBILITY_ALL
   - SHADER_VISIBILITY_VERTEX
   - SHADER_VISIBILITY_HULL
@@ -608,14 +683,14 @@ Example for same root signature as above:
   - SHADER_VISIBILITY_MESH
 
 - Valid values for RootDescriptorFlags
-  
+
   - 0
   - DataVolatile
   - DataStaticWihleSetAtExecute
   - DataStatic
 
 - Valid values for DescriptorRangeFlags on CBV/SRV/UAV
-  
+
   - 0
   - DESCRIPTORS_VOLATILE
   - DATA_VOLATILE
@@ -629,15 +704,15 @@ Example for same root signature as above:
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - Valid values for DescriptorRangeFlags on Sampler
-  
+
   - 0
   - DESCRIPTORS_VOLATILE
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - StaticSampler
-  
+
   - Valid values for Filter
-    
+
     - FILTER_MIN_MAG_MIP_POINT
     - FILTER_MIN_MAG_POINT_MIP_LINEAR
     - FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT
@@ -674,35 +749,35 @@ Example for same root signature as above:
     - FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT
     - FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR
     - FILTER_MAXIMUM_ANISOTROPIC
-  
+
   - Valid values for TextureAddress
-    
-    - TEXTURE_ADDRESS_WRAP 
-    - TEXTURE_ADDRESS_MIRROR  
-    - TEXTURE_ADDRESS_CLAMP 
-    - TEXTURE_ADDRESS_BORDER 
+
+    - TEXTURE_ADDRESS_WRAP
+    - TEXTURE_ADDRESS_MIRROR
+    - TEXTURE_ADDRESS_CLAMP
+    - TEXTURE_ADDRESS_BORDER
     - TEXTURE_ADDRESS_MIRROR_ONCE
-  
+
   - Valid values for ComparisonFunc
-    
+
     - 0
-    - COMPARISON_NEVER 
-    - COMPARISON_LESS 
-    - COMPARISON_EQUAL 
-    - COMPARISON_LESS_EQUAL 
-    - COMPARISON_GREATER 
-    - COMPARISON_NOT_EQUAL 
-    - COMPARISON_GREATER_EQUAL 
+    - COMPARISON_NEVER
+    - COMPARISON_LESS
+    - COMPARISON_EQUAL
+    - COMPARISON_LESS_EQUAL
+    - COMPARISON_GREATER
+    - COMPARISON_NOT_EQUAL
+    - COMPARISON_GREATER_EQUAL
     - COMPARISON_ALWAYS
-  
+
   - Valid values for StaticBorderColor
-    
-    - STATIC_BORDER_COLOR_TRANSPARENT_BLACK 
-    - STATIC_BORDER_COLOR_OPAQUE_BLACK 
+
+    - STATIC_BORDER_COLOR_TRANSPARENT_BLACK
+    - STATIC_BORDER_COLOR_OPAQUE_BLACK
     - STATIC_BORDER_COLOR_OPAQUE_WHITE
-  
+
   - Comparison filter must have ComparisonFunc not equal to 0.
-    
+
     When the Filter of a StaticSampler is `FILTER_COMPARISON*`,
     the ComparisonFunc cannot be 0.
 
