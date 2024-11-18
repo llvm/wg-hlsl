@@ -2,9 +2,9 @@
 
 # Initializer Lists
 
-* Proposal: [NNNN](NNNN-initializer-lists.md)
+* Proposal: [0013](0013-initializer-lists.md)
 * Author(s): [Chris Bieneman](https://github.com/llvm-beanz)
-* Status: **Design In Progress**
+* Status: **Accepted**
 
 
 ## Introduction
@@ -12,8 +12,8 @@
 HLSL's initializer lists assume a member-by-member flattened initialization
 sequence. It is significantly different in behavior from C/C++ initializer
 lists, but in a way that may not be apparent to users that they are depending on
-the divergent behavior. This proposal suggests an approach to implementing
-HLSL's initializer lists with a forward-looking perspective.
+the divergent behavior. This proposal offers a forward-looking approach to
+implementing HLSL's unique initializer behavior.
 
 ## Motivation
 
@@ -80,10 +80,10 @@ in Clang.
 ## Proposed solution
 
 This solution is based on an assumption that we will adopt
-[Proposal 0005 - Strict Initializer Lists](https://github.com/microsoft/hlsl-specs/blob/main/proposals/0005-strict-initializer-lists.md)
-for HLSL 202y. The strict initializer lists proposal is motivated by a closer
-alignment with C++, better error handling, and resolving incompatibilities with
-variadic template initializer lists.
+[Proposal 0005 - Strict Initializer Lists](Proposal_0005) for HLSL 202y. The
+strict initializer lists proposal is motivated by a closer alignment with C++,
+better error handling, and resolving incompatibilities with variadic template
+initializer lists.
 
 To facilitate implementing C++ initializer list behavior while also providing
 compatibility with existing HLSL, this proposal suggests that Clang parse HLSL
@@ -165,5 +165,7 @@ A a = {F.x, F.y, F.z, F.w};
 
 Because the AST would represent a valid C++ structure, we can make a refactoring
 easily by just running the statement printer. 
+
+[Proposal_0005]: https://github.com/microsoft/hlsl-specs/blob/main/proposals/0005-strict-initializer-lists.md
 
 <!-- {% endraw %} -->
