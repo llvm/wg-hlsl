@@ -67,8 +67,33 @@ HLSL Attribute                                                        | Applicab
 `vk::ext_literal`                                                     | Parameters of functions with `vk::ext_instruction`                            | `"spv.literal"`                                              | The parameter is encoded as a literal in the SPIR-V instruction instead of generating an `OpConstant`.
 `vk::ext_reference`                                                   | Parameters of functions with `vk::ext_instruction`                            | N/A (handled in Clang)                                       | The parameter's type is modified to a reference type in the Clang AST. (Address space handling needs further investigation.)
 
+TODO: Discuss optimizations.
+
 ## Detailed design
 
 ## Alternatives considered (Optional)
+
+When implementing the extension and capability attributes, they could be
+represented as a target type: `target("spv.capability", <capability>)` and
+`target("spv.extension.<name>")`. We could then have some way of add these as
+extra parameter to the function. This is not a desirable solution for functions
+because it is less straight forward. The llvm-ir will be harder to read, and the
+code to generate the function will contain code that does not follow common code
+patterns.
+
+Another alternative is to add metadata nodes that contain this information. The
+OpenCL FE uses metadata to pass information to the SPIR-V backend. One example
+is the `spirv.Decorations` metadata nodes to adding decorations to values. We
+chose not to use metadata because metadata is supposed to "convey extra
+information about the code to the optimizers and code generator." However, these
+attributes do not represent extra information. Instead, they are information
+necessary for the code-generator to generate correct code. The information
+cannot be dropped.
+
+Extensions and capabilities are module level information. It would be possible
+to encode them as named metadata attached to the module, which cannot be
+dropped. That could work, but we want to retain the connection between the
+extensions and capabilities with the function or type so that the backend can
+avoid generating them if the function or type is unused.
 
 <!-- {% endraw %} -->
