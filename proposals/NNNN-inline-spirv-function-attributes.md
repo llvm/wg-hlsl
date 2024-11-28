@@ -48,8 +48,13 @@ The `vk::ext_instruction`, `vk:spvexecutionmode`, `vk::ext_capability`, and
 `vk::ext_extension` will become target attributes on the functions to which they
 apply. Then the backend can generate the appropriate SPIR-V. Note that
 `vk::ext_capability` and `vk::ext_extension` can apply to variables and type
-aliases, but that will be part of another proposal. The `vk::literal` attribute
-will be turned in to a target attribute on the function parameter.
+aliases, but that will be part of another proposal.
+
+In Sema, paramters with the `vk::literal` attribute will be converted to a
+parameter of type `target(spirv.inline.literal, <N>)`, and the parameter passed
+it is `zeroinitializer`. The SPIR-V backend will set the corresponding operand
+in the `vk::ext_instruction` with the literal `N`. The value of the parameter is
+ignored.
 
 The `vk::ext_reference` attribute can be handled in Clang but changing the type
 in the AST to a reference type. TODO: Need to figure out how address spaces work
@@ -58,14 +63,14 @@ with this.
 The following table explains which target attribute each HLSL attribute will
 correspond to, and how it will be interpreted in the backend.
 
-HLSL Attribute                                                        | Applicable to                                                                 | llvm-ir target attribute                                     | Attribute Description
---------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------
-`vk::ext_instruction(uint opcode, [string extended_instruction_set])` | Function declarations with no definition.                                     | `"spv.ext_instruction"="<opcode>,<instruction set>"`         | Calls to functions with this attribute are replaced by a single SPIR-V instruction.<br>If `<instruction set>` is the empty string, then it will generate the core SPIR-V instruction with the given opcode.<br>Otherwise, it will create an `OpExtInst` instruction, where the instruction is `<opcode>` in the given instruction set.
-`vk::spvexecutionmode(uint execution_mode, ...)`                      | Entry point functions                                                         | `"spv.executionmode"="<mode>:<op>..."`                       | For each execution mode, a separate `OpExecuteMode` instruction is generated with the given operands. The operands are interpreted as literal integers.
-`vk::ext_extension(string extension_name)`                            | Applicable to entry point functions and functions with `vk::ext_instruction`. | `"spv.extextension"="<extension name>,<extension name>,..."` | A separate `OpExtension` instruction is added for each extension name. The extension is added to the list of allowed extensions in the SPIR-V backend.
-`vk::ext_capability(uint capability)`                                 | Applicable to entry point functions and functions with `vk::ext_instruction`. | `"spv.extcapability"="<capability id>: <capability id>..."`  | A separate `OpCapability` instruction is added for each capability. The capability is added to the list of allowed capabilities in the SPIR-V backend.
-`vk::ext_literal`                                                     | Parameters of functions with `vk::ext_instruction`                            | `"spv.literal"`                                              | The parameter is encoded as a literal in the SPIR-V instruction instead of generating an `OpConstant`.
-`vk::ext_reference`                                                   | Parameters of functions with `vk::ext_instruction`                            | N/A (handled in Clang)                                       | The parameter's type is modified to a reference type in the Clang AST. (Address space handling needs further investigation.)
+HLSL Attribute                                                        | Applicable to                                                                 | llvm-ir                                                                       | Attribute Description
+--------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------
+`vk::ext_instruction(uint opcode, [string extended_instruction_set])` | Function declarations with no definition.                                     | Target attribute `"spv.ext_instruction"="<opcode>,<instruction set>"`         | Calls to functions with this attribute are replaced by a single SPIR-V instruction.<br>If `<instruction set>` is the empty string, then it will generate the core SPIR-V instruction with the given opcode.<br>Otherwise, it will create an `OpExtInst` instruction, where the instruction is `<opcode>` in the given instruction set.
+`vk::spvexecutionmode(uint execution_mode, ...)`                      | Entry point functions                                                         | Target attribute `"spv.executionmode"="<mode>:<op>..."`                       | For each execution mode, a separate `OpExecuteMode` instruction is generated with the given operands. The operands are interpreted as literal integers.
+`vk::ext_extension(string extension_name)`                            | Applicable to entry point functions and functions with `vk::ext_instruction`. | Target attribute `"spv.extextension"="<extension name>,<extension name>,..."` | A separate `OpExtension` instruction is added for each extension name. The extension is added to the list of allowed extensions in the SPIR-V backend.
+`vk::ext_capability(uint capability)`                                 | Applicable to entry point functions and functions with `vk::ext_instruction`. | Target attribute `"spv.extcapability"="<capability id>: <capability id>..."`  | A separate `OpCapability` instruction is added for each capability. The capability is added to the list of allowed capabilities in the SPIR-V backend.
+`vk::ext_literal`                                                     | Parameters of functions with `vk::ext_instruction`                            | Target type `"spirv.inline.literal"`                                          | The parameter's type becomes the `spirv.inline.literal` target type, and the operand of the target type is the value of the parameter.
+`vk::ext_reference`                                                   | Parameters of functions with `vk::ext_instruction`                            | N/A (handled in Clang)                                                        | The parameter's type is modified to a reference type in the Clang AST. (Address space handling needs further investigation.)
 
 TODO: Discuss optimizations.
 
