@@ -37,7 +37,7 @@ proposals left open what the target types should be for SPIR-V.
 
 The general pattern for the solution will be that `@llvm.spv.handle.fromBinding`
 will return a SPIR-V pointer to a type `T`. The type for `T` will be detailed
-when discusses each HLSL resource type. The SPIR-V backend will create a global
+when discussing each HLSL resource type. The SPIR-V backend will create a global
 variable with type `T` if `range_size` is 1, and `T[range_size]` otherwise.
 
 The reason we want `@llvm.spv.handle.fromBinding` to return a pointer is to make
@@ -68,9 +68,8 @@ For these cases the return type from `@llvm.spv.handle.fromBinding` would be:
 target("spirv.Pointer", 0 /* UniformConstantStorageClass */, target("spirv.Image", ...))
 ```
 
-The details of the `spirv.Image` type depend on the specific declaration.
-
-TODO: We need to determine the image format.
+The details of the `spirv.Image` type depend on the specific declaration, and
+are detailed in the "Mapping Resource Attributes to DXIL and SPIR-V" proposal.
 
 ### Structured buffers and texture buffers
 
@@ -83,45 +82,49 @@ For these cases the return type from `@llvm.spv.handle.fromBinding` for
 `RWStructuredBuffer<T>` would be:
 
 ```llvm-ir
-target("spirv.Pointer", 12 /* StorageBuffer */, T')
+%T = type { ... } ; Fully laid out version of T.
+%T1 = type { [0 x %T] } ; The SPIR-V backend should turn the array into a runtime array.
+target("spirv.Type", target(spirv.Literal, /* StorageBuffer */ 12),
+                     target("spirv.DecoratedType", %T1, /* block */ 2),
+                     /* OpTypePointer */32)
 ```
 
-Where `T' = struct { T t[]; }`.
+Note that the llvm-ir does not have to be exactly that, but should be
+equivalent. For example, there does not have to be a identified type for `%T1`.
 
 For `StructuredBuffer<T>`,
 
 ```llvm-ir
-target("spirv.Pointer", 12 /* StorageBuffer */, const T')
+%T = type { ... } ; Fully laid out version of T.
+%T1 = type { [0 x %T] } ; The SPIR-V backend should turn the array into a runtime array.
+target("spirv.Type", target(spirv.Literal, /* StorageBuffer */ 12),
+                     target("spirv.DecoratedType",
+                            target("spirv.DecoratedType", %T1, /* block */ 2),
+                            /* NonWriteable */ 24),
+                     /* OpTypePointer */32)
 ```
 
-TODO: We need to determine how the Block decoration will be added. The current
-idea will have clang describe the type in detail, which means that clang needs a
-way to say that the type `T'` requires the decoration. There is a
-`spirv.Decoration` metadata, but that works on global variable only at this
-time. We could have the target spirv type access the metadata node as an
-operand. This interacts with the implementation of `vk::ext_decorate`, which
-will have to be able to apply decoration to members of types.
+This is the same as `RWStructuredBuffer` except that it has the NonWritable
+decoration.
 
-TODO: We need to determine what the layout of the struct should be. Will we
-support multiple layout as we do in DXC? This could be communicated to the back
-end by adding the decorations to the type in the same way as the previous todo.
-
-Note: We are in the middle of implementing `vk::SpirvType` in clang. That should
-add a way to implement the target types without adding a specific
-`spirv.Pointer` target type.
+The specific layout for `T` is out of scope for this proposal, and will be part
+of another proposal.
 
 ### Constant buffers
 
 Constant buffers are implemented as uniform buffers. They will have the exact
-same representation as a structured buffer except that the storage class will be
-`Uniform` instead of `UniformConstant`.
+same representation as a `StructuredBuffer` except that the storage class will
+be `Uniform` instead of `StorageBuffer`. The layout will potentially be
+different.
 
 ### Samplers
 
-For these cases the return type from `@llvm.spv.handle.fromBinding` would be:
+The return type from `@llvm.spv.handle.fromBinding` for a sampler will be:
 
 ```llvm-ir
-target("spirv.Pointer", 0 /* UniformConstantStorageClass */, target("spirv.Sampler"))
+target("spirv.Type", target(spirv.Literal, /* UniformConstantStorageClass */ 0),
+                     target("spirv.Sampler"),
+                     /* OpTypePointer */32)
 ```
 
 This is the same for a `SamplerState` and `SamplerComparisonState`.
@@ -139,27 +142,38 @@ decision.
 
 If
 [untyped pointers](https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_untyped_pointers.html)
-are available, then the return type from `@llvm.spv.handle.fromBinding` would
-be:
+are available, then the return type from `@llvm.spv.handle.fromBinding` for a
+`RWByteAddressBuffer` would be:
 
 ```llvm-ir
-target("spirv.UntypedPointer", 12 /* StorageBuffer */)
+target("spirv.Type", target(spirv.Literal, /* StorageBuffer */ 12),
+                     /* OpTypeUntypedPointerKHR */ 4417)
 ```
+
+This assumes that knowledge of untyped pointers is added to the SPIR-V backend.
+If it is not added, we will have to explicitly attached the capability and
+extension to the type.
 
 If untyped pointers are not available, then the return type from
 `@llvm.spv.handle.fromBinding` would be:
 
 ```llvm-ir
-target("spirv.Pointer", 12 /* StorageBuffer */, { uint32_t[] })
+target("spirv.Type", target(spirv.Literal, /* StorageBuffer */ 12),
+                     target("spirv.DecoratedType", { [0 x i32] }, /* block */ 2),
+                     /* OpTypePointer */32)
 ```
 
-TODO: Add the `block` decoration.
+It would be the same for `ByteAddressBuffer` except the `NonWriteable`
+decoration is will be added.
 
 The intrinsics that use the ByteAddressBuffers will not change depending on the
-type used. The SPIR-V backend should recognize the type and implement
-accordingly.
+type used. The SPIR-V backend should recognize the type and implement the
+operation accordingly.
 
 ### Rasterizer Order Views
+
+TODO: This needs to be redone. We might need to add the attribute to the
+fromBinding call site.
 
 If a resource is a rasterizer order view it will generate the exact same code as
 its regular version except
