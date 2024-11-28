@@ -17,32 +17,30 @@ Input `BuiltIn` values are private to the executing lane. Reading their
 value has no side-effect. If not used, those built-in can safely be removed
 from the shader module (Unlike the inputs tagged with `Location`).
 
-Output 'BuiltIn' values starts with an undefined value. Those are private
-to the lane, and storing to them had no other side-effect than to modify the
-initially stored value. It is allowed to load those values.
+Output 'BuiltIn' values are slightly different:
+ - Their initial value is undefined. Loading them is UB.
+ - Storing to it has a side effect: removing the pipeline default value.
+ - Loading the built-in once stored to is defined: it returns the last
+   set value.
 
-Example:
-
+Examples:
 ```hlsl
-float4 vsmain(float4 Position : POSITION) : SV_POSITION
-{
-  return Position;
-}
+  float a = my_output_builtin * 123.f; // Undefined behavior.
+  my_output_builtin = my_output_builtin; // Undefined behavior.
+  my_output_builtin = 0.f; // Replacing pipeline's default value with 0.f.
+  float b = my_output_builtin; // Defined, b = 0.f;
 ```
 
-Both `POSITION` and `SV_POSITION` will be represented as an `OpVariable`:
-
-- `POSITION` will have the `Input` storage class.
-- `SV_POSITION` will have the `Output` storage class.
-
-- `POSITION` will be decorated with `Location 0`.
-- `SV_POSITION` will be decorated with `BuiltIn Position`.
-
-In addition, users can define their own SPIR-V built-ins using inline SPIR-V:
+In HLSL, Input/Output built-ins can be accessed through two methods:
 
 ```hlsl
 [[vk::ext_builtin_input(/* NumWorkGroups */ 24)]]
-static const uint3 myBuiltIn;
+static const uint3 from_a_global;
+
+void main(uint3 from_a_semantic : SV_ThreadId)
+{
+  uint3 a = from_a_semantic + from_a_global;
+}
 ```
 
 This document explain how we plan on implementing those in Clang/LLVM.
@@ -56,8 +54,9 @@ attributes:
 - `HLSLInputBuiltin`
 - `HLSLOutputBuiltin`
 
-In addition, a new address space will be added:
-- `vulkan_private`
+In addition, a two new address spaces will be added:
+- `hlsl_input`
+- `hlsl_output`
 
 The TD file will attach each attribute to a `SubjectList` with the following
 constraints:
@@ -87,133 +86,54 @@ def HLSLVkExtBuiltinOutput: InheritableAttr {
 ```
 
 When this attribute is encountered, several changes will occur:
-- The address space will be set to `vulkan_private`
-- a constructor will be added for both input & output builtins.
-- a destructor will be added to output builtins.
+- AS will be set to `hlsl_input` for input built-ins.
+- AS will be set to `hlsl_output` for input built-ins.
+- a `spirv.Decoration` metadata is added with the `BuiltIn <id>` decoration.
 
-The construction will call a target-specific intrinsic: `spv_load_builtin`.
-This builtin takes the SPIR-V built-in ID as parameter, and returns the
-value of the corresponding built-in.
+The AS change will allow the back-end to correctly determine the variable
+storage class.
+The metadata will be converted `OpDecorate <reg> BuiltIn <id>`.
 
-The destructor will call another intrinsic: `spv_store_builtin`. This builtin
-takes the SPIR-V built-in ID, as well as a value to store as parameter.
 
-And lastly, to support input parameters with semantics, the same intrinsic
-will be called in the generated entrypoint wrapper function.
-
-Because the 2 new intrinsics will be marked as `MemWrite` or `MemRead`, LLVM
-won't be able to optimize them away, and the initial/final load/store will
-be kept.
-
-Corresponding code could be:
+The same mechanism will be used for semantic inputs, but we'll also create
+load/stores in the entry-point wrapper to be equivalent to:
 
 ```
 [[vk::ext_builtin_input(/* GlobalInvocationId */ 28)]]
-static const uint3 myBuiltIn;
+static const uint3 dispatch_thread_id;
 
-[[vk::ext_builtin_output(/* SomeUnknownOutput */ 1234)]]
-static uint3 myOutputBuiltIn;
+[[vk::ext_builtin_output(/* ValidOutputSemantic */ 1234)]]
+static uint3 output_semantic;
 
-void main(uint3 thread_id_from_param : SV_DispatchThreadID) {
+[numthreads(1, 1, 1)]
+uint3 csmain(uint3 id : SV_DispatchThreadID) : SV_SomeValidOutputSemantic {
   [...]
 }
 
-constructor_myBuiltIn() {
-  myBuiltIn = spv_load_builtin(28);
-}
-
-constructor_myOutputBuiltIn() {
-  myOutputBuiltIn = spv_load_builtin(1234);
-}
-
-destructor_myOutputBuiltIn() {
-  spv_store_builtin(1234, myOutputBuiltIn);
-}
-
-void entrypoint() {
-  constructor_myBuiltIn();
-  constructor_myOutputBuiltIn();
-
-  uint3 input_param1 = spv_load_builtin(28);
-  main(input_param1)
-
-  destructor_myOutputBuiltIn();
+void generated_entrypoint() {
+  output_semantic = main(dispatch_thread_id);
 }
 ```
 
-The emitted global variable for inline SPIR-V will be in the global scope,
-meaning it will require the `Private` storage class in SPIR-V.
-Because of that, globals linked to the added attributes will require a new
-address space `vulkan_private`.
-
-## What about unused or conditionally loaded Input built-ins?
-
-Loading a built-in has no side-effect. Hence, the load can be duplicated, or
-hoisted in the entry function/global ctor.
-
-If the variable is loaded, and result is never used, LLVM should be able to
-optimize those loads away. Same goes for the remaining unused local variable.
-
-## What about conditionally stored Output built-ins?
-
-Output built-ins starts with an undefined value. This means if the shader
-doesn't modify this builtin, we should either remove it, or leave it
-unchanged.
-
-The simplest option is to load the initial value, and then allow the shader
-to modify it.
-
-The global value ctor would load the builtin value into the global, and the
-global dtor store it back.
-From the SPIR-V point of view, loading then storing this undefined value
-should not have any impact, as builtin load/stores should not have
-side-effects.
-
-This design at least allows us to have correct code, even if the output
-builtin modification is gated behing a condition:
- - lanes taking this branch would modify the undefined into a known value.
- - lanes not taking this branch would load & store back the undefined value.
-
-# What about unused Output built-ins?
-
-The issue the ctor/dtor approach has is it prevents LLVM to eliminate unused
-output built-ins.
-
-Assuming we correctly run `dce`, `always-inline`, `dse`, `deadargelim` passes,
-we should end up with an unoptimized `spv_load_builtin()` and
-`spv_store_builtin()`.
-
-Because those are marked `MemRead` and `MemWrite`, LLVM won't be able to
-optimize them away.
-
-Solving could probably be done using a custom IR pass:
-- this would consider a given BuiltIn ID to represent a location in memory.
-- hence, it could associate the load/store pairs.
-- if the loaded value remains unchanged when passed to a store, eliminate
-  both.
+In have the user's entrypoint returns a struct with semantic on fields,
+the entrypoint will have 1 store per semantic, and the module 1 global per
+semantic.
 
 ## Backend changes
 
-Backend will translate the new `vulkan_privatge` address space to
-`StorageClass::Private`.
+Backend will translate the new `vulkan_input` address space to
+`StorageClass::Input`, and `vulkan_output` to `StorageClass::Output`.
 
-The backend will also need to implement 2 new intrinsics:
-```
-llvm_any_ty spv_load_builtin(i32 built_in_id);
-spv_store_builtin(i32 built_in_id, llvm_any_ty);
-```
+Decoration lowering is already available.
+No change is required for the entrypoint wrapper.
 
-Both will use the GlobalRegistry to get/create a builtin global variable with
-the correct decoration. A call to the `load` will generate an Input builtin,
-while a call to the `store` will generate an `Output` builtin.
+# FAQ
 
-Only the first lowering of each intrinsic will generate a builtin.
+## Why not follow the DXIL design with load/store functions?
 
-The load intrinsic will then add an `OpLoad`, while the store an `OpStore`.
-
-## Draft PR
-
-https://github.com/llvm/llvm-project/pull/116393
-
-
-
+SPIR-V implements built-ins as variables.
+Storing to an output built-in has a hidden side-effect on the pipeline.
+Implementing this as a global variable is the most natural way to implement
+this. Implementing it like DXIL using functions would require tracking those,
+and only generating the input/output variable if at least one read/write is
+valid.
