@@ -49,8 +49,8 @@ This document explain how we plan on implementing those in Clang/LLVM.
 
 ## Frontend changes
 
-Global variables marked with Inline SPIR-V will be marked using two new
-attributes:
+Global variables marked with `vk::ext_builtin_input` or
+`vk::ext_builtin_output` will be marked in the AST using two new attributes:
 - `HLSLInputBuiltin`
 - `HLSLOutputBuiltin`
 
@@ -86,13 +86,13 @@ def HLSLVkExtBuiltinOutput: InheritableAttr {
 ```
 
 When this attribute is encountered, several changes will occur:
-- AS will be set to `hlsl_input` for input built-ins.
-- AS will be set to `hlsl_output` for input built-ins.
+- Address space will be set to `hlsl_input` for input built-ins.
+- Address space will be set to `hlsl_output` for output built-ins.
 - a `spirv.Decoration` metadata is added with the `BuiltIn <id>` decoration.
 
-The AS change will allow the back-end to correctly determine the variable
+The address space change will allow the back-end to correctly determine the variable
 storage class.
-The metadata will be converted `OpDecorate <reg> BuiltIn <id>`.
+The metadata will be converted to `OpDecorate <reg> BuiltIn <id>`.
 
 
 The same mechanism will be used for semantic inputs, but we'll also create
@@ -115,16 +115,15 @@ void generated_entrypoint() {
 }
 ```
 
-In have the user's entrypoint returns a struct with semantic on fields,
-the entrypoint will have 1 store per semantic, and the module 1 global per
-semantic.
+If the entrypoint returns a struct with semantic on fields, the entrypoint
+wrapper will have 1 store per semantic, and the module 1 global per semantic.
 
 ## Backend changes
 
-Backend will translate the new `vulkan_input` address space to
-`StorageClass::Input`, and `vulkan_output` to `StorageClass::Output`.
+The SPIR-V backend will translate the new `hlsl_input` address space to
+`StorageClass::Input`, and `hlsl_output` to `StorageClass::Output`.
 
-Decoration lowering is already available.
+The SPIR-V backend already accepts the `spirv.Decoration` metadata.
 No change is required for the entrypoint wrapper.
 
 # FAQ
