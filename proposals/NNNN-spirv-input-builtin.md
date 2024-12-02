@@ -11,11 +11,12 @@ to and from a shader, e.g: the system semantic `SV_GroupID` or `MY_SEMANTIC`,
 a user-defined semantic.
 
 In SPIR-V, those are translated to `Input` and `Output` variables,
-with either a `BuiltIn` or `Location` decoration.
+with either a `BuiltIn` or `Location` decoration. This proposal only
+focuses the `BuiltIn` interface variables.
 
 Input `BuiltIn` values are private to the executing lane. Reading their
 value has no side-effect. If not used, those built-in can safely be removed
-from the shader module (Unlike the inputs tagged with `Location`).
+from the shader module.
 
 Output 'BuiltIn' values are slightly different:
  - Their initial value is undefined. Loading them is UB.
