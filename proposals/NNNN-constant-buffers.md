@@ -37,8 +37,8 @@ struct MyConstants {
 ConstantBuffer<MyConstants> CB;
 ```
  
-In this case the buffer variables are referenced as if they were members of the
-`ConstantBuffer` class: `CB.F`.
+In this case the buffer variables are referenced as if `CB` was of type
+`MyConstants` and the fields are members of that object.
 
 ## Motivation
 
@@ -50,7 +50,7 @@ the HLSL language.
 ### Parsing `cbuffer` Declaration
 
 In Clang frontend the `cbuffer` declaration will be parsed into a new AST Node
-called `HLSLConstantBufferDecl`. This class will be based on from `NameDecl` and
+called `HLSLConstantBufferDecl`. This class will be based on `NameDecl` and
 `DeclContext`.
 
 Variable declarations inside the `cbuffer` context will be children of this new
@@ -76,11 +76,11 @@ same way as other resource classes. It will have a resource handle with
 argument. It will be handled as other resources classes, for example it can be
 passed into a function. 
 
-At the same time Clang needs to recognize this class represents a constant
-buffer and the contained type fields are accessed using the `.` operator on
-`ConstantBuffer` instance. In other words treating `ConstantBuffer<MyConstants>
-CB;` as if it was declared as `cbuffer __CB { MyConstants CB; }`. The exact way
-how to do this is TBD.
+Clang needs to recognize that this class represents a constant buffer and the
+contained type fields are accessed using the `.` operator on `ConstantBuffer`
+instance. In other words treating `ConstantBuffer<MyConstants> CB;` as if it was
+declared as `cbuffer __CB { MyConstants CB; }`. The exact way how to do this is
+TBD.
 
 ### Lowering Constant Buffers to LLVM IR
 
