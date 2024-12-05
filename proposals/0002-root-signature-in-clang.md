@@ -5,7 +5,7 @@
 * Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
   Pepper](https://github.com/damyanp), [Joao Saffran](https://github.com/joaosaffran)
-* Status: **Under Consideration**
+* Status: **Accepted**
 * Impacted Project(s): Clang, LLVM
 
 <!--
