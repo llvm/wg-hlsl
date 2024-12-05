@@ -1,12 +1,12 @@
 <!-- {% raw %} -->
 
-# Implementation of Root Signatures in Clang
+# Implementation of Root Signatures in Clang and LLVM IR
 
 * Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
-  Pepper](https://github.com/damyanp)
+  Pepper](https://github.com/damyanp), [Joao Saffran](https://github.com/joaosaffran)
 * Status: **Under Consideration**
-* Impacted Project(s): Clang
+* Impacted Project(s): Clang, LLVM
 
 <!--
 *During the review process, add the following fields as needed:*
@@ -31,7 +31,6 @@ This change proposes adding:
 * A metadata representation of the root signature so it can be stored in LLVM IR
 * Validation and diagnostic generation for root signatures during semantic
   analysis
-* Conversion of the metadata representation to the binary serialized format.
 
 ## Motivation
 
@@ -385,13 +384,13 @@ parsedRootSignature = RootSignature{
 };
 ```
 
-### Root Signatures in the LLVM IR
+### LLVM IR Root Signature Representation
 
-During frontend code generation an IR-based representation of the root signature
-is generated from the in-memory data structures stored in the AST. This is
-stored as metadata nodes, identified by named metadata. The metadata format
-itself is a straightforward transcription of the in-memory data structure - so
-it is a list of root elements.
+LLVM IR code generation, during entry point emition,
+an IR-based representation of the root signature is generated from the in-memory 
+data structures stored in the AST. This is stored as metadata nodes, identified 
+by named metadata. The metadata format itself is a straightforward transcription 
+of the in-memory data structure - so it is a list of root elements.
 
 While the attribute is attached to a function, the metadata collects all the
 root signatures together, with the initial metadata associating the root
@@ -400,7 +399,7 @@ signatures with functions.
 Example for same root signature as above:
 
 ```llvm
-!dx.rootsignatures = !{!2} ; list of function/root signature pairs
+!hlsl.rootsignatures = !{!2} ; list of function/root signature pairs
 !2 = !{ ptr @main, !3 } ; function, root signature
 !3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
@@ -420,42 +419,6 @@ descriptor range. However, it is possible to represent root signatures where
 registers are bound multiple times, or where there are multiple RootFlags
 entries, so subsequent stages should not assume that any given root signature in
 IR is valid.
-
-### Code Generation
-
-During backend code generation, the LLVM IR metadata representation of the root
-signature is converted to data structures that are more closely aligned to the
-final file format. For example, root parameters and static samplers can be
-intermingled in the previous formats, but are now separated into separate arrays
-at this point.
-
-Example for same root signature as above:
-
-```c++
-rootSignature = RootSignature(
-  ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-  { // parameters
-    RootCBV(0, 1),
-    DescriptorTable({
-      SRV(0, 0, unbounded, 0),
-      UAV(5, 1, 10, 0)
-    })
-  },
-  { // static samplers
-    StaticSampler(1, 0)
-  });
-```
-
-At this point, final validation is performed to ensure that the root signature
-itself is valid. One key validation here is to check that each register is only
-bound once in the root signature. Even though this validation has been performed
-in the Clang frontend, we also need to support scenarios where the IR comes from
-other frontends, so the validation must be performed here as well.
-
-Once the root signature itself has been validated, validation is performed
-against the shader to ensure that any registers that the shader uses are bound
-in the root signature. This validation needs to occur after any dead-code
-elimation has completed.
 
 ## Detailed design
 
