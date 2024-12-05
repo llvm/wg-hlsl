@@ -420,6 +420,52 @@ registers are bound multiple times, or where there are multiple RootFlags
 entries, so subsequent stages should not assume that any given root signature in
 IR is valid.
 
+### Code Generation
+
+During backend code generation, the LLVM IR metadata representation of the root
+signature is converted to data structures that are more closely aligned to the
+final file format. For example, root parameters and static samplers can be
+intermingled in the previous formats, but are now separated into separate arrays
+at this point.
+
+Example for same root signature as above:
+
+```c++
+rootSignature = RootSignature(
+  ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+  { // parameters
+    RootCBV(0, 1),
+    DescriptorTable({
+      SRV(0, 0, unbounded, 0),
+      UAV(5, 1, 10, 0)
+    })
+  },
+  { // static samplers
+    StaticSampler(1, 0)
+  });
+```
+
+At this point, final validation is performed to ensure that the root signature
+itself is valid. One key validation here is to check that each register is only
+bound once in the root signature. Even though this validation has been performed
+in the Clang frontend, we also need to support scenarios where the IR comes from
+other frontends, so the validation must be performed here as well.
+
+Once the root signature itself has been validated, validation is performed
+against the shader to ensure that any registers that the shader uses are bound
+in the root signature. This validation needs to occur after any dead-code
+elimation has completed.
+
+### Testing
+Testing DX Container generation requires a two stage testing strategy.
+1. Use Google Test unit tests to create and inspect binary files for specific
+   hex values, this is useful for local validation.
+2. Cyclic tests, generating YAML from the binary, and then check the other
+   way as well.
+Some examples are the existing DX Container unit tests. 
+Such test infrastructure will require the design and construction of a disassembler
+for Root Signature Blob or DX Container.
+
 ## Detailed design
 
 ### Validations in Sema
