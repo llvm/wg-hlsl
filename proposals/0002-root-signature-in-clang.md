@@ -31,6 +31,8 @@ This change proposes adding:
 * A metadata representation of the root signature so it can be stored in LLVM IR
 * Validation and diagnostic generation for root signatures during semantic
   analysis
+* Conversion of the metadata representation to the binary serialized format.
+
 
 ## Motivation
 
