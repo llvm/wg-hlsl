@@ -399,7 +399,7 @@ signatures with functions.
 Example for same root signature as above:
 
 ```llvm
-!hlsl.rootsignatures = !{!2} ; list of function/root signature pairs
+!dx.rootsignatures = !{!2} ; list of function/root signature pairs
 !2 = !{ ptr @main, !3 } ; function, root signature
 !3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
