@@ -28,7 +28,7 @@ This change proposes adding:
 
 ## Motivation
 
-The motivation is the same as the one in [Purposal 0002](https://github.com/joaosaffran/wg-hlsl/blob/purposal/root-signatures/proposals/0002-root-signature-in-clang.md#motivation).
+The motivation is the same as the one in [Proposal 0002](0002-root-signature-in-clang.md#motivation).
 
 ## Proposed solution
 ### Generating of Root Signatures BLOB
