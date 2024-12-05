@@ -6,7 +6,7 @@
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
   Pepper](https://github.com/damyanp), [Joao Saffran](https://github.com/joaosaffran)
 * Status: **Accepted**
-* Impacted Project(s): Clang, LLVM
+* Impacted Project(s): Clang
 
 <!--
 *During the review process, add the following fields as needed:*
