@@ -31,7 +31,7 @@ This change proposes adding:
 The motivation is the same as the one in [Proposal 0002](0002-root-signature-in-clang.md#motivation).
 
 ## Proposed solution
-### Generating of Root Signatures BLOB
+### Generating of Root Signature blob
 
 During backend code generation, the LLVM IR metadata representation of the root
 signature is converted to data structures that are more closely aligned to the
