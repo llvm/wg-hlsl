@@ -422,7 +422,7 @@ registers are bound multiple times, or where there are multiple RootFlags
 entries, so subsequent stages should not assume that any given root signature in
 IR is valid.
 
-### Code Generation
+### DX Container Blob Generation
 
 During backend code generation, the LLVM IR metadata representation of the root
 signature is converted to data structures that are more closely aligned to the
