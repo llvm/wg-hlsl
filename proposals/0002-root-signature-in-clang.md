@@ -386,7 +386,7 @@ parsedRootSignature = RootSignature{
 };
 ```
 
-### LLVM IR Root Signature Representation
+### Root Signatures in the LLVM IR
 
 During frontend code generation an IR-based representation of the root signature
 is generated from the in-memory data structures stored in the AST. This is
