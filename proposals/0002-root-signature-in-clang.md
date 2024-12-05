@@ -386,11 +386,11 @@ parsedRootSignature = RootSignature{
 
 ### LLVM IR Root Signature Representation
 
-LLVM IR code generation, during entry point emition,
-an IR-based representation of the root signature is generated from the in-memory 
-data structures stored in the AST. This is stored as metadata nodes, identified 
-by named metadata. The metadata format itself is a straightforward transcription 
-of the in-memory data structure - so it is a list of root elements.
+During frontend code generation an IR-based representation of the root signature
+is generated from the in-memory data structures stored in the AST. This is
+stored as metadata nodes, identified by named metadata. The metadata format
+itself is a straightforward transcription of the in-memory data structure - so
+it is a list of root elements.
 
 While the attribute is attached to a function, the metadata collects all the
 root signatures together, with the initial metadata associating the root
