@@ -1,6 +1,6 @@
 <!-- {% raw %} -->
 
-# Implementation of Root Signatures in Clang and LLVM IR
+# Implementation of Root Signatures in Clang
 
 * Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
