@@ -164,16 +164,12 @@ llvm.dx.sigpatchconstant.load ; (LoadPatchConstant)
 llvm.dx.sigpatchconstant.store ; (StorePatchConstant)
 ```
 
-#### GS Stream operations
+#### Geometry Shader Stream ops
 ```llvm
-; GS stream operations (or just ".stream."?)
 llvm.dx.gsstream.emit ; (EmitStream)
 llvm.dx.gsstream.cut ; (CutStream)
 llvm.dx.gsstream.emitthencut ; (EmitThenCutStream)
 ```
-
-Open questions:
-- `gstream`, or `stream`?
 
 #### RayQuery ops
 ```llvm
