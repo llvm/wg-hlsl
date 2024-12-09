@@ -4,8 +4,8 @@
 
 * Proposal: [0002](0002-root-signture-in-clang.md)
 * Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
-  Pepper](https://github.com/damyanp)
-* Status: **Under Consideration**
+  Pepper](https://github.com/damyanp), [Joao Saffran](https://github.com/joaosaffran)
+* Status: **Accepted**
 * Impacted Project(s): Clang
 
 <!--
@@ -32,6 +32,7 @@ This change proposes adding:
 * Validation and diagnostic generation for root signatures during semantic
   analysis
 * Conversion of the metadata representation to the binary serialized format.
+
 
 ## Motivation
 
@@ -421,7 +422,7 @@ registers are bound multiple times, or where there are multiple RootFlags
 entries, so subsequent stages should not assume that any given root signature in
 IR is valid.
 
-### Code Generation
+### DX Container Blob Generation
 
 During backend code generation, the LLVM IR metadata representation of the root
 signature is converted to data structures that are more closely aligned to the
@@ -456,6 +457,16 @@ Once the root signature itself has been validated, validation is performed
 against the shader to ensure that any registers that the shader uses are bound
 in the root signature. This validation needs to occur after any dead-code
 elimation has completed.
+
+### Testing
+Testing DX Container generation requires a two stage testing strategy.
+1. Use Google Test unit tests to create and inspect binary files for specific
+   hex values, this is useful for local validation.
+2. Cyclic tests, generating YAML from the binary, and then check the other
+   way as well.
+Some examples are the existing DX Container unit tests. 
+Such test infrastructure will require the design and construction of a disassembler
+for Root Signature Blob or DX Container.
 
 ## Detailed design
 
