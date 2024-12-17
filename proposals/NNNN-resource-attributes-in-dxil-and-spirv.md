@@ -223,12 +223,10 @@ documented, and is probably most easily understood by looking at the
 [^4]: LLVM is probably buggy here currently. It differs from DXC and sets
     element type/count instead of cbuf size.
     
-#### Target Extension Types
+#### DirectX Target Extension Types
 
 In LLVM IR we'll represent all of the DXIL resource types via [target extension
-types], as described in [proposal 0006] and the [DXILResources docs]. As of
-this writing these docs don't yet cover the texture types, but they'll follow
-from the constraints described here.
+types], as described in [proposal 0006] and the [DXILResources docs].
 
 [target extension types]:
     https://llvm.org/docs/LangRef.html#target-extension-type
@@ -236,7 +234,52 @@ from the constraints described here.
     https://github.com/llvm/wg-hlsl/blob/main/proposals/0006-resource-representations.md
 [DXILResources docs]:
     https://llvm.org/docs/DirectX/DXILResources.html
-    
+
+|                                    | TargetExtType                                                                                 |
+|------------------------------------|-----------------------------------------------------------------------------------------------|
+| Texture1D                          | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, Texture1D)`         |
+| Texture1DArray                     | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, Texture1DArray)`    |
+| Texture2D                          | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, Texture2D)`         |
+| Texture2DArray                     | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, Texture2DArray)`    |
+| Texture3D                          | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, Texture3D)`         |
+| TextureCUBE                        | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, TextureCUBE)`       |
+| TextureCUBEArray                   | `target("dx.Texture", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>, TextureCUBEArray)`  |
+| RWTexture1D                        | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0, <IsSigned>, Texture1D)`         |
+| RWTexture1DArray                   | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0, <IsSigned>, Texture1DArray)`    |
+| RWTexture2D                        | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0, <IsSigned>, Texture2D)`         |
+| RWTexture2DArray                   | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0, <IsSigned>, Texture2DArray)`    |
+| RWTexture3D                        | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0, <IsSigned>, Texture3D)`         |
+| RasterizerOrderedTexture1D         | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1, <IsSigned>, Texture1D)`         |
+| RasterizerOrderedTexture1DArray    | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1, <IsSigned>, Texture1DArray)`    |
+| RasterizerOrderedTexture2D         | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1, <IsSigned>, Texture2D)`         |
+| RasterizerOrderedTexture2DArray    | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1, <IsSigned>, Texture2DArray)`    |
+| RasterizerOrderedTexture3D         | `target("dx.Texture", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1, <IsSigned>, Texture3D)`         |
+| Texture2DMS                        | `target("dx.MSTexture", <Type>, /*IsWriteable*/ 0, Count, <IsSigned>, Texture2DMS)`           |
+| Texture2DMSArray                   | `target("dx.MSTexture", <Type>, /*IsWriteable*/ 0, Count, <IsSigned>, Texture2DMSArray)`      |
+| RWTexture2DMS                      | `target("dx.MSTexture", <Type>, /*IsWriteable*/ 1, Count, <IsSigned>, Texture2DMS)`           |
+| RWTexture2DMSArray                 | `target("dx.MSTexture", <Type>, /*IsWriteable*/ 1, Count, <IsSigned>, Texture2DMSArray)`      |
+| FeedbackTexture2D                  | `target("dx.FeedbackTexture", FeedbackType, FeedbackTexture2D)`                               |
+| FeedbackTexture2DArray             | `target("dx.FeedbackTexture", FeedbackType, FeedbackTexture2DArray)`                          |
+| Buffer                             | `target("dx.TypedBuffer", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0, <IsSigned>)`                |
+| RWBuffer                           | `target("dx.TypedBuffer", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0, <IsSigned>)`                |
+| RasterizerOrderedBuffer            | `target("dx.TypedBuffer", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1, <IsSigned>)`                |
+| ByteAddressBuffer                  | `target("dx.RawBuffer", i8,     /*IsWriteable*/ 0, /*IsROV*/ 0)`[^5]                          |
+| RWByteAddressBuffer                | `target("dx.RawBuffer", i8,     /*IsWriteable*/ 1, /*IsROV*/ 0)`[^5]                          |
+| RasterizerOrderedByteAddressBuffer | `target("dx.RawBuffer", i8,     /*IsWriteable*/ 1, /*IsROV*/ 1)`[^5]                          |
+| StructuredBuffer                   | `target("dx.RawBuffer", <Type>, /*IsWriteable*/ 0, /*IsROV*/ 0)`                              |
+| RWStructuredBuffer                 | `target("dx.RawBuffer", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0)`                              |
+| RasterizerOrderedStructuredBuffer  | `target("dx.RawBuffer", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 1)`                              |
+| AppendStructuredBuffer             | `target("dx.RawBuffer", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0)`                              |
+| ConsumeStructuredBuffer            | `target("dx.RawBuffer", <Type>, /*IsWriteable*/ 1, /*IsROV*/ 0)`                              |
+| cbuffer                            | `target("dx.CBuffer", <Type>, ...)`                                                           |
+| ConstantBuffer                     | `target("dx.CBuffer", <Type>, ...)`                                                           |
+| tbuffer                            |                                                                                               |
+| TextureBuffer                      |                                                                                               |
+| SamplerState                       | `target("dx.Sampler", SamplerType::Default)`                                                  |
+| SamplerComparisonState             | `target("dx.Sampler", SamplerType::Default)`                                                  |
+
+[^5]: It may be better to use void or omit the type entirely rather than i8 here.
+
 ### SPIR-V
 
 DXC's SPIR-V backend treats "Buffer" as a texture and maps [DXC textures]
