@@ -2,7 +2,7 @@
 
 # Consistent Naming for DX Intrinsics
 
-* Proposal: [NNNN](NNNN-consistent-naming-for-dx-intrinsics.md)
+* Proposal: [0014](0014-consistent-naming-for-dx-intrinsics.md)
 * Author(s): [Justin Bogner](https://github.com/bogner)
 * Status: **Design In Progress**
 
