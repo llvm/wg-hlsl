@@ -8,7 +8,7 @@
 
 ## Introduction
 
-In this proposal, we define the `spirv.inline.Type` and `spirv.DecoratedType`
+In this proposal, we define the `spirv.Type` and `spirv.DecoratedType`
 target extension types for the SPIR-V backend.
 
 ## Motivation
@@ -30,9 +30,11 @@ IR.
 To represent `vk::SpirvType` and `vk::SpirvOpaqueType` in LLVM IR, we will add
 three new target extension types:
 
-* `spirv.inline.Type`
-* `spirv.inline.IntegralConstant`
-* `spirv.inline.Literal`
+| Type                     | HasZeroInit | CanBeGlobal | CanBeLocal |
+|--------------------------|-------------|-------------|------------|
+| `spirv.Type`             | - [ ]       | - [x]       | - [x]      |
+| `spirv.IntegralConstant` | - [ ]       | - [ ]       | - [ ]      |
+| `spirv.Literal`          | - [ ]       | - [ ]       | - [ ]      |
 
 `IntegralConstant` and `Literal` are used to encode arguments to `Type`, and
 may not be used outside that context. They are necessary because target
@@ -40,37 +42,41 @@ extension types must have all type arguments precede all integer arguments,
 whereas SPIR-V type instructions may have an arbitrary number of type,
 immediate literal, and constant id operands in any order.
 
-#### `spirv.inline.Type`
+#### `spirv.Type`
 
 ```
-target("spirv.inline.Type", operands..., opcode)
+target("spirv.Type", operands..., opcode, size, alignment)
 ```
 
 `opcode` is an integer literal representing the opcode of the `OpType`
-instruction to be generated. `operands` represents a list of type arguments
-encoding the operands of the `OpType` instruction. Each operand must be one of:
+instruction to be generated. `size` and `alignment` are integer literals
+representing the number of bytes a single value of the type occupies and the
+power of two that the value will be aligned to in memory. An opaque type can be
+represented by setting `size` and `alignment` to zero. `operands` represents a
+list of type arguments encoding the operands of the `OpType` instruction. Each
+operand must be one of:
 
 * A type argument, which will be lowered to the id of the lowered SPIR-V type
-* A `spirv.inline.IntegralConstant`, which will be lowered to the id of an
+* A `spirv.IntegralConstant`, which will be lowered to the id of an
   `OpConstant` instruction
-* A `spirv.inline.Literal`, which will be lowered to an immediate literal value
+* A `spirv.Literal`, which will be lowered to an immediate literal value
 
-#### `spirv.inline.IntegralConstant`
+#### `spirv.IntegralConstant`
 
 ```
-target("spirv.inline.IntegralConstant", integral_type, value)
+target("spirv.IntegralConstant", integral_type, value)
 ```
 
 `integral_type` is the type argument for the `OpConstant` instruction to be
 generated, and `value` is its literal integer value.
 
-#### `spirv.inline.Literal`
+#### `spirv.Literal`
 
 ```
-target("spirv.inline.Literal", value)
+target("spirv.Literal", value)
 ```
 
-`value` is a `spirv.inline.IntegralConstant` type which represents the literal
+`value` is a `spirv.IntegralConstant` type which represents the literal
 integer value to be generated.
 
 #### Example
@@ -79,24 +85,17 @@ Here's an example of using these types to represent an array of images:
 
 ```
 %type_2d_image = type target("spirv.Image", float, 1, 2, 0, 0, 1, 0)
-%integral_constant_28 = type target("spirv.inline.IntegralConstant", i32, 28)
-%integral_constant_4 = type target("spirv.inline.IntegralConstant", i32, 4)
-%ArrayTex2D = type target("spirv.inline.Type", %type_2d_image, %integral_constant_4, 28)
+%integral_constant_28 = type target("spirv.IntegralConstant", i32, 28)
+%integral_constant_4 = type target("spirv.IntegralConstant", i32, 4)
+%ArrayTex2D = type target("spirv.Type", %type_2d_image, %integral_constant_4, 28)
 ```
 
 ### Type decorations
 
-In order to represent types with SPIR-V decorations added, we define a new
-`spirv.DecoratedType` target extension type.
-
-```
-target("spirv.DecoratedType", type, decoration)
-```
-
-`type` is any valid LLVM IR type, and `decoration` is the integer value of the
-decoration, as defined in Section [3.20. Decoration](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_decoration)
-of the SPIR-V Specification. This will create a unique SPIR-V type with the
-specified `OpDecoration`.
+In order to represent types with the `vk::ext_decorate`, `vk::ext_decorate_id`,
+and `vk::ext_decorate_string` annotations, we will use the
+[`int_spv_assign_decoration`](https://github.com/llvm/llvm-project/blob/main/llvm/docs/SPIRVUsage.rst#target-intrinsics)
+intrinsic.
 
 <!--
 ## Detailed design
