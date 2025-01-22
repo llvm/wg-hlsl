@@ -12,10 +12,17 @@ more buffer resources in memory with specific packing rules. These resources can
 be organized into two types of buffers: constant buffers and texture buffers.
 This document describes design decisions related to constant buffers.
 
-Constant buffer loads from a constant buffer view (CBV) and binds to register
-`b`. It can be declared using the `cbuffer` keyword and it looks very much like
-a structure declaration in C, with the addition of the register and packoffset
-keywords for manually assigning registers or packing data. For example:
+Constant buffers load from a constant buffer views (CBVs) and binds to registers
+`b`.
+
+There are three ways to declare a constant buffer in HLSL.
+
+### `cbuffer` Declaration Block
+
+A constant buffer can be declared using the `cbuffer` keyword. This looks very
+much like a structure declaration in C with the addition of `register` and
+`packoffset` keywords for manually assigning binding register or packing info.
+For example:
 
 ```c++
 cbuffer MyConstant : register(b1)  {
@@ -23,11 +30,31 @@ cbuffer MyConstant : register(b1)  {
 }
 ```
 
-Constant buffer variables declared within the `cbuffer` scope can be accessed
-anywhere from a shader by directly using the variable name (`F`) without
-referencing the name of the constant buffer. 
+Variables declared within the `cbuffer` scope can be accessed anywhere in a
+shader by directly using the variable name (`F`) without referencing the name of
+the constant buffer. Note that the name of the constant buffer is not a
+recognized identifier and does not actually have to be unique.
 
-Another way of declaring constant buffers is  with via `ConstantBuffer` class:
+### Default Constant Buffer `$Globals`
+
+Any variable declaration in global scope that is not static and is not a
+resource is implicitly added to a default constant buffer named `$Global`. That
+means a global scope declaration like this:
+
+```c++
+float4 F;
+```
+is equivalent to
+
+```c++
+cbuffer $Globals {
+  float4 F;
+}
+```
+
+### `ConstantBuffer` Resource Class
+
+Third way of declaring constant buffers is by using the `ConstantBuffer` class:
 
 ```c++
 struct MyConstants {
@@ -38,7 +65,8 @@ ConstantBuffer<MyConstants> CB;
 ```
  
 In this case the buffer variables are referenced as if `CB` was of type
-`MyConstants` and the fields are members of that object.
+`MyConstants`. In other words, the float value in `MyConstants` struct is
+referenced as `CB.F`.
 
 ## Motivation
 
@@ -47,128 +75,180 @@ the HLSL language.
 
 ## Proposed Solution
 
-### Parsing `cbuffer` Declaration
+### `hlsl_constant` address space
 
-In Clang frontend the `cbuffer` declaration will be parsed into a new AST Node
-called `HLSLConstantBufferDecl`. This class will be based on `NameDecl` and
-`DeclContext`.
+Constant buffer views (CBV) will be treated as a storage class with a new
+address space `hlsl_constant` with value `2` for DXIL. Constant buffer elements
+will be generated as global variables in `hlsl_constant` address space. Later on
+in the backend there will be a pass that will collects all `addrspace(2)`
+globals and loads from this address space and replace them with constant buffer
+load intrinsics off a CBV handle.
+
+### Parsing of `cbuffer` Declaration
+
+In Clang frontend the `cbuffer` declaration will be parsed into a new AST node
+ `HLSLBufferDecl`. This class will be based on `NameDecl` and `DeclContext`.
 
 Variable declarations inside the `cbuffer` context will be children of this new
-AST node. If a variable declaration specifies a `packoffset`, this information
-will be parsed into an attribute `HLSLPackOffsetAttr` and applied to the
-variable declaration. See [packoffset attribute](0003-packoffset.md).
+AST node and will have `hlsl_constant` address space.
 
-In order to make the variables declared in constant buffer exposed into global
+If a variable declaration specifies a `packoffset`, this information will be
+parsed into an `HLSLPackOffsetAttr` attribute and applied to the variable
+declaration. See [packoffset attribute](0003-packoffset.md).
+
+In order to make the variables declared in `cbuffer` scope exposed into global
 scope we can take advantage of `DeclContext::isTransparentContext` method and
-overload it to return true for `HLSLConstantBufferDecl`. This is the same way
-variables declared in `export` declaration context are exposed at the global
-scope.
+overload it to return true for `HLSLBufferDecl`. This is the same way variables
+declared in `export` declaration context are exposed at the global scope.
 
-*Note: This is already implemented in Clang as `HLSLBufferDecl`. Since constant
-buffers are not the only buffers in HLSL we should rename it to
-`HLSLConstantBufferDecl`.*
+### Layout Structure
 
-### Parsing `ConstantBuffer` declaration
+The `cbuffer` block can contain any declaration that can occur at a global
+scope, but not all of the declarations correspond to data in the CBV and
+contribute to the buffer layout. As part of the semantic analysis the
+declarations in `cbuffer` scope will be processed into a layout struct that will
+represent the actual content of the constant buffer.
 
-`ConstantBuffer` definition will be added to the `HLSLExternalSemaSource` the
-same way as other resource classes. It will have a resource handle with
-`CBuffer` resource class and the contained type would be the template type
-argument. It will be handled as other resources classes, for example it can be
-passed into a function. 
+The layout struct will contain all declaration from the `cbuffer` block except:
+- static variable declarations
+- resource classes
+- empty structs
+- zero-sized arrays
+- any non-variable declarations (functions, classes, ...)
 
-Clang needs to recognize that this class represents a constant buffer and the
-contained type fields are accessed using the `.` operator on `ConstantBuffer`
-instance. In other words treating `ConstantBuffer<MyConstants> CB;` as if it was
-declared as `cbuffer __CB { MyConstants CB; }`. The exact way how to do this is
-TBD.
+If the constant buffer includes a struct variable, this struct it will also need
+to be inspected and transformed into a new layout struct if it contains any of
+the undesired declarations above.
 
-### Lowering Constant Buffers to LLVM IR
+For example for this `cbuffer` declaration:
 
-During CodeGen constant buffers will be lowered to global variables with LLVM
-target type `target("dx.CBuffer", ..)` which will include type information about
-constants, the buffer size and its memory layout.
+```
+struct Something {
+  int a;
+  float f[0];   // zero-sized array
+};
 
-Note: LLVM target types can optionally include a list of one or more types and a
-list of one or more integer constants. We can use these lists to encode any
-information needed for lowering from LLVM IR to DXIL and SPIRV.
-
-To encode the shape of the constant buffer the LLVM target type will include a
-structure type that represents the constant buffer variable declarations.
-
-The size of the constant buffer will be included as the first item in the list
-of integer constants. The rest of the list will be used to encode the constant
-buffer layout. The layout will always be included whether the constant buffer
-uses any `packoffset` attributes or not. The exact way how the layout will be
-encoded is TBD and will be covered in a separate design document.
-
-For simplicity, let's assume the layout will be encoded as a list of offsets of
-all cbuffer declarations. In that case this example:
-
-```c++
-cbuffer MyConstants {
-  float2 a;
-  float b[2];
-  int c;
+cbuffer CB {
+    float x;
+    RWBuffer<float> buf;   // resource class
+    Something s;           // embedded struct
+    static float y;        // static variable
 }
 ```
 
-Would be lowered to LLVM target type:
+The buffer layout struct will look like this:
+```
+  struct __layout_Something {
+      int a;
+  };
+
+  struct __layout_CB {
+      float x;
+      __layout_Something s;
+  };
+```
+All of the layout structs will be declared as `CXXRecordDecl`s in the
+`HLSLBufferDecl` context. The layout struct for the constant buffer is going to
+be the last `CXXRecordDecl` child of `HLSLBufferDecl`.
+
+### Default Constant Buffer
+
+ If there is any variable declaration at global scope that is not static or a
+ resource the semantic analysis will create an implicit instance of
+ `HLSLBufferDecl` named `$Globals` to represent the default constant buffer.
+ This implicit `HLSLBufferDecl` instance will be used to store references to all
+ variable declarations that belong to the default constant buffer. It will also
+ be used as the context for declaring the layout structures for the constant
+ buffer or any embedded structs.
+
+### `ConstantBuffer` Declaration
+
+`ConstantBuffer<T>` is effectively an alias for type `T` in `hlsl_constant`
+address space. If the `hlsl_constant` address space would be spellable it could
+be defined as:
 
 ```
-@MyConstants.cb = global target("dx.CBuffer", { <2 x float>, [2 x float], i32}, 40, 0, 16, 32, 36)
+template <typename T> using ConstantBuffer = hlsl_constant T;
 ```
 
-This layout encoding can obviously get very long and unwieldy for more
-complicated cbuffers, and especially since target type parameters are all
-included in the name mangling for function overloads. We need to investigate how
-to make it smaller, or at least more manageable.
+Definition of `ConstantBuffer` equivalent to the statement above will be added
+to the `HLSLExternalSemaSource`.
 
-One possibility is compressing the list of offsets into a smaller number of
-integers - taking advantage of the fact that outside of `packoffset` use the
-difference between two adjancent offsets is never more than 16. The compression
-could also include repetition construct that would help with encoding of array
-offset. But, as with any compressions, there's always the chance of degenerate
-cases that will end up with the compressed shape being the same size or larger
-than the original.
+Treating `ConstantBuffer` as an alias of `T` takes care the member access issue
+- the `.` access refers directly to members of `T`, and global variables
+declared using the `ConstantBuffer` syntax will be have the `hlsl_constant`
+address space.
 
-> Note: The most tricky part of the layout encoding are probably arrays of
-> structures because the structure-specific layout gets repeated many times and
-> might not be easy to compress. One idea how to solve this could be translating
-> structures embedded in `cbuffer` into separate target types with their own
-> encoded layout and including them in the `cbuffer` target type. It is not
-> clear though if this is possible (probably yes) or if it would actually make
-> things easier or not.
+If `ConstantBuffer` allowed `T` to include only types allowed in CBV this is all
+that would be needed to make `ConstantBuffer` work. Unfortunately DXC allows `T`
+to have resources and or empty types, which means a layout struct might need to
+created for `T`. For this reason we are most likely going to need to handle this
+in a similar way as the default constant buffer by creating an implicit
+`HLSLBufferDecl` that will reference the `ConstantBuffer` global variable and
+hold the layout struct definitions.
 
-Another way could be introducing a typedef concept into the LLVM IR textual
-representation so that the full LLVM target type with long layout representation
-could occur just once.
+### Lowering Constant Buffer Resources to LLVM IR
 
-### Lowering ConstantBuffer to LLVM IR
+For each constant buffer the Clang codegen will create a global variable in
+default address space. The type of the global will be `target("dx.CBuffer",
+...)`. This global variable will be used for the resource handle initialization
+and will be eventually removed. The target type will include 1 parameters - the
+buffer layout structure.
 
-The result of codegen for `cbuffer` and `ConstantBuffer` code should be
-identical.
+For example this `cbuffer`:
+```
+cbuffer MyConstants {
+  float2 a;
+  int c;
+}
+```
+would be translated a global variable with the following target type:
+```
+%class.__layout_MyConstants = type { <2 x float>, i32 }
+@MyConstants.cb = global target("dx.CBuffer", %class.__layout_MyConstants)
+```
 
-### Lowering Constant Buffer Variable Access
+### Lowering Accesses to Individual Constants to LLVM IR
 
-Accesses to `cbuffer` variables will be lowered to LLVM IR as memory accesses in
-specific "resource address space" using the standard C++ structure layout rules.
+For explicit `HLSLBufferDecl`s declarations (`cbuffer` syntax) Clang codegen
+will create global variables for all of its variable declarations. Since the
+declaration are already using the `hlsl_constant` address space the global
+variables will be declared in this address space as well.
+
+For implicit `HLSLBufferDecl`s declarations (`$Globals` and possibly
+`ConstantBuffer<T>` syntax) the declarations already exist at the global scope
+in the `hlsl_constant` address space, no changes should be needed here.
+
+Accesses to these global constants will be translated to `load` instruction from
+a pointer in `addrspace(2)`. These will be later on collected in an pass
+`DXILConstantAccess` and replaced with load operations using a constant buffer
+resource handle.
+
+In order for the `DXILConstantAccess` pass to generate generate the correct CBV
+load instructions it is going to need additinal information, such as which
+constants belong to which constant buffer, and layout of the buffer and any
+embedded structs. Codegen will generate this information as metadata. The exact
+way the metadata will look like is TBD.
 
 ### DXIL Lowering
 
-LLVM pass `DXILResourceAccess` will translate these specific "resource address
-space" memory accesses into cbuffer DXIL ops adjusting the offsets using the
-cbuffer layout information encoded in `target("dx.CBuffer", ..)`. That means
-translating standand C++ structure layout offsets to cbuffer layout offsets and
-replacing the memory accesses with `llvm.dx.cbufferBufferLoad`,
-`llvm.dx.cbufferBufferStore`, and `extractelement ` instructions. The load and
-store instructions will be later lowered to `cbufferLoadLegacy` and
-`cbufferStoreLegacy` DXIL ops.
+A new pass `DXILConstantAccess` will use the constant buffer information from
+the metadata, the buffer global variables and its handle types
+`target("dx.CBuffer", ...)`, and it will translate all `load` instructions in
+`addrspace(2)` to the constant buffer DXIL ops.
+
+It is an open question whether this pass should be translating the constant
+accesses to `llvm.dx.cbufferBufferLoad` instructions which would later need to
+be lowered to `cbufferLoadLegacy` ops, or whether it should generate the
+`cbufferLoadLegacy` ops directly.
+
+Similar transformation pass is going to be needed for SPIR-V target and if
+possible we should share code related to this.
 
 ### Handle initialization
 
-Constant buffers will be initialized the same way as other resources using the
-`createHandleFromBinding` intrinsics. Module initialization code need to be
-updated to include all constant buffers declared in a shader.
+Clang codegen will constant buffer handle initialization the same way as it does
+with other resource classes like raw buffers or structured buffers.
 
 ## Detailed design
 
@@ -182,17 +262,12 @@ updated to include all constant buffers declared in a shader.
   - There is a concern that losing the type information could lead to
     unnecessary copying of values.
 
-- Using type annotations to store cbuffer layout information. Subtypes would
-  have its own layout annotations.
-  - This is something we can fall back to if encoding the cbuffer layout on LLVM
-    target type turns out to be too unwieldy, especially when it comes to
-    encoding the layout of an array of structures.
+- Generate `llvm.dx.cbufferBufferLoad` instruction in Clang codegen whenever a
+  global constant variable is accesses.
+  - This would require intercepting all emits of `load` instructions in the
+  codegen and might turn out quite messy.
 
 ## Open issues
-- How to encode the cbuffer layout into LLVM target type
-- How to implement `ConstantBuffer` member access
-- Handling of `$Globals` constant buffer
-- Nested `cbuffer` declarations
 
 ## Links
 
@@ -203,6 +278,11 @@ Variables](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graph
 [HLSL Constant Buffer Layout
 Visualizer](https://maraneshi.github.io/HLSL-ConstantBufferLayoutVisualizer)<br/>
 [`packoffset` Attribute](0003-packoffset.md)</br>
+
+## Open issues
+-- Nested `cbuffer` declarations
+-- Format of the constant buffer metadata emitted by codegen
+-- Should the `DXILConstantAccess` pass generate `cbufferLoadLegacy` ops directly?
 
 ## Acknowledgments (Optional)
 
