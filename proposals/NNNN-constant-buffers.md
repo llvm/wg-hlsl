@@ -147,9 +147,13 @@ The buffer layout struct will look like this:
       __layout_Something s;
   };
 ```
-All of the layout structs will be declared as `CXXRecordDecl`s in the
-`HLSLBufferDecl` context. The layout struct for the constant buffer is going to
-be the last `CXXRecordDecl` child of `HLSLBufferDecl`.
+
+The layout struct for the constant buffer will be defined in the
+`HLSLBufferDecl` declaration context and is going to be the last `CXXRecordDecl`
+child of `HLSLBufferDecl`.
+
+Layout structs for user defined structs will be added to the same declaration
+context as the original struct (to the same namespace).
 
 ### Default Constant Buffer
 
@@ -158,8 +162,7 @@ be the last `CXXRecordDecl` child of `HLSLBufferDecl`.
  `HLSLBufferDecl` named `$Globals` to represent the default constant buffer.
  This implicit `HLSLBufferDecl` instance will be used to store references to all
  variable declarations that belong to the default constant buffer. It will also
- be used as the context for declaring the layout structures for the constant
- buffer or any embedded structs.
+ be used as the declaration context for the buffer layout structure.
 
 ### `ConstantBuffer` Declaration
 
@@ -185,7 +188,7 @@ to have resources and or empty types, which means a layout struct might need to
 created for `T`. For this reason we are most likely going to need to handle this
 in a similar way as the default constant buffer by creating an implicit
 `HLSLBufferDecl` that will reference the `ConstantBuffer` global variable and
-hold the layout struct definitions.
+hold the buffer layout struct definition.
 
 ### Lowering Constant Buffer Resources to LLVM IR
 
