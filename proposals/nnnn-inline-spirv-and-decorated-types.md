@@ -76,8 +76,7 @@ generated, and `value` is its literal integer value.
 target("spirv.Literal", value)
 ```
 
-`value` is a `spirv.IntegralConstant` type which represents the literal
-integer value to be generated.
+`value` is the literal integer value to be generated.
 
 #### Example
 
