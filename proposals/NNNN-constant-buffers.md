@@ -207,8 +207,8 @@ cbuffer MyConstants {
 ```
 would be translated a global variable with the following target type:
 ```
-%class.__layout_MyConstants = type { <2 x float>, i32 }
-@MyConstants.cb = global target("dx.CBuffer", %class.__layout_MyConstants)
+%struct.__layout_MyConstants = type { <2 x float>, i32 }
+@MyConstants.cb = global target("dx.CBuffer", %struct.__layout_MyConstants)
 ```
 
 ### Lowering Accesses to Individual Constants to LLVM IR
@@ -222,40 +222,123 @@ For implicit `HLSLBufferDecl`s declarations (`$Globals` and possibly
 `ConstantBuffer<T>` syntax) the declarations already exist at the global scope
 in the `hlsl_constant` address space, no changes should be needed here.
 
-Accesses to these global constants will be translated to `load` instruction from
-a pointer in `addrspace(2)`. These will be later on collected in an pass
-`DXILConstantAccess` and replaced with load operations using a constant buffer
-resource handle.
+Note that these globals are temporary. They will be eventually transformed into
+appropriate intrinsics calls and will not exist in the final DXIL or SPIR-V
+code.
 
-In order for the `DXILConstantAccess` pass to generate generate the correct CBV
-load instructions it is going to need additinal information, such as which
-constants belong to which constant buffer, and layout of the buffer and any
-embedded structs. Codegen will generate this information as metadata. The exact
-way the metadata will look like is TBD.
 
-### DXIL Lowering
+For example for this HLSL code:
 
-A new pass `DXILConstantAccess` will use the constant buffer information from
-the metadata, the buffer global variables and its handle types
-`target("dx.CBuffer", ...)`, and it will translate all `load` instructions in
-`addrspace(2)` to the constant buffer DXIL ops.
+```c++
+struct S {
+  float f;
+};
 
-It is an open question whether this pass should be translating the constant
-accesses to `llvm.dx.cbufferBufferLoad` instructions which would later need to
-be lowered to `cbufferLoadLegacy` ops, or whether it should generate the
-`cbufferLoadLegacy` ops directly.
+cbuffer Constants {
+  int i;
+  S s;
+};
 
-Similar transformation pass is going to be needed for SPIR-V target and if
-possible we should share code related to this.
+cbuffer OtherConstants {
+  float4 v;
+  int array[10];
+};
+```
+
+Clang codegen will create these struct definition and global variabless:
+
+```
+$struct.S = type { float }
+%struct.__layout_Constants = type { i32, %struct.S }
+%struct.__layout_MyConstants = type { <4 x float>, [10 x i32] }
+
+@Constants.cb = external constant target("dx.CBuffer", %struct.__layout_Constants)
+@i = external addrspace(2) global float
+@s = external addrspace(2) global %struct.S
+
+@OtherConstants.cb = external constant target("dx.CBuffer", %struct.__layout_OtherConstants)
+@v = external addrspace(2) global <3 x float>
+@array = external addrspace(2) global [10 x i32]
+```
+
+Clang codegen will translate accesses to these global constants to `load`
+instruction from a pointer in `addrspace(2)`. These `load` instructions will be
+later replaced in an LLVM pass with constant buffer load intrinsic calls on a
+buffer resource handle. In order for the pass to generate the correct CBV loads
+it is going to need additinal information, such as which constants belong to
+which constant buffer, and layout of the buffer and any embedded structs.
+Codegen will generate this information as metadata.
+
+### Format of constant buffer metadata
+
+#### Mapping of constant global variables to constant buffer
+
+Clang codegen needs to emit metadata that will link `hlsl_constant` globals  to
+individual constant buffers. Metadata node for a single buffer will be a list of
+global variables where the first item will be the global variable represending
+the constant buffer. It will be followed by 1 or more `hlsl_constant` global
+variables that belong to this constant buffer, in the same order as they were
+declared in the source code.
+
+A named metadata node `hlsl.cbs` will then store a list all metadata nodes for
+individual buffers.
+
+For the HLSL code above the metadata will look like:
+
+```
+!hlsl.cbs = !{!1, !2}
+!1 = !{ptr @Constants.cb, ptr addrspace(2) @i, ptr addrspace(2) @s}
+!2 = !{ptr @OtherConstants.cb, ptr addrspace(2) @v, ptr addrspace(2) @array}
+```
+
+#### Layout information
+
+Clang also needs to include layout information for each constant buffer, and
+for any user defined structs  used in a constant buffer. Metadata node storing
+this information will include the name of the struct, its size, and then a list
+of offset for each field. If the field is an array, we also need to include the
+stride information, which is the size of a single array element including
+padding. The size of the array does not need to be in the list since it is
+already stored on the struct type.
+
+A named metadata node `hlsl.layouts` will then capture a list of all layout
+metadata.
+
+For the HLSL code above the layout metadata will look like this:
+
+```
+!hlsl.layouts = !{!3, !4, !5}
+!3 = !{!"struct.S", i32 4, i32 0}                              ; size 4, element offsets 0
+!4 = !{!"struct.__layout_Constants", i32 20, i32 0, i32 16}    ; size 20, element offsets 0, 16
+!5 = !{!"struct.__layout_OtherConstants", i32 164, i32 0, i32 16, i32 16} 
+                                        ; size 164, element offsets 0, 16, array stride 16
+```
+
+Since the module contains the struct definitions, we know which struct field is
+an array or not, and therefore we know whether to expect a single offset or an
+offset & stride pair when processing the list of offsets.
+
+### Lowering to buffer load intrinsics
+
+A new pass `HLSLConstantAccess` will translate all `load` instructions in
+`hlsl_constant` address space to `llvm.{dx|spv}.resource.load.cbuffer`
+intrinsics. It will make use of the metadata generated by Clang codegen that
+maps the constants global variables to individual constant buffers and specifies
+the constant buffer layout. The pass will also transform related `getelementptr`
+instructions to use the constant buffer layout offsets.
+
+After the `HLSLConstantAccess` pass completes the constant globals and the
+constant buffer and layout metadata are no longer needed and should be removed.
+
+### Lowering to DXIL
+
+Separate DXIL pass will translate the `llvm.dx.resource.load.cbuffer` intrinsics
+to `cbufferLoadLegacy` DXIL ops.
 
 ### Handle initialization
 
 Clang codegen will constant buffer handle initialization the same way as it does
 with other resource classes like raw buffers or structured buffers.
-
-## Detailed design
-
-*TBD*
 
 ## Alternatives considered
 
@@ -271,6 +354,7 @@ with other resource classes like raw buffers or structured buffers.
   codegen and might turn out quite messy.
 
 ## Open issues
+-- Nested `cbuffer` declarations
 
 ## Links
 
@@ -281,11 +365,6 @@ Variables](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graph
 [HLSL Constant Buffer Layout
 Visualizer](https://maraneshi.github.io/HLSL-ConstantBufferLayoutVisualizer)<br/>
 [`packoffset` Attribute](0003-packoffset.md)</br>
-
-## Open issues
--- Nested `cbuffer` declarations
--- Format of the constant buffer metadata emitted by codegen
--- Should the `DXILConstantAccess` pass generate `cbufferLoadLegacy` ops directly?
 
 ## Acknowledgments (Optional)
 
