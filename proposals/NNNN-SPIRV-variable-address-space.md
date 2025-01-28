@@ -41,7 +41,7 @@ has 1, a simple 1:1 lowering of HLSL variables to SPIR-V is not possible.
 
 This section will explain why some HLSL patterns are hard to lower to SPIR-V.
 
-Note: HLSL does not implements references yet, but we have to make sure our
+Note: HLSL does not implement references yet, but we have to make sure our
 design would allow us to implement them. For this reason, we'll assume HLSL
 has references.
 
