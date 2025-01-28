@@ -149,13 +149,13 @@ If an exported function references a global variable, we cannot change the signa
 
 ## Solution 4: Move all variables to the global scope
 
-HLSL & SPIR-V disallow static recursion. Meaning we know at compile-time
-that each function requires one instance of each local variable.
-
 By moving all local variables to the global scope, we now have a single
 storage class `Private`, and won't have conflict issues.
 This also allows us to compile non-optimized code, and to keep functions if
 required.
+
+HLSL & SPIR-V disallow static recursion. Meaning we know at compile-time
+that each function requires one instance of each local variable.
 This would also work with exported functions: static recursion is still not
 allowed, so cross compile-units recursion is not an issue.
 
@@ -167,8 +167,11 @@ I believe those 2 are not hard blockers, but something we need to be aware of.
 
 ## Implementing the solution
 
-This would be implemented as a backend LLVM-IR pass. LLVM-IR would remain
-normal: global variables in the global scope, `alloca` in the function scope.
+This would be implemented as a backend LLVM-IR pass run for any LLVM-IR
+when targeting Vulkan SPIR-V.
+Reason is LLVM-IR also default to globals and locals sharing the same address
+space, so this transformation is required even when the source language is not
+HLSL.
 
 The pass would iteration on all function instructions, and replace each
 `alloca` with a global variable with the same type. The initialization will
