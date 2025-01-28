@@ -145,7 +145,7 @@ This would require passing references to other functions referencing those
 globals, or inline them, but it would be possible.
 
 But the blocker remains the same: building to a library function.
-If an exported variable references a global variable, that's an issue.
+If an exported function references a global variable, we cannot change the signature of the function.
 
 ## Solution 4: Move all variables to the global scope
 
