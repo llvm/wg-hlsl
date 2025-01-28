@@ -165,6 +165,26 @@ The main issue of this solution can have are:
 
 I believe those 2 are not hard blockers, but something we need to be aware of.
 
+## Maybe bad solution 5: Selectively move variables to the global scope.
+
+If a variable is only loaded/stored from/to, and remains in the function
+scope, there should be no pointer incompatibility.
+This means we could potentially implement the solution 4, but only targeting
+variables for which addresses are moved across their function scope
+boundaries.
+
+This would require additional IR analysis, as we would need to determine
+which address is used in another scope to recreate a global variable.
+
+The motivation we could have for such solution are:
+- if drivers have a hard time optimizing the global variables.
+- if the global variable count limit becomes an issue.
+
+Implementing this solution is more complex, and could be more error prone,
+so until we have a real need, I would recommend against, and moving forward
+with solution 4. If the need comes, moving from solution 4 to solution 5
+would be possible, as it's just an optimization on top.
+
 ## Implementing the solution
 
 This would be implemented as a backend LLVM-IR pass run for any LLVM-IR
