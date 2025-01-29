@@ -3,7 +3,9 @@ query($after: String) {
         projectV2(number: 4) {
             items(first: 100, after: $after) {
                 nodes {
-                    updatedAt id                     
+                    updatedAt id
+                    status:fieldValueByName(name: "Status") {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name } }
                     category:fieldValueByName(name: "Category") { 
                         ... on ProjectV2ItemFieldSingleSelectValue { name } }
                     target:fieldValueByName(name: "Target") { 

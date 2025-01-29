@@ -37,7 +37,7 @@ def updateMilestoneField(args):
         milestoneIssue = all[milestoneIssue_id]
 
         if issue.projectMilestone != milestoneIssue.projectMilestone:
-            print(f"{issue.getIssueReference()}: {
+            print(f"https://github.com{issue.issue_resourcePath}: {
                   issue.projectMilestone} --> {milestoneIssue.projectMilestone}")
             issue.projectMilestone = milestoneIssue.projectMilestone
             if args.commit:

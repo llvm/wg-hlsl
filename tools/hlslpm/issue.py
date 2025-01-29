@@ -4,8 +4,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, date
 from enum import Enum
 import re
-from typing import Dict, List, Optional, Self, Union
-import json
+from typing import Dict, List, Optional, Self
+
+class Status(Enum):
+    NoStatus = None
+    Designing = "Designing"
+    Planning = "Planning"
+    Ready = "Ready"
+    Active = "Active"
+    NeedsReview = "Needs Review"
+    Closed = "Closed"
 
 class Category(Enum):
     NoCategory = None
@@ -52,6 +60,7 @@ class Issue:
     issue_resourcePath: Optional[str] = field(default=None)
     item_id: Optional[str] = field(default=None)
     item_updatedAt: Optional[datetime] = field(default=None)
+    status: Optional[Status] = field(default=None)
     category: Optional[Category] = field(default=None)
     target_date: Optional[date] = field(default=None)
     workstream: Optional[str] = field(default=None)
@@ -357,6 +366,8 @@ class Issues:
 
         self.milestones = [i for i in interesting if i.category == Category.ProjectMilestone]
         self.workstreams = [i for i in interesting if i.category == Category.Workstream]
+
+        self.milestones.sort(key=lambda i: i.target_date);
 
         issuesTracked = gh.get_issues_tracked(self.all_issues_by_id.keys())
         self.tracked_issues_not_in_project = []

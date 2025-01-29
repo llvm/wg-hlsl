@@ -28,8 +28,9 @@ and valid element types for `*StructuredBuffer` resources and `*ByteAddressBuffe
 
 Element types for typed buffer resources:
 * Are not intangible (e.g., isn't a resource type)
-* Must be vectors or scalars of arithmetic types, not bools nor enums nor arrays
+* Must be vectors or scalars of arithmetic types, not bools nor enums nor arrays nor structs
 * Should be a scalar or homogenous vector of a floating-point or integer type, with a maximum of 4 components after translating 64-bit components into pairs of uint32_t components
+
 Element types for raw buffer resources:
 * Are not intangible (e.g., isn't a resource type)
 
@@ -91,57 +92,11 @@ that's needed to validate element types for raw buffers.
 
 ### Examples of Element Type validation results:
 ```
-struct oneInt {
-    int i;
-};
 
-struct twoInt {
-   int aa;
-   int ab;
-};
-
-struct threeInts {
-  oneInt o;
-  twoInt t;
-};
-
-struct oneFloat {
-    float f;
-};
 struct notComplete;
-struct depthDiff {
-  int i;
-  oneInt o;
-  oneFloat f;
-};
 
-struct notHomogenous{     
-  int i;
-  float f;
-};
-
-struct EightElements {
-  twoInt x[2];
-  twoInt y[2];
-};
-
-struct EightHalves {
-half x[8]; 
-};
-
-struct intVec {
-  int2 i;
-};
-
-struct oneIntWithVec {
-  int i;
-  oneInt i2;
-  int2 i3;
-};
-
-struct weirdStruct {
-  int i;
-  intVec iv;
+struct UDTType {
+  int x;
 };
 
 RWBuffer<double2> r0; // valid - element type fits in 4 32-bit quantities
@@ -150,23 +105,12 @@ RWBuffer<float> r2; // valid
 RWBuffer<float4> r3; // valid
 RWBuffer<notComplete> r4; // invalid - the element type isn't complete, the definition is missing. 
 // the type trait that would catch this is the negation of `__builtin_hlsl_is_intangible`
-RWBuffer<oneInt> r5; // valid - all leaf types are valid primitive types, and homogenous
-RWBuffer<oneFloat> r6; // valid
-RWBuffer<twoInt> r7; // valid
-RWBuffer<threeInts> r8; // valid
-RWBuffer<notHomogenous> r9; // invalid, all template type components must have the same type, DXC fails
-StructuredBuffer<notHomogenous> r9Structured; // valid
-RWBuffer<depthDiff> r10; // invalid, all template type components must have the same type, DXC fails
-RWBuffer<EightElements> r11; // invalid, > 4 elements and > 16 bytes, DXC fails 
-// This would be caught by __builtin_hlsl_typed_resource_element_compatible
-StructuredBuffer<EightElements> r9Structured; // valid
-RWBuffer<EightHalves> r12; // invalid, > 4 elements, DXC fails
-// This would be caught by __builtin_hlsl_typed_resource_element_compatible
-StructuredBuffer<EightHalves> r12Structured; // valid
-RWBuffer<oneIntWithVec> r13; // valid
-RWBuffer<weirdStruct> r14; // valid
-RWBuffer<RWBuffer<int> > r15; // invalid - the element type has a handle with unknown size, 
+
+RWBuffer<RWBuffer<int> > r5; // invalid - the element type has a handle with unknown size
 // thus it is an intangible element type. The type trait that would catch this is the negation of `__builtin_hlsl_is_intangible`
+
+RWBuffer<UDTType> r6; // invalid - the element type is a struct, not scalar or vector
+// this would be caught by __builtin_hlsl_typed_resource_element_compatible
 ```
 
 Below is a sample C++ implementation of the `RWBuffer` resource type.
