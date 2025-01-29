@@ -1,7 +1,7 @@
 
 # Constant buffers
 
-* Proposal: [NNNN](NNNN-constant-buffers.md)
+* Proposal: [15](0015-constant-buffers.md)
 * Author(s): [Helena Kotas](https://github.com/hekota)
 * Status: **Design In Progress**
 
