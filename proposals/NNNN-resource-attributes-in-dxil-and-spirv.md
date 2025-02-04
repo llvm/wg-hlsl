@@ -113,8 +113,9 @@ The DXIL metadata records a resource class, a "shape", and a few resource class
 dependent properties:
 
 - The Resource class is SRV (Shader resource view), UAV (Unordered Access
-  View), CBV (Constant buffer view), or Sampler. The only difference between
-  SRV and UAV is whether the object is writeable.
+  View), CBV (Constant buffer view), or Sampler. This is largely only used for
+  determining which register class a resource belongs to, and is mostly
+  valuable in differentiating between (writeable) UAVs and (read-only) SRVs.
 - The "shape" is more commonly referred to as "resource kind" outside of the
   DXIL docs. This covers all of the texture and buffer types, as well as
   "tbuffer" which maps to the cbuffer layout when the resource class is SRV.
@@ -241,7 +242,7 @@ from the constraints described here.
 DXC's SPIR-V backend treats "Buffer" as a texture and maps [DXC textures]
 directly to [OpTypeImage]. In LLVM IR there is a 1-1 correspondence between the
 set of SPIR-V target extension types and the resulting OpTypeImage for the
-simple cases:
+simple cases.
 
 [DXC textures]:
     https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#textures
@@ -249,32 +250,45 @@ simple cases:
     https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
 
 
-|                                 | Dim    | Depth       | Arrayed | MS    | Sampled | Access |
-|---------------------------------|--------|-------------|---------|-------|---------|--------|
-| Texture1D                       | 1D     | Unknown (2) | false   | false | r/o (1) | r/o    |
-| Texture1DArray                  | 1D     | Unknown (2) | true    | false | r/o (1) | r/o    |
-| Texture2D                       | 2D     | Unknown (2) | false   | false | r/o (1) | r/o    |
-| Texture2DArray                  | 2D     | Unknown (2) | true    | false | r/o (1) | r/o    |
-| Texture2DMS                     | 2D     | Unknown (2) | false   | true  | r/o (1) | r/o    |
-| Texture2DMSArray                | 2D     | Unknown (2) | true    | true  | r/o (1) | r/o    |
-| Texture3D                       | 3D     | Unknown (2) | false   | false | r/o (1) | r/o    |
-| TextureCUBE                     | Cube   | Unknown (2) | false   | false | r/o (1) | r/o    |
-| TextureCUBEArray                | Cube   | Unknown (2) | true    | false | r/o (1) | r/o    |
-| RWTexture1D                     | 1D     | Unknown (2) | false   | false | r/w (2) | r/w    |
-| RWTexture1DArray                | 1D     | Unknown (2) | true    | false | r/w (2) | r/w    |
-| RWTexture2D                     | 2D     | Unknown (2) | false   | false | r/w (2) | r/w    |
-| RWTexture2DArray                | 2D     | Unknown (2) | true    | false | r/w (2) | r/w    |
-| RWTexture2DMS                   | 2D     | Unknown (2) | false   | true  | r/w (2) | r/w    |
-| RWTexture2DMSArray              | 2D     | Unknown (2) | true    | true  | r/w (2) | r/w    |
-| RWTexture3D                     | 3D     | Unknown (2) | false   | false | r/w (2) | r/w    |
-| Buffer                          | Buffer | Unknown (2) | false   | false | r/o (1) | r/o    |
-| RWBuffer                        | Buffer | Unknown (2) | false   | false | r/w (2) | r/w    |
+|                    | Dim    | Depth       | Arrayed | MS    | Sampled | Image Format |
+|--------------------|--------|-------------|---------|-------|---------|--------------|
+| Texture1D          | 1D     | Unknown (2) | false   | false | r/o (1) |              |
+| Texture1DArray     | 1D     | Unknown (2) | true    | false | r/o (1) |              |
+| Texture2D          | 2D     | Unknown (2) | false   | false | r/o (1) |              |
+| Texture2DArray     | 2D     | Unknown (2) | true    | false | r/o (1) |              |
+| Texture2DMS        | 2D     | Unknown (2) | false   | true  | r/o (1) |              |
+| Texture2DMSArray   | 2D     | Unknown (2) | true    | true  | r/o (1) |              |
+| Texture3D          | 3D     | Unknown (2) | false   | false | r/o (1) |              |
+| TextureCUBE        | Cube   | Unknown (2) | false   | false | r/o (1) |              |
+| TextureCUBEArray   | Cube   | Unknown (2) | true    | false | r/o (1) |              |
+| RWTexture1D        | 1D     | Unknown (2) | false   | false | r/w (2) |              |
+| RWTexture1DArray   | 1D     | Unknown (2) | true    | false | r/w (2) |              |
+| RWTexture2D        | 2D     | Unknown (2) | false   | false | r/w (2) |              |
+| RWTexture2DArray   | 2D     | Unknown (2) | true    | false | r/w (2) |              |
+| RWTexture2DMS      | 2D     | Unknown (2) | false   | true  | r/w (2) |              |
+| RWTexture2DMSArray | 2D     | Unknown (2) | true    | true  | r/w (2) |              |
+| RWTexture3D        | 3D     | Unknown (2) | false   | false | r/w (2) |              |
+| Buffer             | Buffer | Unknown (2) | false   | false | r/o (1) |              |
+| RWBuffer           | Buffer | Unknown (2) | false   | false | r/w (2) |              |
+
+Note that dxc generally guesses at the image format for SPIR-V, and there is a
+`vk::image_format` attribute in DXC's HLSL implementation that can be used to
+choose something in particular. We need to document what we'll be doing here,
+considering the many discussions and issues about this over the years in DXC
+([#4941], [#4773], [#2498], [#3395], [#4868], ...)
+
+[#4941]: https://github.com/microsoft/DirectXShaderCompiler/issues/4941
+[#4773]: https://github.com/microsoft/DirectXShaderCompiler/issues/4773
+[#2498]: https://github.com/microsoft/DirectXShaderCompiler/issues/2498
+[#3395]: https://github.com/microsoft/DirectXShaderCompiler/issues/3395
+[#4868]: https://github.com/microsoft/DirectXShaderCompiler/issues/4868
 
 DXC lowers [Constant/Texture/Structured/Byte Buffers] to [OpTypeStruct] in
-SPIR-V with a uniform storage class and various layout decorations. DXC tracks
-the necessary information to lower these in side structures, and we'll likely
-need to keep track of that information in new SPIR-V target extension types in
-our implementation.
+SPIR-V with a storage class that depends on the Vulkan version (Uniform or
+StorageBuffer) and various layout decorations. DXC tracks the necessary
+information to lower these in side structures, and we'll likely need to keep
+track of that information in new SPIR-V target extension types in our
+implementation.
 
 [Constant/Texture/Structured/Byte Buffers]:
     https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#constant-texture-structured-byte-buffers
@@ -296,10 +310,11 @@ our implementation.
 
 The "RasterizerOrdered" (or ROV) resources in HLSL don't map directly to
 SPIR-V. In DXC, we emulate ROV by treating these the same as their non-ROV
-counterparts but wrapping accesses to the resource in critical sections using
-[SPV_EXT_fragment_shader_interlock]. We will probably need to extend the SPIR-V
-target extension types to represent these unless we want to emit the critical
-sections awkwardly early in the compiler.
+counterparts, wrapping accesses to the resource in critical sections using
+[SPV_EXT_fragment_shader_interlock], and then relying on `spirv-opt` to clean
+up. We will probably need to extend the SPIR-V target extension types to
+represent these, and then have the backend do what it needs to do with that
+information.
 
 [SPV_EXT_fragment_shader_interlock]:
     https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_fragment_shader_interlock.asciidoc
