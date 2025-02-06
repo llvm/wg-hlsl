@@ -590,7 +590,7 @@ Operands:
 
 * i32: the root signature flags
   ([D3D12_ROOT_SIGNATURE_FLAGS][d3d12_root_signature_flags])
-  
+
 #### Root Constants
 
 ```LLVM
@@ -680,6 +680,7 @@ Operands:
 [d3d12_texture_address_mode]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_texture_address_mode
 [d3d12_comparison_func]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_comparison_func
 [d3d12_static_border_color]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_static_border_color
+
 
 ### Validations during DXIL generation
 
