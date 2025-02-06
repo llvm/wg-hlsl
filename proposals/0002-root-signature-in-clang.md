@@ -402,7 +402,7 @@ Example for same root signature as above:
 
 ```llvm
 !dx.rootsignatures = !{!2} ; list of function/root signature pairs
-!2 = !{ ptr @main, !3 } ; function, root signature
+!2 = !{ ptr @main, !3, i32 2 } ; function, root signature
 !3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
@@ -434,6 +434,7 @@ Example for same root signature as above:
 
 ```c++
 rootSignature = RootSignature(
+  Version_1_1,
   ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
   { // parameters
     RootCBV(0, 1),
@@ -469,6 +470,19 @@ Such test infrastructure will require the design and construction of a disassemb
 for Root Signature Blob or DX Container.
 
 ## Detailed design
+
+### Root Signature Versioning 
+
+Root Signature have multiple versions that require supporting. To support it,
+a new optional flag called `-force-rootsig-ver` will be added to clang dxc
+driver, the flag naming was chosen to keep compatibility with existing DXC.
+If the flag is not specified, the latest supported version of root signature will
+be selected by default.
+
+In the frontend, this value will be used during parsing, validation and metadata generation
+to enforce compatibility with the specified Root Signature version. The backend should do 
+the same while parsing the metadata and validating it. This version will also be present in the 
+metadata representation, and will lead root signature generation in dxcontainer. 
 
 ### Validations in Sema
 
@@ -532,11 +546,12 @@ signature pairs.
 #### Function/Root Signature Pair
 
 ```LLVM
-!2 = !{ptr @main, !3 }
+!2 = !{ptr @main, !3, i32 2 }
 ```
 
 The function/root signature associates a function (the first operand) with a
-reference to a root signature (the second operand).
+reference to a root signature (the second operand) and it's version (the third operand),
+following [DXC VERSIONING OF ROOT SIGNATURES](https://github.com/microsoft/DirectXShaderCompiler/blob/a8a4e98a2367080af683c48feedd7f7481a31a96/include/dxc/DxilRootSignature/DxilRootSignature.h#L91).
 
 #### Root Signature
 
@@ -575,7 +590,7 @@ Operands:
 
 * i32: the root signature flags
   ([D3D12_ROOT_SIGNATURE_FLAGS][d3d12_root_signature_flags])
-
+  
 #### Root Constants
 
 ```LLVM
@@ -665,7 +680,6 @@ Operands:
 [d3d12_texture_address_mode]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_texture_address_mode
 [d3d12_comparison_func]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_comparison_func
 [d3d12_static_border_color]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_static_border_color
-
 
 ### Validations during DXIL generation
 
