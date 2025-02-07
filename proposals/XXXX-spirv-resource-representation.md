@@ -165,18 +165,13 @@ it is used.
 
 The handle for structured buffers will
 
-| HLSL Resource Type                   | Handle Type                         |
-| ------------------------------------ | ----------------------------------- |
-| StructuredBuffer<T>                  | spv.Buffer(T, StorageBuffer, false, |
-:                                      : false)                              :
-| RWStructuredBuffer<T>                | spv.Buffer(T, StorageBuffer, true,  |
-:                                      : false, set, binding)                :
-| RasterizerOrderedStructuredBuffer<T> | spv.Buffer(T, StorageBuffer, true,  |
-:                                      : true, set, binding)                 :
-| AppendStructuredBuffer<T>            | spv.Buffer(T, StorageBuffer, true,  |
-:                                      : false, set, binding)                :
-| ConsumeStructuredBuffer<T>           | spv.Buffer(T, StorageBuffer, true,  |
-:                                      : false, set, binding)                :
+| HLSL Resource Type                   | Handle Type                                             |
+|--------------------------------------|---------------------------------------------------------|
+| StructuredBuffer<T>                  | spv.Buffer(T, StorageBuffer, false, false)              |
+| RWStructuredBuffer<T>                | spv.Buffer(T, StorageBuffer, true, false, set, binding) |
+| RasterizerOrderedStructuredBuffer<T> | spv.Buffer(T, StorageBuffer, true, true, set, binding)  |
+| AppendStructuredBuffer<T>            | spv.Buffer(T, StorageBuffer, true, false, set, binding) |
+| ConsumeStructuredBuffer<T>           | spv.Buffer(T, StorageBuffer, true, false, set, binding) |
 
 The `set` and `binding` will be set following the convention in DXC. The set
 will be the same as the set for the main storage. If the
@@ -230,14 +225,11 @@ Note that if
 [untyped pointers](https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_untyped_pointers.html)
 are available, this will map naturally to untyped pointers.
 
-| HLSL Resource Type                 | Handle Type                            |
-| ---------------------------------- | -------------------------------------- |
-| ByteAddressBuffer                  | spv.Buffer(void, StorageBuffer, false, |
-:                                    : false)                                 :
-| RWByteAddressBuffer                | spv.Buffer(void, StorageBuffer, true,  |
-:                                    : false)                                 :
-| RasterizerOrderedByteAddressBuffer | spv.Buffer(void, StorageBuffer, true,  |
-:                                    : true)                                  :
+| HLSL Resource Type                 | Handle Type                                   |
+|------------------------------------|-----------------------------------------------|
+| ByteAddressBuffer                  | spv.Buffer(void, StorageBuffer, false, false) |
+| RWByteAddressBuffer                | spv.Buffer(void, StorageBuffer, true,  false) |
+| RasterizerOrderedByteAddressBuffer | spv.Buffer(void, StorageBuffer, true,  true)  |
 
 ### Feedback textures
 
