@@ -312,6 +312,17 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
                           'STATIC_BORDER_COLOR_OPAQUE_WHITE'
 ```
 
+### Root Signature Versioning 
+
+Currently, DirectX supports two "versions" of root signatures: 1.0 and 1.1. Version 1.1 includes additional flags for descriptor ranges and root descriptors. See the [DirectX Documentation][root_signature_versions_doc] for full details.
+
+The metadata format specification will differ on according to each version. Version 1.1 has introduced new flags to Root Descriptors and Descriptors Range. This flags as well as it's values are being specified in [validations section] (#validations-in-sema)
+
+In the AST, the version will be used during parsing, validation and metadata generation
+to enforce compatibility with the metadata representation.
+
+In the metadata representation, this will be specified and used to perform the correct validation of root signatures, as well as being represented in the final object file.
+
 ### Validation and Diagnostics
 
 As well as validating that the root signature is syntactically correct, the
@@ -335,6 +346,10 @@ float4 eg2() : SV_TARGET { return b[0]; }
 
 ## Proposed solution
 
+### Driver
+
+A new optional flag called `-hlsl-rootsig-ver` needs to be added in `Options.td` and it's associated description in `LangOptions.td`. If the flag is not specified, the latest supported version of root signature will be selected by default.
+
 ### Root Signatures in the AST
 
 A new attribute, `HLSLRootSignatureAttr` (defined in `Attr.td`), is added to
@@ -347,6 +362,7 @@ diagnostics can be produced at this stage. For example:
 * is the root signature string syntactically correct?
 * is the specified root signature internally consistent?
   * is the right type of register used in each parameter / descriptor range?
+  * is all parsed elments correct according to the specified version definition?
 * is each register bound only once?
 * see [Validations in Sema](#validations-in-sema) for full list
 
@@ -354,6 +370,8 @@ The in-memory representation is guaranteed to be valid as far as the above
 checks are concerned.
 
 The root signature AST nodes are serialized / deserialized as normal bitcode.
+
+The root signature version must be added as one of the parameters for the in-memory datastructures.
 
 In the root signature DSL, a root signature is made up of a list of "root
 elements". The in-memory datastructures are designed around this concept; the
@@ -376,6 +394,7 @@ When parsed will produce a the equivalent of:
 
 ```c++
 parsedRootSignature = RootSignature{
+  Version_1_2,
   RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT),
   RootCBV(0, 1), // register 0, space 1
   StaticSampler(1, 0), // register 1, space 0
@@ -402,7 +421,7 @@ Example for same root signature as above:
 
 ```llvm
 !dx.rootsignatures = !{!2} ; list of function/root signature pairs
-!2 = !{ ptr @main, !3, i32 2 } ; function, root signature
+!2 = !{ ptr @main, !3, i32 2 } ; function, root signature, version
 !3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
@@ -471,19 +490,6 @@ for Root Signature Blob or DX Container.
 
 ## Detailed design
 
-### Root Signature Versioning 
-
-Root Signature have multiple versions that require supporting. To support it,
-a new optional flag called `-force-rootsig-ver` will be added to clang dxc
-driver, the flag naming was chosen to keep compatibility with existing DXC.
-If the flag is not specified, the latest supported version of root signature will
-be selected by default.
-
-In the frontend, this value will be used during parsing, validation and metadata generation
-to enforce compatibility with the specified Root Signature version. The backend should do 
-the same while parsing the metadata and validating it. This version will also be present in the 
-metadata representation, and will lead root signature generation in dxcontainer. 
-
 ### Validations in Sema
 
 #### All the values should be legal.
@@ -498,7 +504,7 @@ The additional semantic rules not already covered by the grammar are listed here
   - DESCRIPTORS_VOLATILE
   - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
-- For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV, only the following values are
+- [Only available in version 1.1 onwards] For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV, only the following values are
    valid
 
   - 0
@@ -551,7 +557,7 @@ signature pairs.
 
 The function/root signature associates a function (the first operand) with a
 reference to a root signature (the second operand) and it's version (the third operand),
-following [DXC VERSIONING OF ROOT SIGNATURES](https://github.com/microsoft/DirectXShaderCompiler/blob/a8a4e98a2367080af683c48feedd7f7481a31a96/include/dxc/DxilRootSignature/DxilRootSignature.h#L91).
+following [dxc root signature versioning][dxc_root_signature_version].
 
 #### Root Signature
 
@@ -671,7 +677,8 @@ Operands:
 * i32: RegisterSpace
 * i32: ShaderVisibility ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
 
-
+[root_signature_versions_doc]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-version-1-1
+[dxc_root_signature_version]: https://github.com/microsoft/DirectXShaderCompiler/blob/a8a4e98a2367080af683c48feedd7f7481a31a96/include/dxc/DxilRootSignature/DxilRootSignature.h#L91
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
 [d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
 [d3d12_root_descriptor_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_descriptor_flags
@@ -715,7 +722,7 @@ Operands:
   - DataStaticWihleSetAtExecute
   - DataStatic
 
-- Valid values for DescriptorRangeFlags on CBV/SRV/UAV
+- [Only valid for version 1.1 onwards] Valid values for DescriptorRangeFlags on CBV/SRV/UAV
 
   - 0
   - DESCRIPTORS_VOLATILE
