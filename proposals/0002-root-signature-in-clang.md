@@ -397,7 +397,7 @@ RootSignature[
 ]
 ```
 
-When parsed will produce a the equivalent of:
+When parsed will produce the equivalent of:
 
 ```c++
 parsedRootSignature = RootSignature{
@@ -413,6 +413,50 @@ parsedRootSignature = RootSignature{
   }
 };
 ```
+
+### Default Values of Optional Parameters
+
+Many of the parameters of each root element are optional. If they are not
+specified they will take the following default values. These comply with
+previous documentation
+[here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl).
+
+General Parameters:
+
+- `visibility = SHADER_VISIBLITY_ALL`
+
+Descriptor Specific:
+
+- `space = 0`
+- `numDescriptors = 1`
+- `offset = DESCRIPTOR_RANGE_OFFSET_APPEND`
+
+Static Sampler Specific:
+
+- `filter = FILTER_ANSIOTROPIC`
+- `addressU = TEXTURE_ADDRESS_WRAP`
+- `addressV = TEXTURE_ADDRESS_WRAP`
+- `addressW = TEXTURE_ADDRESS_WRAP`
+- `mipLODBias = 0.f`
+- `maxAnsiotropy = 16`
+- `comparisonFunc = COMPARISON_LESS_EQUAL`
+- `borderColor = STATIC_BORDER_COLOR_OPAQUE_WHITE`
+- `minLOD = 0.f`
+- `maxLOD = 3.402823466e+38f`
+
+Flags:
+
+As specified in the grammar '0' denotes there are no flags set.
+
+- `RootFlags = 0`
+- `ROOT_DESCRIPTOR_FLAGS` and `DESCRIPTOR_RANGE_FLAGS`
+  - Version 1.0:
+    - `DATA_VOLATILE`
+  - Version 1.1:
+    - `RootCBV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
+    - `RootSRV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
+    - `RootUAV`: `DATA_VOLATILE`
+    - `Sampler`: `0`
 
 ### Root Signatures in the LLVM IR
 
