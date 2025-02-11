@@ -312,6 +312,23 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
                           'STATIC_BORDER_COLOR_OPAQUE_WHITE'
 ```
 
+### Root Signature Versioning 
+
+Currently, DirectX supports two "versions" of root signatures: 1.0 and 1.1. 
+Version 1.1 includes additional flags for descriptor ranges and root descriptors. 
+See the [DirectX Documentation][root_signature_versions_doc] for full details.
+
+The metadata format specification will be the same, regardless of the version. 
+Each version has different defaults and different valid flag combinations.
+Further details are specified in [validations section](#validations-in-sema)
+
+In the AST, the version is used during parsing, validation and metadata 
+generation to enforce compatibility with the metadata representation.
+
+In the metadata representation, this is specified and used to perform  
+the correct validation of root signatures, as well as being represented in 
+the final object file.
+
 ### Validation and Diagnostics
 
 As well as validating that the root signature is syntactically correct, the
@@ -335,11 +352,18 @@ float4 eg2() : SV_TARGET { return b[0]; }
 
 ## Proposed solution
 
+### Driver
+
+A new optional flag called `-hlsl-rootsig-ver` needs to be added in `Options.td` 
+and its associated description in `LangOptions.td`. If the flag is not specified, 
+the latest supported version of root signature will be selected by default.
+
 ### Root Signatures in the AST
 
 A new attribute, `HLSLRootSignatureAttr` (defined in `Attr.td`), is added to
 capture the string defining the root signature. `AdditionalMembers` is used to
-add a member that holds the parsed representation of the root signature.
+add a member that retains the version and a member that holds the parsed
+representation of the root signature.
 
 Parsing of the root signature string happens in Sema, and some validation and
 diagnostics can be produced at this stage. For example:
@@ -347,6 +371,7 @@ diagnostics can be produced at this stage. For example:
 * is the root signature string syntactically correct?
 * is the specified root signature internally consistent?
   * is the right type of register used in each parameter / descriptor range?
+  * are all parsed elements correct according to the chosen root signature version?
 * is each register bound only once?
 * see [Validations in Sema](#validations-in-sema) for full list
 
@@ -376,13 +401,16 @@ When parsed will produce a the equivalent of:
 
 ```c++
 parsedRootSignature = RootSignature{
-  RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT),
-  RootCBV(0, 1), // register 0, space 1
-  StaticSampler(1, 0), // register 1, space 0
-  DescriptorTable({
-    SRV(0, 0, unbounded), // register 0, space 0, unbounded
-    UAV(5, 1, 10) // register 5, space 1, 10 descriptors
-  })
+  Version = Version_1_1,
+  RootElements = {
+    RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT),
+    RootCBV(0, 1), // register 0, space 1
+    StaticSampler(1, 0), // register 1, space 0
+    DescriptorTable({
+      SRV(0, 0, unbounded), // register 0, space 0, unbounded
+      UAV(5, 1, 10) // register 5, space 1, 10 descriptors
+    })
+  }
 };
 ```
 
@@ -402,7 +430,7 @@ Example for same root signature as above:
 
 ```llvm
 !dx.rootsignatures = !{!2} ; list of function/root signature pairs
-!2 = !{ ptr @main, !3 } ; function, root signature
+!2 = !{ ptr @main, !3, i32 2 } ; function, root signature, version
 !3 = !{ !4, !5, !6, !7 } ; list of root signature elements
 !4 = !{ !"RootFlags", i32 1 } ; 1 = allow_input_assembler_input_layout
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
@@ -434,6 +462,7 @@ Example for same root signature as above:
 
 ```c++
 rootSignature = RootSignature(
+  Version_1_1,
   ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
   { // parameters
     RootCBV(0, 1),
@@ -479,25 +508,26 @@ checks in Sema.
 The additional semantic rules not already covered by the grammar are listed here.
 
 - For DESCRIPTOR_RANGE_FLAGS on a Sampler, only the following values are valid
+  - For version 1.0, only the value DESCRIPTORS_VOLATILE is valid.
+  - For version 1.1, the following values are valid:  
+    - 0
+    - DESCRIPTORS_VOLATILE
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
-  - 0
-  - DESCRIPTORS_VOLATILE
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
-
-- For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV, only the following values are
-   valid
-
-  - 0
-  - DESCRIPTORS_VOLATILE
-  - DATA_VOLATILE
-  - DATA_STATIC
-  - DATA_STATIC_WHILE_SET_AT_EXECUTE
-  - DESCRIPTORS_VOLATILE | DATA_VOLATILE
-  - DESCRIPTORS_VOLATILE | DATA_STATIC_WHILE_SET_AT_EXECUTE
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_VOLATILE
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
+- For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV
+  - For version 1.0, only the value DATA_VOLATILE is valid.
+  - For version 1.1, the following values are valid:  
+    - 0
+    - DESCRIPTORS_VOLATILE
+    - DATA_VOLATILE
+    - DATA_STATIC
+    - DATA_STATIC_WHILE_SET_AT_EXECUTE
+    - DESCRIPTORS_VOLATILE | DATA_VOLATILE
+    - DESCRIPTORS_VOLATILE | DATA_STATIC_WHILE_SET_AT_EXECUTE
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_VOLATILE
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - StaticSampler
 
@@ -532,11 +562,14 @@ signature pairs.
 #### Function/Root Signature Pair
 
 ```LLVM
-!2 = !{ptr @main, !3 }
+!2 = !{ptr @main, !3, i32 2 }
 ```
 
 The function/root signature associates a function (the first operand) with a
-reference to a root signature (the second operand).
+reference to a root signature (the second operand) and its version (the third operand),
+following. The valid values for version are:
+ * 1: version 1.0
+ * 2: version 1.1
 
 #### Root Signature
 
@@ -656,7 +689,7 @@ Operands:
 * i32: RegisterSpace
 * i32: ShaderVisibility ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
 
-
+[root_signature_versions_doc]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-version-1-1
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
 [d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
 [d3d12_root_descriptor_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_descriptor_flags
@@ -701,24 +734,26 @@ Operands:
   - DataStatic
 
 - Valid values for DescriptorRangeFlags on CBV/SRV/UAV
-
-  - 0
-  - DESCRIPTORS_VOLATILE
-  - DATA_VOLATILE
-  - DATA_STATIC
-  - DATA_STATIC_WHILE_SET_AT_EXECUTE
-  - DESCRIPTORS_VOLATILE | DATA_VOLATILE
-  - DESCRIPTORS_VOLATILE | DATA_STATIC_WHILE_SET_AT_EXECUTE
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_VOLATILE
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
+  - For root signature version 1.0 must be DESCRIPTORS_VOLATILE.
+  - For root signature version 1.1:
+    - 0
+    - DESCRIPTORS_VOLATILE
+    - DATA_VOLATILE
+    - DATA_STATIC
+    - DATA_STATIC_WHILE_SET_AT_EXECUTE
+    - DESCRIPTORS_VOLATILE | DATA_VOLATILE
+    - DESCRIPTORS_VOLATILE | DATA_STATIC_WHILE_SET_AT_EXECUTE
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_VOLATILE
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - Valid values for DescriptorRangeFlags on Sampler
-
-  - 0
-  - DESCRIPTORS_VOLATILE
-  - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
+  - For root signature version 1.0 must be 0.
+  - For root signature version 1.1:
+    - 0
+    - DESCRIPTORS_VOLATILE
+    - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - StaticSampler
 
