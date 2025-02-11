@@ -446,16 +446,16 @@ Static Sampler Specific:
 
 Flags:
 
-As specified in the grammar '0' denotes there are no flags set.
+As specified in the grammar, '0' denotes there are no flags set.
 
 - `RootFlags = 0`
 - `ROOT_DESCRIPTOR_FLAGS` and `DESCRIPTOR_RANGE_FLAGS`
   - Version 1.0:
     - `DATA_VOLATILE`
   - Version 1.1:
-    - `RootCBV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
-    - `RootSRV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
-    - `RootUAV`: `DATA_VOLATILE`
+    - `CBV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
+    - `SRV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
+    - `UAV`: `DATA_VOLATILE`
     - `Sampler`: `0`
 
 ### Root Signatures in the LLVM IR
