@@ -2,9 +2,9 @@
 
 # Mapping Resource Attributes to DXIL and SPIR-V
 
-* Proposal: [NNNN](NNNN-resource-attributes-in-dxil-and-spirv.md)
+* Proposal: [0015](0015-resource-attributes-in-dxil-and-spirv.md)
 * Author: [Justin Bogner](https://github.com/bogner)
-* Status: **Design In Progress**
+* Status: **Accepted**
 
 ## Introduction
 
