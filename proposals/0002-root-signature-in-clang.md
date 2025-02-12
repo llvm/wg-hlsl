@@ -20,10 +20,9 @@
 
 [Root
 Signatures](https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signatures-overview)
-can be [specified in
-HLSL](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl)
-and included in the generated DXContainer in a binary serialized format.
-Support for this functionality needs to be added to Clang.
+can be [specified in HLSL][specify_root_signatures] and included in the
+generated DXContainer in a binary serialized format. Support for this
+functionality needs to be added to Clang.
 
 This change proposes adding:
 
@@ -33,6 +32,7 @@ This change proposes adding:
   analysis
 * Conversion of the metadata representation to the binary serialized format.
 
+[specify_root_signatures]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl
 
 ## Motivation
 
@@ -98,8 +98,7 @@ in C++. A compiled shader that contains a root signature can be passed to
 `CreateRootSignature`.
 
 In HLSL, Root Signatures are specified using a domain specific language as
-documented
-[here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl).
+documented [here][specify_root_signatures].
 
 See below for the [grammar](#root-signature-grammar) of this DSL.
 
@@ -418,8 +417,7 @@ parsedRootSignature = RootSignature{
 
 Many of the parameters of each root element are optional. If they are not
 specified they will take the following default values. These comply with
-previous documentation
-[here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl).
+previous documentation [here][specify_root_signatures].
 
 General Parameters:
 
