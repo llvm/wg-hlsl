@@ -422,10 +422,10 @@ previous documentation [here][specify_root_signatures].
 General Parameters:
 
 - `visibility = SHADER_VISIBLITY_ALL`
-
-Descriptor Specific:
-
 - `space = 0`
+
+Descriptor Range Specific:
+
 - `numDescriptors = 1`
 - `offset = DESCRIPTOR_RANGE_OFFSET_APPEND`
 
