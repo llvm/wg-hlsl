@@ -20,10 +20,9 @@
 
 [Root
 Signatures](https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signatures-overview)
-can be [specified in
-HLSL](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl)
-and included in the generated DXContainer in a binary serialized format.
-Support for this functionality needs to be added to Clang.
+can be [specified in HLSL][specify_root_signatures] and included in the
+generated DXContainer in a binary serialized format. Support for this
+functionality needs to be added to Clang.
 
 This change proposes adding:
 
@@ -33,6 +32,7 @@ This change proposes adding:
   analysis
 * Conversion of the metadata representation to the binary serialized format.
 
+[specify_root_signatures]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl
 
 ## Motivation
 
@@ -98,8 +98,7 @@ in C++. A compiled shader that contains a root signature can be passed to
 `CreateRootSignature`.
 
 In HLSL, Root Signatures are specified using a domain specific language as
-documented
-[here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/specifying-root-signatures-in-hlsl).
+documented [here][specify_root_signatures].
 
 See below for the [grammar](#root-signature-grammar) of this DSL.
 
@@ -397,7 +396,7 @@ RootSignature[
 ]
 ```
 
-When parsed will produce a the equivalent of:
+When parsed will produce the equivalent of:
 
 ```c++
 parsedRootSignature = RootSignature{
@@ -413,6 +412,53 @@ parsedRootSignature = RootSignature{
   }
 };
 ```
+
+### Default Values of Optional Parameters
+
+Many of the parameters of each root element are optional. If they are not
+specified they will take the following default values. These comply with
+previous documentation [here][specify_root_signatures].
+
+General Parameters:
+
+- `visibility = SHADER_VISIBLITY_ALL`
+
+Root Descriptor Specific:
+
+- `space = 0`
+
+Descriptor Range Specific:
+
+- `numDescriptors = 1`
+- `space = 0`
+- `offset = DESCRIPTOR_RANGE_OFFSET_APPEND`
+
+Static Sampler Specific:
+
+- `filter = FILTER_ANSIOTROPIC`
+- `addressU = TEXTURE_ADDRESS_WRAP`
+- `addressV = TEXTURE_ADDRESS_WRAP`
+- `addressW = TEXTURE_ADDRESS_WRAP`
+- `mipLODBias = 0.f`
+- `maxAnsiotropy = 16`
+- `comparisonFunc = COMPARISON_LESS_EQUAL`
+- `borderColor = STATIC_BORDER_COLOR_OPAQUE_WHITE`
+- `minLOD = 0.f`
+- `maxLOD = 3.402823466e+38f`
+
+Flags:
+
+As specified in the grammar, '0' denotes there are no flags set.
+
+- `RootFlags = 0`
+- `ROOT_DESCRIPTOR_FLAGS` and `DESCRIPTOR_RANGE_FLAGS`
+  - Version 1.0:
+    - `DATA_VOLATILE`
+  - Version 1.1:
+    - `CBV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
+    - `SRV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
+    - `UAV`: `DATA_VOLATILE`
+    - `Sampler`: `0`
 
 ### Root Signatures in the LLVM IR
 
