@@ -153,7 +153,7 @@ Use of `[[vk::offset()]]`:
 ```llvm
 ; struct vkoffset1 {
 ;   float2 a;
-;   [[vk::offset(8) float2 b;
+;   [[vk::offset(8)]] float2 b;
 ; }
 %__hlsl_vkoffset1 = { <2 x float>, <2 x float> }
 target("spirv.Layout", %__hlsl_vkoffset1, 12, 0, 8)
