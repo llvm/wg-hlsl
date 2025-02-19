@@ -113,32 +113,8 @@ Simple usage of packoffset:
 target("dx.Layout", { i32, i32 }, 40, 16, 36)
 ```
 
-packoffset that only specifies the first field:
-> note: This emits a warning in DXC. Do we really want to support it?
-
-```llvm
-; cbuffer packoffset1 {
-;   float x : packoffset(c1.x);
-;   float y;
-; };
-target("dx.Layout", { i32, i32 }, 24, 16, 20)
-```
-
-packoffset that only specifies a later field:
-> note: This behaves differently between DXIL and SPIR-V in DXC, and the DXIL
-> behaviour is very surprising. Do we want to allow this?
-
-```llvm
-; cbuffer packoffset1 {
-;   float x;
-;   float y : packoffset(c1.x);
-; };
-target("dx.Layout", { i32, i32 }, 24, 20, 16)
-target("spirv.Layout", { i32, i32 }, 20, 0, 16)
-```
-
 packoffset that reorders fields:
-> note: This fails to compile for SPIR-V in DXC. Is this worth handling?
+> note: This does not currently work in DXC targeting SPIR-V.
 
 ```llvm
 ; cbuffer packoffset1 {
@@ -172,10 +148,31 @@ target("spirv.Layout", %__hlsl_vkoffset1, 16, 0, 8)
 
 ## Open questions
 
-- Should we also add a `target("dx.CBufArray", <type>, <size>)` type, rather
-  than having the CBuffer logic need to be aware of special array element
-  spacing rules?
-- Should reordering fields actually be allowed here?
+#### Arrays in CBuffers
+
+Should we also add a `target("dx.CBufArray", <type>, <size>)` type, rather than
+having the CBuffer logic need to be aware of special array element spacing
+rules?
+
+#### Decaying to non-target types
+
+Operations like `resource.getpointer` can expose us to the contained type of a
+resource, but should that give us an object of the underlying struct or the
+target type? For the former, we would lose the layout, which is problematic.
+For the latter, we need to talk about GEPs.
+
+If we can have pointers of the target type, we'd either need to teach GEP to
+handle these, which is a fairly wide-reaching change, or we would need a set of
+GEP-like intrinsics.
+
+This will need to be resolved in order to use these in StructuredBuffer and for
+most real use-cases of `vk::offset`.
+
+#### Copying in and out of the layout
+
+How do we convert from the Layout types to types without the offsets? We'll
+probably need an intrinsic that does a logical copy from the target type to a
+compatible structure. See https://godbolt.org/z/rh5dvd3E7 for an example.
 
 ## Acknowledgments
 
