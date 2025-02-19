@@ -174,6 +174,25 @@ How do we convert from the Layout types to types without the offsets? We'll
 probably need an intrinsic that does a logical copy from the target type to a
 compatible structure. See https://godbolt.org/z/rh5dvd3E7 for an example.
 
+#### Struct layouts in Clang
+
+Clang uses [ASTContext::getRecordLayout] to get the offset of a member when
+needed. This proposal means that we will not update this class to be aware of
+`vk::offset` and `packedoffset`. The goal of this proposal is to avoid adding
+explicit padding members in the llvm:StructType as is done when handling
+`alignof` in C++.
+
+[ASTContext::getRecordLayout]: https://github.com/llvm/llvm-project/blob/aa9e519b2423/clang/lib/AST/RecordLayoutBuilder.cpp#L3321
+
+If we update `ASTContext::getRecordLayout`, then the explicit padding will be
+added to the llvm::StructType. If we do not update it, then we will have to
+consider every spot in Clang that calls it to see if we need to special case
+the HLSL layout.
+
+Currently known issue are: `offsetof` and `sizeof`. There is a lot more that
+needs to be looked into in Clang. `ASTRecordLayout` is passed around to a lot
+of functions, without the original type.
+
 ## Acknowledgments
 
 This proposal is expanded from comments in [llvm/wg-hlsl#94] and follow up
