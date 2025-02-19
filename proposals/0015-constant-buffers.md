@@ -110,13 +110,13 @@ declarations in `cbuffer` scope will be processed into a layout struct that will
 represent the actual content of the constant buffer.
 
 The layout struct will contain all declaration from the `cbuffer` block except:
-- static and groupshared variable declarations
+- static or groupshared variable declarations
 - resource classes
 - empty structs
 - zero-sized arrays
 - any non-variable declarations (functions, classes, ...)
 
-If the constant buffer includes a struct variable, this struct it will also need
+If the constant buffer includes a struct variable, it will also need
 to be inspected and transformed into a new layout struct if it contains any of
 the undesired declarations above.
 
@@ -252,7 +252,7 @@ Clang codegen will create these struct definition and global variabless:
 ```
 $struct.S = type { float }
 %struct.__layout_Constants = type { i32, %struct.S }
-%struct.__layout_MyConstants = type { <4 x float>, [10 x i32] }
+%struct.__layout_OtherConstants = type { <4 x float>, [10 x i32] }
 
 @Constants.cb = external constant target("dx.CBuffer", %struct.__layout_Constants)
 @i = external addrspace(2) global float
@@ -270,6 +270,12 @@ buffer resource handle. In order for the pass to generate the correct CBV loads
 it is going to need additinal information, such as which constants belong to
 which constant buffer, and layout of the buffer and any embedded structs.
 Codegen will generate this information as metadata.
+
+Note that the name of `cbuffer` declaration does not have to be unique. A shader
+can have multiple `cbuffer` declarations using the same name. The name of the
+layout struct created for the buffer should be derived from the `cbuffer` name.
+The compiler must ensure that it is unique by adding a number to the name or
+other similar mechanism.
 
 ### Format of constant buffer metadata
 
