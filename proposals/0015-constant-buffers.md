@@ -116,9 +116,9 @@ The layout struct will contain all declaration from the `cbuffer` block except:
 - zero-sized arrays
 - any non-variable declarations (functions, classes, ...)
 
-If the constant buffer includes a struct variable, it will also need
-to be inspected and transformed into a new layout struct if it contains any of
-the undesired declarations above.
+If the constant buffer includes a struct variable, it will also need to be
+inspected and transformed into a new layout struct if it contains any of the
+undesired declarations above.
 
 For example for this `cbuffer` declaration:
 
@@ -149,11 +149,9 @@ The buffer layout struct will look like this:
 ```
 
 The layout struct for the constant buffer will be defined in the
-`HLSLBufferDecl` declaration context and is going to be the last `CXXRecordDecl`
-child of `HLSLBufferDecl`.
-
-Layout structs for user defined structs will be added to the same declaration
-context as the original struct (to the same namespace).
+`HLSLBufferDecl` declaration contex. If a layout struct needs to be created for
+a user defined struct it will be added to the same declaration context as the
+original struct (the same namespace).
 
 ### Default Constant Buffer
 
@@ -182,10 +180,11 @@ address space.
 On the other hand, we need to make sure `ConstantBuffer` can also be handled as
 other resources, i.e. as a record class that contains a resource handle. That
 would be useful when creating arrays of `ConstantBuffer<T>` or when
-`ConstantBuffer<T>` is used a as function argument. It is not clear how 
-that would work with the alias declaration.
+`ConstantBuffer<T>` is used a as function argument. It is not clear how that
+would work with the alias declaration.
 
-*At this point the design of the `ConstantBuffer<T>` class is still work in progress.*
+*At this point the design of the `ConstantBuffer<T>` class is still work in
+progress.*
 
 
 Note that resources and other non-constant buffer constructs should not be
@@ -197,8 +196,9 @@ should report an error.
 For each constant buffer the Clang codegen will create a global variable in
 default address space. The type of the global will be `target("dx.CBuffer",
 ...)`. This global variable will be used for the resource handle initialization
-and will be eventually removed. The target type will include 1 parameters - the
-buffer layout structure.
+and will be eventually removed. The target type `target("dx.CBuffer", ...)` will
+include 1 parameter - an explicit HLSL layout type representing the buffer
+layout structure.
 
 For example this `cbuffer`:
 ```
@@ -209,9 +209,12 @@ cbuffer MyConstants {
 ```
 would be translated a global variable with the following target type:
 ```
-%struct.__layout_MyConstants = type { <2 x float>, i32 }
-@MyConstants.cb = global target("dx.CBuffer", %struct.__layout_MyConstants)
+%__cblayout_MyConstants = type <{ <2 x float>, i32 }>
+@MyConstants.cb = external constant target("dx.CBuffer", target("dx.Layout", %__cblayout_MyConstants, 12, 0, 8))
 ```
+
+The explicit HLSL layout types are described
+[here](0016-NNNN-explicit-layout-struct.md).
 
 ### Lowering Accesses to Individual Constants to LLVM IR
 
@@ -227,7 +230,6 @@ in the `hlsl_constant` address space, no changes should be needed here.
 Note that these globals are temporary. They will be eventually transformed into
 appropriate intrinsics calls and will not exist in the final DXIL or SPIR-V
 code.
-
 
 For example for this HLSL code:
 
@@ -250,17 +252,17 @@ cbuffer OtherConstants {
 Clang codegen will create these struct definition and global variabless:
 
 ```
-$struct.S = type { float }
-%struct.__layout_Constants = type { i32, %struct.S }
-%struct.__layout_OtherConstants = type { <4 x float>, [10 x i32] }
+%__cblayout_Constants = type <{ i32, target("dx.Layout", %S, 4, 0) }>
+%S = type <{ float }>
+%__cblayout_OtherConstants = type <{ <4 x float>, [10 x i32] }>
 
-@Constants.cb = external constant target("dx.CBuffer", %struct.__layout_Constants)
-@i = external addrspace(2) global float
-@s = external addrspace(2) global %struct.S
+@Constants.cb = external constant target("dx.CBuffer", target("dx.Layout", %__cblayout_Constants, 20, 0, 16))
+@i = external addrspace(2) global i32, align 4
+@s = external addrspace(2) global target("dx.Layout", %S, 4, 0), align 4
 
-@OtherConstants.cb = external constant target("dx.CBuffer", %struct.__layout_OtherConstants)
-@v = external addrspace(2) global <3 x float>
-@array = external addrspace(2) global [10 x i32]
+@OtherConstants.cb = external constant target("dx.CBuffer", target("dx.Layout", %__cblayout_OtherConstants, 164, 0, 16))
+@v = external addrspace(2) global <4 x float>, align 16
+@array = external addrspace(2) global [10 x i32], align 4
 ```
 
 Clang codegen will translate accesses to these global constants to `load`
@@ -268,8 +270,7 @@ instruction from a pointer in `addrspace(2)`. These `load` instructions will be
 later replaced in an LLVM pass with constant buffer load intrinsic calls on a
 buffer resource handle. In order for the pass to generate the correct CBV loads
 it is going to need additinal information, such as which constants belong to
-which constant buffer, and layout of the buffer and any embedded structs.
-Codegen will generate this information as metadata.
+which constant buffer. Codegen will generate this information as metadata.
 
 Note that the name of `cbuffer` declaration does not have to be unique. A shader
 can have multiple `cbuffer` declarations using the same name. The name of the
@@ -278,8 +279,6 @@ The compiler must ensure that it is unique by adding a number to the name or
 other similar mechanism.
 
 ### Format of constant buffer metadata
-
-#### Mapping of constant global variables to constant buffer
 
 Clang codegen needs to emit metadata that will link `hlsl_constant` globals  to
 individual constant buffers. Metadata node for a single buffer will be a list of
@@ -299,44 +298,17 @@ For the HLSL code above the metadata will look like:
 !2 = !{ptr @OtherConstants.cb, ptr addrspace(2) @v, ptr addrspace(2) @array}
 ```
 
-#### Layout information
-
-Clang also needs to include layout information for each constant buffer, and
-for any user defined structs  used in a constant buffer. Metadata node storing
-this information will include the name of the struct, its size, and then a list
-of offset for each field.
-
-A named metadata node `hlsl.layouts` will then capture a list of all layout
-metadata.
-
-For the HLSL code above the layout metadata will look like this:
-
-```
-!hlsl.layouts = !{!3, !4, !5}
-!3 = !{!"struct.S", i32 4, i32 0}                              ; size 4, element offsets 0
-!4 = !{!"struct.__layout_Constants", i32 20, i32 0, i32 16}    ; size 20, element offsets 0, 16
-!5 = !{!"struct.__layout_OtherConstants", i32 164, i32 0, i32 16} 
-                                        ; size 164, element offsets 0, 16
-```
-
-Since the module contains the struct definitions, we know which struct field is
-an array or not and how many subelements is contains. The only additional layout
-information that is not included here is the stride of the array elements. This
-can can be calculated as the size of the array element aligned to 16 (size of
-constant buffer row) because each array element always starts at the begining of
-a row.
-
 ### Lowering to buffer load intrinsics
 
 A new pass `HLSLConstantAccess` will translate all `load` instructions in
 `hlsl_constant` address space to `llvm.{dx|spv}.resource.load.cbuffer`
 intrinsics. It will make use of the metadata generated by Clang codegen that
-maps the constants global variables to individual constant buffers and specifies
-the constant buffer layout. The pass will also transform related `getelementptr`
-instructions to use the constant buffer layout offsets.
+maps the constants global variables to individual constant buffers. The pass
+will also transform related `getelementptr` instructions to use the constant
+buffer layout offsets.
 
 After the `HLSLConstantAccess` pass completes the constant globals and the
-constant buffer and layout metadata are no longer needed and should be removed.
+constant buffer metadata are no longer needed and should be removed.
 
 ### Lowering to DXIL
 
