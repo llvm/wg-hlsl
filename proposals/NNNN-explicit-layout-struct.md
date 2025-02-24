@@ -193,6 +193,23 @@ Currently known issue are: `offsetof` and `sizeof`. There is a lot more that
 needs to be looked into in Clang. `ASTRecordLayout` is passed around to a lot
 of functions, without the original type.
 
+## Alternative Solutions
+
+There are a few other approaches we might take here in order to get a handle on
+the many open questions:
+
+- Target types that describe the bit layout (padding included), with
+  integer fields to describe the logical layout
+- Target types that describe the bit layout with fields to describe padding
+- Adding or modifying a first class structure type with layout information
+- Adding explicit padding types to LLVM's type system
+- Accessors to the layout types that give us a "physical layout" struct of the
+  object.
+
+It's clear that the layout type is sufficient for cbuffers, but it has some
+problems when trying to use it more generically. We need to investigate further
+if a combined solution for cbuffers, vk::offset, and alignas is feasible.
+
 ## Acknowledgments
 
 This proposal is expanded from comments in [llvm/wg-hlsl#94] and follow up
