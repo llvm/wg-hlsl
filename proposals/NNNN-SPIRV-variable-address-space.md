@@ -34,8 +34,14 @@ A variable declared with the `Private` storage class is private to the current
 invocation/thread, but belongs to the global scope.
 This would be the equivalent of a static global variable in HLSL.
 
-Because SPIR-V has 2 storage classes to represent those 2 categories and HLSL
-has 1, a simple 1:1 lowering of HLSL variables to SPIR-V is not possible.
+Reconciliating the SPIR-V & HLSL side could be done in two ways:
+ - unify the storage classes in SPIR-V.
+ - separate the address spaces in HLSL.
+
+Implementing constant buffers & other resources is done by creating new
+address spaces, making explicit the constraints some allocations have.
+Thus, it seems separating the address spaces for globals & locals would
+allow us to stay consistent with the rest of the language.
 
 ## HLSL patterns to look for
 
@@ -105,16 +111,42 @@ incompatibilities.
 
 This becomes impossible if `foo` is exported, or marked as `noinline`.
 
-## Bad solution 1: using 2 HLSL address spaced
+Making address spaces explicit in HLSL, thus marking references with the
+appropriate address space solves those issues: the constraint is now surfacing
+in the language.
 
-The main issue here boils down to:
-HSLS uses 1 address space when SPIR-V would require 2 storage classes.
+This however opens another set of issues: overload resolution rules on the
+`this` pointer, and template deduction. But this is not a new issue:
+adding address spaces for resources already did started this debate. Hence I
+will consider those out-of-scope for this proposal.
 
-The first solution would be to require HLSL to use 2 address spaces.
-This is not possible as HLSL required global & static variables addresses
-to be used interchangeably. (See [this comment](https://github.com/llvm/llvm-project/pull/122103#pullrequestreview-2550483607))
+## Proposed solution: using 2 HLSL address spaced
 
-## Bad solution 2: Force optimizations, and force inlining
+Thread-local, global variables should be put in the `hlsl_private` address
+space. Thread-local function-local variables should be put in the `default`
+address space.
+
+## Implementing the solution
+
+A new address space will be added to Clang: `hlsl_private`.
+This address space will be mapped to `Spirv::Private` on the SPIR-V backend,
+`PRIVATE_ADDRESS` for AMDGPU, and the address space `0` in DXIL.
+
+Clang codegen will add the new address space annotations, separating
+the `private` from the default.
+
+For the time being, the `private` address space will be marked as a subset of
+the `default` address space, allowing overload resolution for class methods:
+- an object in the `private` address space will be allowed to use a method
+  declared with a `this` in the default address space.
+
+Clang will emit an `addrspacecast` we will have to handle, but that's a known
+issue in address-space overload resolution, and not new to this proposal.
+
+
+## Alternative design considered
+
+### Force optimizations, and force inlining
 
 This solution was mentioned in the example 3.
 - force inline all the functions
@@ -135,7 +167,7 @@ have been a valid option. But it has a few flaws:
 
 The 3rd problem is a nice-to-have, but the first 2 are a complete stop.
 
-## Bad solution 3: Move all variables to the function scope
+### Move all variables to the function scope
 
 HLSL static globals have a known initialization value at compile-time.
 Meaning we could move the global variables to the entrypoint first basic
@@ -145,9 +177,10 @@ This would require passing references to other functions referencing those
 globals, or inline them, but it would be possible.
 
 But the blocker remains the same: building to a library function.
-If an exported function references a global variable, we cannot change the signature of the function.
+If an exported function references a global variable, we cannot change
+the signature of the function.
 
-## Solution 4: Move all variables to the global scope
+## Move all variables to the global scope
 
 By moving all local variables to the global scope, we now have a single
 storage class `Private`, and won't have conflict issues.
@@ -165,7 +198,7 @@ The main issue of this solution can have are:
 
 I believe those 2 are not hard blockers, but something we need to be aware of.
 
-## Maybe bad solution 5: Selectively move variables to the global scope.
+## Selectively move variables to the global scope.
 
 If a variable is only loaded/stored from/to, and remains in the function
 scope, there should be no pointer incompatibility.
@@ -185,31 +218,3 @@ so until we have a real need, I would recommend against, and moving forward
 with solution 4. If the need comes, moving from solution 4 to solution 5
 would be possible, as it's just an optimization on top.
 
-## Implementing the solution
-
-This would be implemented as a backend LLVM-IR pass run for any LLVM-IR
-when targeting Vulkan SPIR-V.
-Reason is LLVM-IR also default to globals and locals sharing the same address
-space, so this transformation is required even when the source language is not
-HLSL.
-
-The pass would iteration on all function instructions, and replace each
-`alloca` with a global variable with the same type. The initialization will
-be set to the zero-value for the type.
-Each user will be modified to use the global variable instead of the `alloca`.
-
-Then, each global variable in the default address space would be modified to
-be in the address space `10` (SPIR-V Private).
-
-At this stage, we'd have no variable in the default address space, but
-some IR operands would still use `ptr` instead of `ptr addrspace(10)`.
-
-The pass would then blindly iterate on all operands (types, variables & instructions),
-and modify each `ptr` into a `ptr addrspace(10)` (leaving non-default address
-space ptr unchanged).
-
-At this stage, we should have no uses of the default address space left, only
-`addressspace(10)` and non-zero address spaces uses for resources/workgroup.
-
-This pass would sadly require some specific instructions fixup, like `gep`,
-as they do store some additional state, but that's an implementation detail.
