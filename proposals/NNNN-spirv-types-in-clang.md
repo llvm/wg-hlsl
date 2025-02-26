@@ -21,34 +21,32 @@ In DXC, we represented `SpirvType` as a template for a struct. This was simple
 to implement, since in DXC we lower the AST directly to SPIR-V without going
 through LLVM codegen, and could add special cases handling structs that were
 `SpirvType` specializations while lowering types. However, this approach does
-not interact well with Sema and the rest of Clang, resulting in at least several
-bugs in handling template arguments and other areas. In order to take the same
-approach in Clang, we would need to add special case handling while lowering
-struct types, as well as for calculating size and alignment and anywhere else
-structs are interacted with in Clang. Struct types are already processed
-separately from all other types while lowering, and adding special cases for
-`SpirvType` would complicate their handling even more.
+not interact well with Sema and the rest of Clang, resulting in several bugs in
+handling template arguments and other areas. In order to take the same approach
+in Clang, we would need to add special case handling while lowering struct
+types, as well as for calculating size and alignment and anywhere else structs
+are interacted with in Clang. Struct types are already processed separately from
+all other types while lowering, and adding special cases for `SpirvType` would
+complicate their handling even more.
 
 Finally, a struct is not a good semantic representation of a `SpirvType`.
 `SpirvType` is fundamentally a new kind of type for Clang that is different from
 all existing types—it represents a low-level target type specified by the user.
+This type is opaque and cannot be represented as a struct because Clang does not
+treat structs as opaque.
 
 ## Proposed solution
 
 ### Type Representation
 
-Describe your solution to the problem. Provide examples and describe how they
-work. Show how your solution is better than current workarounds: is it cleaner,
-safer, or more efficient?
-
 `HLSLInlineSpirvType` is a subclass of `clang::Type`, which has the properties
 
-| Property    | Optional | Type                   |
-| ----------- | -------- | ---------------------- |
-| `Operand`   | no       | `uint32_t`             |
-| `Size`      | yes      | `uint32_t`             |
-| `Alignment` | yes      | `uint32_t`             |
-| `Operands`  | no       | array of`SpirvOperand` |
+| Property    | Description                                                                                              | Optional | Type                   |
+| ----------- | -------------------------------------------------------------------------------------------------------- | -------- | ---------------------- |
+| `Opcode`    | [SPIR-V opcode enumerant](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_instructions_3) | no       | `uint32_t`             |
+| `Size`      | Number of bytes a single value of the type occupies                                                      | yes      | `uint32_t`             |
+| `Alignment` | A power of two that the value will be aligned to in memory                                               | yes      | `uint32_t`             |
+| `Operands`  | List of arguments to the SPIR-V type instruction                                                         | no       | array of`SpirvOperand` |
 
 A value of type `HLSLInlineSpirvType` is always canonical.
 
@@ -69,12 +67,27 @@ Since `HLSLInlineSpirvType` types should only be created using the `SpirvType`
 and `SpirvOpaqueType` templates, we do not need to provide special syntax for
 their declaration. In order to implement these templates, and to avoid the
 necessity of creating an additional dependent type, these types will be created
-using a `vk::__hlsl_spirv_type` builtin template.
+using a `vk::__hlsl_spirv_type` template.
 
 ```C++
 template <uint32_t Opcode, uint32_t Size, uint32_t Alignment,
           typename... Operands>
 using __hlsl_spirv_type = ...;
+```
+
+The implementation of this struct, represented above as `...`, will be provided
+as a
+[Clang builtin type alias](https://clang.llvm.org/docs/LanguageExtensions.html#builtin-type-aliases).
+This builtin can then be used to implement `SpirvType` and `SpirvOpaqueType`:
+
+```C++
+namespace vk {
+    template <uint Opcode, uint Size, uint Alignment, typename... Operands>
+    using SpirvType = __hlsl_spirv_type<Opcode, Size, Alignment, Operands...>;
+
+    template <uint Opcode, typename... Operands>
+    using SpirvOpaqueType = __hlsl_spirv_type<Opcode, 0, 0, Operands...>;
+}
 ```
 
 Operands will be interpreted as specified in
