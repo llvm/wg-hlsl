@@ -1,7 +1,7 @@
 
 # Constant buffers
 
-* Proposal: [15](0015-constant-buffers.md)
+* Proposal: [16](0015-constant-buffers.md)
 * Author(s): [Helena Kotas](https://github.com/hekota)
 * Status: **Design In Progress**
 
@@ -214,7 +214,7 @@ would be translated a global variable with the following target type:
 ```
 
 The explicit HLSL layout types are described
-[here](0016-NNNN-explicit-layout-struct.md).
+[here](0017-NNNN-explicit-layout-struct.md).
 
 ### Lowering Accesses to Individual Constants to LLVM IR
 
