@@ -32,10 +32,10 @@ To represent `vk::SpirvType` and `vk::SpirvOpaqueType` in LLVM IR, we will add
 three new target extension types:
 
 | Type                     | HasZeroInit | CanBeGlobal | CanBeLocal |
-|--------------------------|-------------|-------------|------------|
-| `spirv.Type`             | - [ ]       | - [x]       | - [x]      |
-| `spirv.IntegralConstant` | - [ ]       | - [ ]       | - [ ]      |
-| `spirv.Literal`          | - [ ]       | - [ ]       | - [ ]      |
+| ------------------------ | ----------- | ----------- | ---------- |
+| `spirv.Type`             | false       | true        | true       |
+| `spirv.IntegralConstant` | false       | false       | false      |
+| `spirv.Literal`          | false       | false       | false      |
 
 `IntegralConstant` and `Literal` are used to encode arguments to `Type`, and
 may not be used outside that context. They are necessary because target
