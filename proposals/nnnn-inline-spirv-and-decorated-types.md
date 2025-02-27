@@ -65,19 +65,22 @@ operand must be one of:
 #### `spirv.IntegralConstant`
 
 ```
-target("spirv.IntegralConstant", integral_type, value)
+target("spirv.IntegralConstant", integral_type, value...)
 ```
 
 `integral_type` is the type argument for the `OpConstant` instruction to be
-generated, and `value` is its literal integer value.
+generated, and `value` is its literal integer value. To represent a value larger
+than a single 32-bit word, multiple 32-bit words may be passed as arguments.
 
 #### `spirv.Literal`
 
 ```
-target("spirv.Literal", value)
+target("spirv.Literal", value...)
 ```
 
-`value` is the literal integer value to be generated.
+`value` is the literal integer value to be generated. To represent a value
+larger than a single 32-bit word, multiple 32-bit words may be passed as
+arguments.
 
 #### Example
 
