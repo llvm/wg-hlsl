@@ -70,7 +70,10 @@ target("spirv.IntegralConstant", integral_type, value...)
 
 `integral_type` is the type argument for the `OpConstant` instruction to be
 generated, and `value` is its literal integer value. To represent a value larger
-than a single 32-bit word, multiple 32-bit words may be passed as arguments.
+than a single 32-bit word, multiple 32-bit words may be passed as arguments. As
+stated in the
+[SPIR-V Specification](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstant),
+they should be in little-endian order.
 
 #### `spirv.Literal`
 
@@ -80,7 +83,7 @@ target("spirv.Literal", value...)
 
 `value` is the literal integer value to be generated. To represent a value
 larger than a single 32-bit word, multiple 32-bit words may be passed as
-arguments.
+arguments, in little-endian order.
 
 #### Example
 
