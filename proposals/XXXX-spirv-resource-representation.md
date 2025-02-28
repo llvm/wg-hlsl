@@ -61,11 +61,10 @@ They have multiple implicit features that need to map to different SPIR-V:
     start and stop the critical region.
 
 This makes it impossible to create a handle type that maps directly to a SPIR-V
-type. To handle this, we will create a target type `spv.Buffer`:
+type. To handle this, we will create a target type `spv.VulkanBuffer`:
 
 ```
-target("spv.Buffer", ElementType, StorageClass, IsWriteable, IsROV)
-target("spv.Buffer", ElementType, StorageClass, IsWriteable, IsROV, CounterSet, CounterBinding)
+target("spv.VulkanBuffer", ElementType, StorageClass, IsWriteable, IsROV)
 ```
 
 `ElementType` is the type for the storage buffer array, and `StorageClass` is
@@ -75,7 +74,7 @@ resource has an associated counter variable, its set and binding can be provided
 in `CounterSet` and `CounterBinding`.
 
 In the SPIR-V backend, there will be a legalization pass that will lower the
-`spv.Buffer` type to code closer to the SPIR-V to be generated:
+`spv.VulkanBuffer` type to code closer to the SPIR-V to be generated:
 
 1.  Calls to `@llvm.spv.handle.fromBinding` will be replaced by two calls. One
     that returns a handle to the array, and another that return a handle to the
@@ -104,9 +103,6 @@ handle for the array will be
 target("spirv.Type", target(spirv.Literal, StorageClass), %T1,
 /* OpTypePointer */32)
 ```
-
-TODO: I need to check if a call to `int_spv_assign_decoration` can be added that
-will decorate the target type with the block decoration.
 
 The types for the buffers must have an
 [explicit layout](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#ExplicitLayout).
@@ -145,8 +141,22 @@ image type matching the resource type:
 target("spirv.Image", ...)
 ```
 
-The details of the `spirv.Image` type depend on the specific declaration, and
-are detailed in the "Mapping Resource Attributes to DXIL and SPIR-V" proposal.
+The details of the `spirv.Image` type depend on the specific declaration. Except
+for the image format, the value for each operand is given in the
+[Mapping Resource Attributes to DXIL and SPIR-V](https://github.com/llvm/wg-hlsl/blob/main/proposals/0015-resource-attributes-in-dxil-and-spirv.md)
+proposal. For all resource types other than `Buffer<T>` and `RWBuffer<T>`, the
+image format will be `Unknown`.
+
+For `Buffer<T>`, if Clang can determine that the `StorageImageReadWithoutFormat`
+capability is available, the image format will be `Unknown`. Similarly, with
+`RWBuffer<T>` and the `StorageImageWriteWithoutFormat` capability. See Table 1
+in the
+[Vulkan Environment for SPIR-V](https://docs.vulkan.org/spec/latest/appendices/spirvenv.html)
+In particular, if the Vulkan version is 1.3 or later, the image format will be
+`Unknown`.
+
+Otherwise, the image format will be determined by the template type `T`, and
+will match the existing behaviour implemented in DXC.
 
 Note that this creates disconnect with the
 [Universal Validation Rules](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_universal_validation_rules).
@@ -163,21 +173,20 @@ it is used.
 
 ### Structured Buffers
 
-The handle for structured buffers will
+The handle for structured buffers will be
 
-| HLSL Resource Type                   | Handle Type                                             |
-|--------------------------------------|---------------------------------------------------------|
-| StructuredBuffer<T>                  | spv.Buffer(T, StorageBuffer, false, false)              |
-| RWStructuredBuffer<T>                | spv.Buffer(T, StorageBuffer, true, false, set, binding) |
-| RasterizerOrderedStructuredBuffer<T> | spv.Buffer(T, StorageBuffer, true, true, set, binding)  |
-| AppendStructuredBuffer<T>            | spv.Buffer(T, StorageBuffer, true, false, set, binding) |
-| ConsumeStructuredBuffer<T>           | spv.Buffer(T, StorageBuffer, true, false, set, binding) |
-
-The `set` and `binding` will be set following the convention in DXC. The set
-will be the same as the set for the main storage. If the
-`vk::counter_binding(b)` attribute is attached to the variable, then the binding
-will be `b`. Otherwise, the `binding` will be the binding number of the main
-storage plus 1.
+| HLSL Resource Type                   | Handle Type                        |
+| ------------------------------------ | ---------------------------------- |
+| StructuredBuffer<T>                  | spv.VulkanBuffer(T, StorageBuffer, |
+:                                      : false, false)                      :
+| RWStructuredBuffer<T>                | spv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true, false)                       :
+| RasterizerOrderedStructuredBuffer<T> | spv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true, true)                        :
+| AppendStructuredBuffer<T>            | spv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true, false)                       :
+| ConsumeStructuredBuffer<T>           | spv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true, false)                       :
 
 ### Texture buffers
 
@@ -186,7 +195,7 @@ perspective, this makes it the same as a `StructureBuffer`, and will be
 represented the same way:
 
 ```
-spv.Buffer(T, StorageBuffer, false, false)
+spv.VulkanBuffer(T, StorageBuffer, false, false)
 ```
 
 ### Constant buffers
@@ -196,7 +205,7 @@ difference between a uniform buffer and storage buffer is the storage class.
 Uniform buffers use the `Uniform` storage class. The handle type will be:
 
 ```
-spv.Buffer(T, Uniform, false, false)
+spv.VulkanBuffer(T, Uniform, false, false)
 ```
 
 ### Samplers
@@ -225,11 +234,14 @@ Note that if
 [untyped pointers](https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_untyped_pointers.html)
 are available, this will map naturally to untyped pointers.
 
-| HLSL Resource Type                 | Handle Type                                   |
-|------------------------------------|-----------------------------------------------|
-| ByteAddressBuffer                  | spv.Buffer(void, StorageBuffer, false, false) |
-| RWByteAddressBuffer                | spv.Buffer(void, StorageBuffer, true,  false) |
-| RasterizerOrderedByteAddressBuffer | spv.Buffer(void, StorageBuffer, true,  true)  |
+| HLSL Resource Type                 | Handle Type                           |
+| ---------------------------------- | ------------------------------------- |
+| ByteAddressBuffer                  | spv.VulkanBuffer(void, StorageBuffer, |
+:                                    : false, false)                         :
+| RWByteAddressBuffer                | spv.VulkanBuffer(void, StorageBuffer, |
+:                                    : true, false)                          :
+| RasterizerOrderedByteAddressBuffer | spv.VulkanBuffer(void, StorageBuffer, |
+:                                    : true, true)                           :
 
 ### Feedback textures
 
@@ -258,6 +270,12 @@ is the handle to the image. We chose the design the was the better match
 conceptually. Replicating the load of the image object is not a difficult
 problem to solve.
 
-## Acknowledgments (Optional)
+## Open Questions
+
+1.  How will the binding for the counter resource be represented?
+
+They will have to somehow be added to the `resource.gethandlefrombinding`. They
+cannot be added to the target type. If they were, the types for the resource
+aliases would not match, causing problem in codegen.
 
 <!-- {% endraw %} -->
