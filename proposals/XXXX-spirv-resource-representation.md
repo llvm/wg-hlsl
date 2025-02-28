@@ -144,19 +144,17 @@ target("spirv.Image", ...)
 The details of the `spirv.Image` type depend on the specific declaration. Except
 for the image format, the value for each operand is given in the
 [Mapping Resource Attributes to DXIL and SPIR-V](https://github.com/llvm/wg-hlsl/blob/main/proposals/0015-resource-attributes-in-dxil-and-spirv.md)
-proposal. For all resource types other than `Buffer<T>` and `RWBuffer<T>`, the
-image format will be `Unknown`.
+proposal. For all resource types other than `RWBuffer<T>` and `RWTexture*<T>`,
+the image format will be `Unknown`.
 
-For `Buffer<T>`, if Clang can determine that the `StorageImageReadWithoutFormat`
-capability is available, the image format will be `Unknown`. Similarly, with
-`RWBuffer<T>` and the `StorageImageWriteWithoutFormat` capability. See Table 1
-in the
-[Vulkan Environment for SPIR-V](https://docs.vulkan.org/spec/latest/appendices/spirvenv.html)
-In particular, if the Vulkan version is 1.3 or later, the image format will be
-`Unknown`.
+For `RWBuffer<T>` and `RWTexture*<T>` resource types, if the Vulkan version is
+1.3 or later, the image format will be `Unknown`. This satisfies
+[VUID-RuntimeSpirv-apiVersion-07954](https://docs.vulkan.org/spec/latest/appendices/spirvenv.html#VUID-RuntimeSpirv-apiVersion-07954)
+and
+[VUID-RuntimeSpirv-apiVersion-07955](https://docs.vulkan.org/spec/latest/appendices/spirvenv.html#VUID-RuntimeSpirv-apiVersion-07954).
 
-Otherwise, the image format will be determined by the template type `T`, and
-will match the existing behaviour implemented in DXC.
+Otherwise, the image format for those resource types will be determined by the
+template type `T`, and will match the existing behaviour implemented in DXC.
 
 Note that this creates disconnect with the
 [Universal Validation Rules](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_universal_validation_rules).
@@ -175,18 +173,13 @@ it is used.
 
 The handle for structured buffers will be
 
-| HLSL Resource Type                   | Handle Type                        |
-| ------------------------------------ | ---------------------------------- |
-| StructuredBuffer<T>                  | spv.VulkanBuffer(T, StorageBuffer, |
-:                                      : false, false)                      :
-| RWStructuredBuffer<T>                | spv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true, false)                       :
-| RasterizerOrderedStructuredBuffer<T> | spv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true, true)                        :
-| AppendStructuredBuffer<T>            | spv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true, false)                       :
-| ConsumeStructuredBuffer<T>           | spv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true, false)                       :
+| HLSL Resource Type                   | Handle Type                                      |
+|--------------------------------------|--------------------------------------------------|
+| StructuredBuffer<T>                  | spv.VulkanBuffer(T, StorageBuffer, false, false) |
+| RWStructuredBuffer<T>                | spv.VulkanBuffer(T, StorageBuffer, true, false)  |
+| RasterizerOrderedStructuredBuffer<T> | spv.VulkanBuffer(T, StorageBuffer, true, true)   |
+| AppendStructuredBuffer<T>            | spv.VulkanBuffer(T, StorageBuffer, true, false)  |
+| ConsumeStructuredBuffer<T>           | spv.VulkanBuffer(T, StorageBuffer, true, false)  |
 
 ### Texture buffers
 
@@ -234,14 +227,11 @@ Note that if
 [untyped pointers](https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_untyped_pointers.html)
 are available, this will map naturally to untyped pointers.
 
-| HLSL Resource Type                 | Handle Type                           |
-| ---------------------------------- | ------------------------------------- |
-| ByteAddressBuffer                  | spv.VulkanBuffer(void, StorageBuffer, |
-:                                    : false, false)                         :
-| RWByteAddressBuffer                | spv.VulkanBuffer(void, StorageBuffer, |
-:                                    : true, false)                          :
-| RasterizerOrderedByteAddressBuffer | spv.VulkanBuffer(void, StorageBuffer, |
-:                                    : true, true)                           :
+| HLSL Resource Type                 | Handle Type                                         |
+|------------------------------------|-----------------------------------------------------|
+| ByteAddressBuffer                  | spv.VulkanBuffer(void, StorageBuffer, false, false) |
+| RWByteAddressBuffer                | spv.VulkanBuffer(void, StorageBuffer, true, false)  |
+| RasterizerOrderedByteAddressBuffer | spv.VulkanBuffer(void, StorageBuffer, true, true)   |
 
 ### Feedback textures
 
