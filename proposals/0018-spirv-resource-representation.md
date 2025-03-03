@@ -2,7 +2,7 @@
 
 # HLSL resources in SPIR-V
 
-*   Proposal: [NNNN](NNNN-spirv-resource-representation.md)
+*   Proposal: [0018](0018-spirv-resource-representation.md)
 *   Author(s): [Steven Perron](https://github.com/s-perron)
 *   Status: **Design In Progress**
 
@@ -259,7 +259,7 @@ RWStructuredBuffer<int> a;
 // needs a different counter var.
 RWStructuredBuffer<int> b;
 
-static RWBuffer<int> c; // What type should `c`'s be?
+static RWStructuredBuffer<int> c; // What type should `c`'s be?
 
 void main() {
   c = a; // It must match the type for a.
