@@ -2,7 +2,7 @@
 
 # Target Extension Types for Inline SPIR-V and Decorated Types
 
-* Proposal: [NNNN](NNNN-filename.md)
+* Proposal: [0017](NNNN-filename.md)
 * Author(s): [Cassandra Beckley](https://github.com/cassiebeckley)
 * Status: **Design In Progress**
 * PRs: [#125316](https://github.com/llvm/llvm-project/pull/125316)
