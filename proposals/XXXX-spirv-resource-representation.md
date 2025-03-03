@@ -273,4 +273,11 @@ void main() {
   c = b; // It must also match the type for b.
 ```
 
+2. Do we need `vk::image_format` for Vulkan 1.3 and later?
+
+We need to determine whether we can deprecate the use of `vk::image_format` for
+Vulkan 1.3 and later. We could potentially use unknown for all resource types. 
+We need to assess if there is any advantage to specifying a particular format. 
+If no advantage exists, then we should not attempt to support specific formats.
+
 <!-- {% endraw %} -->
