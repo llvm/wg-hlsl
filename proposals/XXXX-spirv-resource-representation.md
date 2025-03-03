@@ -62,7 +62,8 @@ They have multiple implicit features that need to map to different SPIR-V:
     start and stop the critical region.
 
 This makes it impossible to create a handle type that maps directly to a SPIR-V
-type. To handle this, we will create a target type `spirv.VulkanBuffer`:
+type. For now, the counter variable will not be handled. We will create a target
+type `spirv.VulkanBuffer` to represent a storage or uniform buffer:
 
 ```
 target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable, IsROV)
@@ -70,22 +71,14 @@ target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable, IsROV)
 
 `ElementType` is the type for the storage buffer array, and `StorageClass` is
 the storage class for the array. `IsWriteable` is true if the resource can be
-written to, and `IsROV` is true if it is a rasterizer order view. If the
-resource has an associated counter variable, its set and binding can be provided
-in `CounterSet` and `CounterBinding`.
+written to, and `IsROV` is true if it is a rasterizer order view.
 
 In the SPIR-V backend, there will be a legalization pass that will lower the
 `spirv.VulkanBuffer` type to code closer to the SPIR-V to be generated:
 
-1.  Calls to `@llvm.spv.handle.fromBinding` will be replaced by two calls. One
-    that returns a handle to the array, and another that return a handle to the
-    counter, if necessary.
-2.  Calls to `@llvm.spv.resource.getpointer` will have the handle replaced by
+1.  Calls to `@llvm.spv.resource.getpointer` will have the handle replaced by
     the handle of the array.
-3.  Calls to `@llvm.spv.resource.updatecounter` will be replaced by a call to
-    `@llvm.spv.resource.getpointer` with the handle of the counter followed by
-    an atomic add.
-4.  If the type of the original handle is rasterizer ordered, all uses of
+2.  If the type of the original handle is rasterizer ordered, all uses of
     `@llvm.spv.resource.getpointer` will be surrounded by instructions to begin
     and end the critical region.
 
@@ -115,7 +108,7 @@ and that the structs have the correct explicit padding for this to be correct.
 All of these resource types are represented using an image type in SPIRV. The
 `Texture*` types are implemented as sampled images. The `RWTexture*` types are
 implemented as storage images. `Buffer` is implemented as a uniform buffer, and
-`RWBuffer` is implemented as a storage buffer.
+`RWBuffer` is implemented as a storage texel buffer.
 
 For these cases the return type from `@llvm.spv.handle.fromBinding` would be the
 image type matching the resource type:
@@ -139,7 +132,7 @@ and
 Otherwise, the image format for those resource types will be determined by the
 template type `T`, and will match the existing behaviour implemented in DXC.
 
-Note that this creates disconnect with the
+Note that this creates a disconnect with the
 [Universal Validation Rules](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_universal_validation_rules).
 Specifically,
 
@@ -279,5 +272,12 @@ We need to determine whether we can deprecate the use of `vk::image_format` for
 Vulkan 1.3 and later. We could potentially use unknown for all resource types. 
 We need to assess if there is any advantage to specifying a particular format. 
 If no advantage exists, then we should not attempt to support specific formats.
+
+3. Determine how to add the appropriate decorations for matrices.
+
+If a matrix is part of a storage buffer, it must have an explicit layout with
+MatrixStride and either RowMajor or ColMajor decorations. Because matrices are
+not yet implemented, we cannot yet determine how these decorations will be
+added.
 
 <!-- {% endraw %} -->
