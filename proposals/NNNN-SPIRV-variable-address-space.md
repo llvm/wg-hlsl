@@ -103,27 +103,13 @@ In SPIR-V, function declarations contains the return and parameters types,
 including the storage classes.
 This means, depending on the call-site, and the value of `select`, the
 return value and parameter would required either the `Function` or the
-`Private` storage class.
-As-is, this cannot be emitted in SPIR-V.
-One solution we might say have is force-inline everything, and propagate
-references down to the final load, removing temporaries, and thus removing
-incompatibilities.
+`Private` storage class. When this selection depends on a runtime condition,
+this cannot be lowered to SPIR-V as-is.
 
-This becomes impossible if `foo` is exported, or marked as `noinline`.
+## Proposed solution: using 2 HLSL address spaces
 
-Making address spaces explicit in HLSL, thus marking references with the
-appropriate address space solves those issues: the constraint is now surfacing
-in the language.
-
-This however opens another set of issues: overload resolution rules on the
-`this` pointer, and template deduction. But this is not a new issue:
-adding address spaces for resources already did started this debate. Hence I
-will consider those out-of-scope for this proposal.
-
-## Proposed solution: using 2 HLSL address spaced
-
-Thread-local, global variables should be put in the `hlsl_private` address
-space. Thread-local function-local variables should be put in the `default`
+Thread-local, global variables will be put in the `hlsl_private` address
+space. Thread-local function-local variables will be put in the `default`
 address space.
 
 ## Implementing the solution
@@ -143,7 +129,6 @@ the `default` address space, allowing overload resolution for class methods:
 Clang will emit an `addrspacecast` we will have to handle, but that's a known
 issue in address-space overload resolution, and not new to this proposal.
 
-
 ## Alternative design considered
 
 ### Force optimizations, and force inlining
@@ -161,11 +146,13 @@ generate valid SPIR-V.
 Since HLSL generates functions with the `always inline` attribute, this could
 have been a valid option. But it has a few flaws:
 
-- HLSL allows using `noinline`.
-- HLSL allows exporting functions to compile to a library.
+- HLSL allows using `noinline`: we would have to ignore it.
+- HLSL allows exporting functions to compile to a library: if we need to
+  inline to generate functions, we cannot emit libraries exposign such
+  functions.
+- Runtime conditions causing address-space conflict would require code
+  duplication.
 - It makes reading the generated assembly harder.
-
-The 3rd problem is a nice-to-have, but the first 2 are a complete stop.
 
 ### Move all variables to the function scope
 
