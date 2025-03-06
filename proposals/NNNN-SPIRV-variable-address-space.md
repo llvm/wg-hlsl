@@ -133,22 +133,21 @@ issue in address-space overload resolution, and not new to this proposal.
 
 ### Force optimizations, and force inlining
 
-This solution was mentioned in the example 3.
-- force inline all the functions
-- eliminate local temporaries by propagating the global variable load/stores.
-
-If those transformations were applied, we could avoid address-conflict
-mismatch for pointers, and all we'd have are direct load/stores to global
-variables.
+One solution is to inline all function call, even those marked as
+noinline. Then replicate all instruction that use pointers so that the
+pointer operand has a single known address space. If those transformations
+were applied, we could avoid address-conflict mismatch for pointers, and all
+we'd have are direct load/stores to global/local variables.
 Functions returning incompatible references wouldn't exist, allowing us to
 generate valid SPIR-V.
 
-Since HLSL generates functions with the `always inline` attribute, this could
-have been a valid option. But it has a few flaws:
+Note that those transformations can get arbitrarily complex. The number of
+copies is exponential in regards to the number of pointer operands.
 
+Additionally:
 - HLSL allows using `noinline`: we would have to ignore it.
 - HLSL allows exporting functions to compile to a library: if we need to
-  inline to generate functions, we cannot emit libraries exposign such
+  inline to generate functions, we cannot emit libraries exposing such
   functions.
 - Runtime conditions causing address-space conflict would require code
   duplication.
