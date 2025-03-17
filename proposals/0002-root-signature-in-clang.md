@@ -413,6 +413,15 @@ parsedRootSignature = RootSignature{
 };
 ```
 
+### Special Parameter Values
+
+There are a couple of parameters that have enum specific values with interpreted
+meanings:
+
+- `offset`: Can be assigned the value `DESCRIPTOR_RANGE_OFFSET_APPEND`, which
+denotes that the described descriptor range immediately follows the preceding
+range. This will be resolved to a fixed numerical offset during serialization.
+
 ### Default Values of Optional Parameters
 
 Many of the parameters of each root element are optional. If they are not
