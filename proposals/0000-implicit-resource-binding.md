@@ -68,14 +68,14 @@ void main() {
 }
 ```
 
-If `C` is used then `D` gets assigned register `u3`. 
+If `C` is used then `D` gets assigned descriptor `u3`. 
 
 ### Resource Arrays
 
-Constant-sized resource arrays are assigned a range of register slots regardless
-of whether the individual resources in the array are used or not. If none of the
-resources are used though the whole resource declaration is optimized away and its
-register range is available for use by other resources.
+Constant-sized resource arrays are assigned a range of descriptors regardless of
+whether the individual resources in the array are used or not. If none of the
+resources are used though the whole resource declaration is optimized away and
+its descriptor range is available for use by other resources.
 
 #### Example 2
 ```c++
@@ -94,11 +94,12 @@ void main() {
 
 ### Unboud Resource Arrays
 
-Unbound resources are placed in `space0` after the highest register slot
-assigned and they take up the rest of the register slots.
+Unbound resources are placed in `space0` after the highest explicitly assigned
+descriptor, or after the highest implictly assigned descriptor so far, whichever
+is greater. They take up the rest of the descriptor slots in `space0`.
 
 If there are resources declared after the unbound array that do not fit into the
-remaining space available in `space0` DXC reports an error.
+remaining space available in `space0`, DXC reports an error.
 
 #### Example 3
 
@@ -121,12 +122,12 @@ RWBuffer<float> D : register(u5);
 RWBuffer<float> E[10];             // error - does not fit before A
 ```
 
-It looks like DXC never attempts to assing registers slots from virtual register
+It looks like DXC never attempts to assing descriptors from virtual register
 space other than `space0`.
 
 #### Example 5
 Moving declaration of `E` before `B` compiles successfully and `B` gets assigned
-register slot `u13`:
+descriptor `u13`:
 ```c++
 // assume all resources are used
 RWBuffer<float> A : register(u2);
@@ -140,8 +141,8 @@ void main() {
 ```
 
 #### Example 6
-Since DXC seems to only assigns register slots from `space0` it reports error
-when there are:
+Since DXC seems to only assigns descriptors from `space0`, it reports error when
+there are:
 - two or more unbound resource arrays without explicit binding
 - a resource array with explicit binding in `space0` and one unbound resource
   array
@@ -157,6 +158,7 @@ RWBuffer<float> D[];  // error
 Use of other virtual register spaces does not seem to affect the implicit
 assignments in `space0`:
 
+#### Example 7
 ```c++
 // assume all resources are used
 RWBuffer<float> A : register(u0, space1); 
