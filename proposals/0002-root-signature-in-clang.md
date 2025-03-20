@@ -155,12 +155,12 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 ### Root Signature Grammar
 
 ```
-    RootSignature : (RootElement(,RootElement)?)?
+    RootSignature = [ RootElement { ',' RootElement } ];
 
     RootElement : RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
                   DescriptorTable | StaticSampler
 
-    RootFlags : 'RootFlags' '(' (RootFlag(|RootFlag)?)? ')'
+    RootFlags = 'RootFlags' '(' [ RootFlag { '|' RootFlag } ] ')';
 
     RootFlag : 0 |
                'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
@@ -197,12 +197,14 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
           (',' 'visibility' '=' SHADER_VISIBILITY)?
           (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
 
-    DescriptorTable : 'DescriptorTable' '(' (DTClause(|DTClause)?)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    DescriptorTable = 'DescriptorTable' '('
+      [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')';
 
     DTClause : CBV | SRV | UAV | Sampler
 
-    DESCRIPTOR_RANGE_FLAGS : DESCRIPTOR_RANGE_FLAGS(|DESCRIPTOR_RANGE_FLAGS)?
+    DESCRIPTOR_RANGE_FLAGS =
+      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ];
 
     DESCRIPTOR_RANGE_FLAG : 0 |
         'DESCRIPTORS_VOLATILE' |
