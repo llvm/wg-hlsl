@@ -179,8 +179,7 @@ Additionally, all keywords and enums are case-insensitive.
                'ALLOW_STREAM_OUTPUT' |
                'LOCAL_ROOT_SIGNATURE' |
                'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
-               'SAMPLER_HEAP_DIRECTLY_INDEXED' |
-               'AllowLowTierReservedHwCbLimit'
+               'SAMPLER_HEAP_DIRECTLY_INDEXED'
 
     RootConstants = 'RootConstants' '('
       ( 'num32BitConstants' '=' POS_INT ) : bReg
