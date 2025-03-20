@@ -183,10 +183,12 @@ Additionally, all keywords and enums are case-insensitive.
                'AllowLowTierReservedHwCbLimit'
 
     RootConstants = 'RootConstants' '('
-      ( 'num32BitConstants' '=' NUMBER ) : bReg
-      [ : ( 'space' '=' NUMBER ) ]
+      ( 'num32BitConstants' '=' POS_INT ) : bReg
+      [ : ( 'space' '=' POS_INT ) ]
       [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
     ')';
+
+    POS_INT = [ + ] DIGITS
 
     ROOT_DESCRIPTOR_FLAGS : 0 | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
@@ -198,7 +200,7 @@ Additionally, all keywords and enums are case-insensitive.
     RootUAV = 'UAV' '(' uReg RootParams ')';
 
     RootParams =
-      [ : ( 'space' '=' NUMBER ) ]
+      [ : ( 'space' '=' POS_INT ) ]
       [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
       [ : ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ];
 
@@ -227,8 +229,8 @@ Additionally, all keywords and enums are case-insensitive.
     Sampler = 'Sampler' '(' sReg ClauseArgs ')';
 
     ClauseArgs =
-      [ : ( 'numDescriptors' '=' NUMBER ) ]
-      [ : ( 'space' '=' NUMBER) ]
+      [ : ( 'numDescriptors' '=' POS_INT ) ]
+      [ : ( 'space' '=' POS_INT ) ]
       [ : ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) ]
       [ : ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ];
 
@@ -240,7 +242,7 @@ Additionally, all keywords and enums are case-insensitive.
                         'SHADER_VISIBILITY_AMPLIFICATION' |
                         'SHADER_VISIBILITY_MESH'
 
-    DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | NUMBER
+    DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT
 
     StaticSampler = 'StaticSampler' '(' sReg
       [ : ( 'filter' '=' FILTER ) ]
@@ -253,17 +255,17 @@ Additionally, all keywords and enums are case-insensitive.
       [ : ( 'borderColor' '=' STATIC_BORDER_COLOR ) ]
       [ : ( 'minLOD' '=' NUMBER ) ]
       [ : ( 'maxLOD' '=' NUMBER ) ]
-      [ : ( 'space' '=' NUMBER ) ]
+      [ : ( 'space' '=' POS_INT ) ]
       [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
     ')';
 
-    bReg : 'b' NUMBER
+    bReg : 'b' DIGITS
 
-    tReg : 't' NUMBER
+    tReg : 't' DIGITS
 
-    uReg : 'u' NUMBER
+    uReg : 'u' DIGITS
 
-    sReg : 's' NUMBER
+    sReg : 's' DIGITS
 
     FILTER : 'FILTER_MIN_MAG_MIP_POINT' |
              'FILTER_MIN_MAG_POINT_MIP_LINEAR' |
