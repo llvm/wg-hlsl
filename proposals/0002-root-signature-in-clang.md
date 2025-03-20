@@ -154,6 +154,11 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 
 ### Root Signature Grammar
 
+The root signature DSL is defined using a slightly modified version of Extended
+Backus-Naur form. We define the additional symbol `:` to denote a
+comma-seperated list of components in any order:  `A : B = (A ',' B | B ',' A)`.
+Additionally, all keywords and enums are case-insensitive.
+
 ```
     RootSignature = [ RootElement { ',' RootElement } ];
 
@@ -177,25 +182,25 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
                'SAMPLER_HEAP_DIRECTLY_INDEXED' |
                'AllowLowTierReservedHwCbLimit'
 
-    RootConstants : 'RootConstants' '(' 'num32BitConstants' '=' NUMBER ','
-           bReg (',' 'space' '=' NUMBER)?
-           (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    RootConstants = 'RootConstants' '('
+      ( 'num32BitConstants' '=' NUMBER ) : bReg
+      [ : ( 'space' '=' NUMBER ) ]
+      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')';
 
     ROOT_DESCRIPTOR_FLAGS : 0 | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
                             'DATA_VOLATILE'
+    RootCBV = 'CBV' '(' bReg RootParams ')';
 
-    RootCBV : 'CBV' '(' bReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootSRV = 'SRV' '(' tReg RootParams ')';
 
-    RootSRV : 'SRV' '(' tReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootUAV = 'UAV' '(' uReg RootParams ')';
 
-    RootUAV : 'UAV' '(' uReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootParams =
+      [ : ( 'space' '=' NUMBER ) ]
+      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+      [ : ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ];
 
     DescriptorTable = 'DescriptorTable' '('
       [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
@@ -213,24 +218,19 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
         'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
         'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS'
 
-    CBV : 'CBV' '(' bReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    CBV = 'CBV' '(' bReg ClauseArgs ')';
 
-    SRV : 'SRV' '(' tReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    SRV = 'SRV' '(' tReg ClauseArgs ')';
 
-    UAV : 'UAV' '(' uReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    UAV = 'UAV' '(' uReg ClauseArgs ')';
 
-    Sampler : 'Sampler' '(' sReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)? (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    Sampler = 'Sampler' '(' sReg ClauseArgs ')';
+
+    ClauseArgs =
+      [ : ( 'numDescriptors' '=' NUMBER ) ]
+      [ : ( 'space' '=' NUMBER) ]
+      [ : ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) ]
+      [ : ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ];
 
     SHADER_VISIBILITY : 'SHADER_VISIBILITY_ALL' | 'SHADER_VISIBILITY_VERTEX' |
                         'SHADER_VISIBILITY_HULL' |
@@ -242,17 +242,20 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 
     DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | NUMBER
 
-    StaticSampler : 'StaticSampler' '(' sReg (',' 'filter' '=' FILTER)?
-             (',' 'addressU' '=' TEXTURE_ADDRESS)?
-             (',' 'addressV' '=' TEXTURE_ADDRESS)?
-             (',' 'addressW' '=' TEXTURE_ADDRESS)?
-             (',' 'mipLODBias' '=' NUMBER)?
-             (',' 'maxAnisotropy' '=' NUMBER)?
-             (',' 'comparisonFunc' '=' COMPARISON_FUNC)?
-             (',' 'borderColor' '=' STATIC_BORDER_COLOR)?
-             (',' 'minLOD' '=' NUMBER)?
-             (',' 'maxLOD' '=' NUMBER)? (',' 'space' '=' NUMBER)?
-             (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    StaticSampler = 'StaticSampler' '(' sReg
+      [ : ( 'filter' '=' FILTER ) ]
+      [ : ( 'addressU' '=' TEXTURE_ADDRESS ) ]
+      [ : ( 'addressV' '=' TEXTURE_ADDRESS ) ]
+      [ : ( 'addressW' '=' TEXTURE_ADDRESS ) ]
+      [ : ( 'mipLODBias' '=' NUMBER ) ]
+      [ : ( 'maxAnisotropy' '=' NUMBER ) ]
+      [ : ( 'comparisonFunc' '=' COMPARISON_FUNC ) ]
+      [ : ( 'borderColor' '=' STATIC_BORDER_COLOR ) ]
+      [ : ( 'minLOD' '=' NUMBER ) ]
+      [ : ( 'maxLOD' '=' NUMBER ) ]
+      [ : ( 'space' '=' NUMBER ) ]
+      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')';
 
     bReg : 'b' NUMBER
 
