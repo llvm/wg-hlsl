@@ -229,7 +229,7 @@ Additionally, all keywords and enums are case-insensitive.
     Sampler = 'Sampler' '(' sReg ClauseArgs ')';
 
     ClauseArgs =
-      [ : ( 'numDescriptors' '=' POS_INT ) ]
+      [ : ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) ]
       [ : ( 'space' '=' POS_INT ) ]
       [ : ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) ]
       [ : ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ];
@@ -241,6 +241,8 @@ Additionally, all keywords and enums are case-insensitive.
                         'SHADER_VISIBILITY_PIXEL' |
                         'SHADER_VISIBILITY_AMPLIFICATION' |
                         'SHADER_VISIBILITY_MESH'
+
+    DESCRIPTOR_RANGE_OFFSET : 'unbounded' | POS_INT
 
     DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT
 
