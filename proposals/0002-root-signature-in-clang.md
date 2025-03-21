@@ -589,15 +589,6 @@ The additional semantic rules not already covered by the grammar are listed here
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
 
-- RootConstants: `num32BitConstants`
-  A value of `num32BitConstants` that will cause the root signature size to
-  exceed 64 DWORDs of size can be validated. We can ensure that
-  `num32BitConstants <= 64 - (# of descriptor tables) - 2 * (# of root descriptors)`.
-  As described by the memory limits [here](https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-limits#memory-limits-and-costs).
-
-  `RootConstants(b0, num32BitConstants = 65)` will cause an error as it would
-  generate a root signature that is larger than 64 DWORDs.
-
 - Register Value
   The value `0xFFFFFFFF` is invalid.
   `CBV(b4294967295)` will result in an error as it refers past a valid address.
