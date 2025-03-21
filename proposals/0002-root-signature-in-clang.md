@@ -420,7 +420,9 @@ meanings:
 
 - `offset`: Can be assigned the value `DESCRIPTOR_RANGE_OFFSET_APPEND`, which
 denotes that the described descriptor range immediately follows the preceding
-range. This will be resolved to a fixed numerical offset during serialization.
+range. This maps to a value of `-1` in the metadata representation, and will be
+interpreted as `D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND` when creating the root
+signature.
 
 ### Default Values of Optional Parameters
 
