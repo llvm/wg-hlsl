@@ -733,6 +733,9 @@ Operands:
 
 * string: type of range - "SRV", "UAV", "CBV" or "Sampler"
 * i32: number of descriptors in the range
+  - number of descriptors can take the value of `-1` to denote an `unbounded`
+  descriptor range during root signature creation. This must denote the end of
+  the table and does not allow the next descriptor range to be appended.
 * i32: base shader register
 * i32: register space
 * i32: descriptor range flags ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
