@@ -406,23 +406,12 @@ parsedRootSignature = RootSignature{
     RootCBV(0, 1), // register 0, space 1
     StaticSampler(1, 0), // register 1, space 0
     DescriptorTable({
-      SRV(0, 0, unbounded), // register 0, space 0, unbounded
-      UAV(5, 1, 10) // register 5, space 1, 10 descriptors
+      SRV(0, 0, unbounded, append), // register 0, space 0, unbounded, offset append
+      UAV(5, 1, 10, 5) // register 5, space 1, 10 descriptors, offset 5
     })
   }
 };
 ```
-
-### Special Parameter Values
-
-There are a couple of parameters that have enum specific values with interpreted
-meanings:
-
-- `offset`: Can be assigned the value `DESCRIPTOR_RANGE_OFFSET_APPEND`, which
-denotes that the described descriptor range immediately follows the preceding
-range. This maps to a value of `-1` in the metadata representation, and will be
-interpreted as `D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND` when creating the root
-signature.
 
 ### Default Values of Optional Parameters
 
@@ -723,7 +712,11 @@ Operands:
 * i32: number of descriptors in the range
 * i32: base shader register
 * i32: register space
-* i32: offset
+* i32: offset ([D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND][d3d12_descriptor_range_append])
+  - offset can take the value of `-1` which will be interpreted as
+  `D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND` when the root signature is created.
+  This denotes that this descriptor range will immediately follow the preceding
+  range, or, there is no offset from the table start.
 * i32: descriptor range flags ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
 
 #### Static Samplers
@@ -750,6 +743,7 @@ Operands:
 [root_signature_versions_doc]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-version-1-1
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
 [d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
+[d3d12_descriptor_range_append]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_descriptor_range
 [d3d12_root_descriptor_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_descriptor_flags
 [d3d12_descriptor_range_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_descriptor_range_flags
 [d3d12_filter]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_filter
