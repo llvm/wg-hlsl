@@ -122,8 +122,9 @@ void main() {
 https://godbolt.org/z/qha84sjvT
 
 However, if the resource array is defined in a `struct`, the binding seems to be
-assigned to the individual array elements in the order they are used in
-the code:
+assigned to the individual array elements in the order they are used in the
+code. In other words, the array elements are treated as unrelated individual
+resources:
 
 #### Example 2.2
 ```c++
