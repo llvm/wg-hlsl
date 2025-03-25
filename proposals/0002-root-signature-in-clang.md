@@ -154,13 +154,18 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 
 ### Root Signature Grammar
 
+The root signature DSL is defined using a slightly modified version of Extended
+Backus-Naur form. We define the additional symbol `:` to denote a
+comma-seperated list of components in any order:  `A : B = (A ',' B | B ',' A)`.
+Additionally, all keywords and enums are case-insensitive.
+
 ```
-    RootSignature : (RootElement(,RootElement)?)?
+    RootSignature = [ RootElement { ',' RootElement } ];
 
     RootElement : RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
                   DescriptorTable | StaticSampler
 
-    RootFlags : 'RootFlags' '(' (RootFlag(|RootFlag)?)? ')'
+    RootFlags = 'RootFlags' '(' [ RootFlag { '|' RootFlag } ] ')';
 
     RootFlag : 0 |
                'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
@@ -174,35 +179,38 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
                'ALLOW_STREAM_OUTPUT' |
                'LOCAL_ROOT_SIGNATURE' |
                'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
-               'SAMPLER_HEAP_DIRECTLY_INDEXED' |
-               'AllowLowTierReservedHwCbLimit'
+               'SAMPLER_HEAP_DIRECTLY_INDEXED'
 
-    RootConstants : 'RootConstants' '(' 'num32BitConstants' '=' NUMBER ','
-           bReg (',' 'space' '=' NUMBER)?
-           (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    RootConstants = 'RootConstants' '('
+      ( 'num32BitConstants' '=' POS_INT ) : bReg
+      [ : ( 'space' '=' POS_INT ) ]
+      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')';
+
+    POS_INT = [ + ] DIGITS
 
     ROOT_DESCRIPTOR_FLAGS : 0 | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
                             'DATA_VOLATILE'
+    RootCBV = 'CBV' '(' bReg RootParams ')';
 
-    RootCBV : 'CBV' '(' bReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootSRV = 'SRV' '(' tReg RootParams ')';
 
-    RootSRV : 'SRV' '(' tReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootUAV = 'UAV' '(' uReg RootParams ')';
 
-    RootUAV : 'UAV' '(' uReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootParams =
+      [ : ( 'space' '=' POS_INT ) ]
+      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+      [ : ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ];
 
-    DescriptorTable : 'DescriptorTable' '(' (DTClause(|DTClause)?)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    DescriptorTable = 'DescriptorTable' '('
+      [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')';
 
     DTClause : CBV | SRV | UAV | Sampler
 
-    DESCRIPTOR_RANGE_FLAGS : DESCRIPTOR_RANGE_FLAGS(|DESCRIPTOR_RANGE_FLAGS)?
+    DESCRIPTOR_RANGE_FLAGS =
+      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ];
 
     DESCRIPTOR_RANGE_FLAG : 0 |
         'DESCRIPTORS_VOLATILE' |
@@ -211,24 +219,19 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
         'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
         'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS'
 
-    CBV : 'CBV' '(' bReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    CBV = 'CBV' '(' bReg ClauseArgs ')';
 
-    SRV : 'SRV' '(' tReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    SRV = 'SRV' '(' tReg ClauseArgs ')';
 
-    UAV : 'UAV' '(' uReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    UAV = 'UAV' '(' uReg ClauseArgs ')';
 
-    Sampler : 'Sampler' '(' sReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)? (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    Sampler = 'Sampler' '(' sReg ClauseArgs ')';
+
+    ClauseArgs =
+      [ : ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) ]
+      [ : ( 'space' '=' POS_INT ) ]
+      [ : ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) ]
+      [ : ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ];
 
     SHADER_VISIBILITY : 'SHADER_VISIBILITY_ALL' | 'SHADER_VISIBILITY_VERTEX' |
                         'SHADER_VISIBILITY_HULL' |
@@ -238,27 +241,32 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
                         'SHADER_VISIBILITY_AMPLIFICATION' |
                         'SHADER_VISIBILITY_MESH'
 
-    DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | NUMBER
+    DESCRIPTOR_RANGE_OFFSET : 'unbounded' | POS_INT
 
-    StaticSampler : 'StaticSampler' '(' sReg (',' 'filter' '=' FILTER)?
-             (',' 'addressU' '=' TEXTURE_ADDRESS)?
-             (',' 'addressV' '=' TEXTURE_ADDRESS)?
-             (',' 'addressW' '=' TEXTURE_ADDRESS)?
-             (',' 'mipLODBias' '=' NUMBER)?
-             (',' 'maxAnisotropy' '=' NUMBER)?
-             (',' 'comparisonFunc' '=' COMPARISON_FUNC)?
-             (',' 'borderColor' '=' STATIC_BORDER_COLOR)?
-             (',' 'minLOD' '=' NUMBER)?
-             (',' 'maxLOD' '=' NUMBER)? (',' 'space' '=' NUMBER)?
-             (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT
 
-    bReg : 'b' NUMBER
+    StaticSampler = 'StaticSampler' '(' sReg
+      [ : ( 'filter' '=' FILTER ) ]
+      [ : ( 'addressU' '=' TEXTURE_ADDRESS ) ]
+      [ : ( 'addressV' '=' TEXTURE_ADDRESS ) ]
+      [ : ( 'addressW' '=' TEXTURE_ADDRESS ) ]
+      [ : ( 'mipLODBias' '=' NUMBER ) ]
+      [ : ( 'maxAnisotropy' '=' NUMBER ) ]
+      [ : ( 'comparisonFunc' '=' COMPARISON_FUNC ) ]
+      [ : ( 'borderColor' '=' STATIC_BORDER_COLOR ) ]
+      [ : ( 'minLOD' '=' NUMBER ) ]
+      [ : ( 'maxLOD' '=' NUMBER ) ]
+      [ : ( 'space' '=' POS_INT ) ]
+      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')';
 
-    tReg : 't' NUMBER
+    bReg : 'b' DIGITS
 
-    uReg : 'u' NUMBER
+    tReg : 't' DIGITS
 
-    sReg : 's' NUMBER
+    uReg : 'u' DIGITS
+
+    sReg : 's' DIGITS
 
     FILTER : 'FILTER_MIN_MAG_MIP_POINT' |
              'FILTER_MIN_MAG_POINT_MIP_LINEAR' |
@@ -581,16 +589,22 @@ The additional semantic rules not already covered by the grammar are listed here
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
 
+- Register Value
+  The value `0xFFFFFFFF` is invalid.
+  `CBV(b4294967295)` will result in an error as it refers past a valid address.
+
 - Register Space
   -The range 0xFFFFFFF0 to 0xFFFFFFFF is reserved.
 
   `CBV(b0, space=4294967295)` is invalid due to the use of reserved space 0xFFFFFFFF.
 
-
 - Resource ranges must not overlap.
 
   `CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))` will result in an error
   due to overlapping at b2.
+
+  Note that a valid value for `numDescriptors` is `unbounded` and requires
+  overlap analysis.
 
 
 ### Metadata Schema
@@ -710,6 +724,9 @@ Operands:
 
 * string: type of range - "SRV", "UAV", "CBV" or "Sampler"
 * i32: number of descriptors in the range
+  - number of descriptors can take the value of `-1` to denote an `unbounded`
+  descriptor range during root signature creation. This must denote the end of
+  the table and does not allow the next descriptor range to be appended.
 * i32: base shader register
 * i32: register space
 * i32: offset ([D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND][d3d12_descriptor_range_append])
