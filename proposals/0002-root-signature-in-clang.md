@@ -392,7 +392,7 @@ RootSignature[
  "StaticSampler(s1),"
  "DescriptorTable("
  "  SRV(t0, numDescriptors=unbounded),"
- "  UAV(u5, space=1, numDescriptors=10))"
+ "  UAV(u5, space=1, numDescriptors=10, offset=5))"
 ]
 ```
 
@@ -406,8 +406,8 @@ parsedRootSignature = RootSignature{
     RootCBV(0, 1), // register 0, space 1
     StaticSampler(1, 0), // register 1, space 0
     DescriptorTable({
-      SRV(0, 0, unbounded), // register 0, space 0, unbounded
-      UAV(5, 1, 10) // register 5, space 1, 10 descriptors
+      SRV(0, 0, unbounded, append), // register 0, space 0, unbounded, offset append
+      UAV(5, 1, 10, 5) // register 5, space 1, 10 descriptors, offset 5
     })
   }
 };
@@ -482,8 +482,8 @@ Example for same root signature as above:
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
 !6 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
 !7 = !{ !"DescriptorTable", i32 0, !8, !9 } ;  0 = visibility, range list !8, !9
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 -1, i32 4 } ; register 0, space 0, unbounded descriptors, offset append, flags 4
+!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 5, i32 2 } ; register 5, space 1, 10 descriptors, offset 5, flags 2
 ```
 
 See [Metadata Schema](#metadata-schema) for details.
@@ -513,8 +513,8 @@ rootSignature = RootSignature(
   { // parameters
     RootCBV(0, 1),
     DescriptorTable({
-      SRV(0, 0, unbounded, 0),
-      UAV(5, 1, 10, 0)
+      SRV(0, 0, unbounded, append, 0),
+      UAV(5, 1, 10, 5, 0)
     })
   },
   { // static samplers
@@ -702,8 +702,8 @@ Operands:
 ##### Descriptor Ranges
 
 ```LLVM
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 }
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 }
+!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 -1, i32 4 }
+!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 5, i32 2 }
 ```
 
 Operands:
@@ -712,6 +712,11 @@ Operands:
 * i32: number of descriptors in the range
 * i32: base shader register
 * i32: register space
+* i32: offset ([D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND][d3d12_descriptor_range_append])
+  - offset can take the value of `-1` which will be interpreted as
+  `D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND` when the root signature is created.
+  This denotes that this descriptor range will immediately follow the preceding
+  range, or, there is no offset from the table start.
 * i32: descriptor range flags ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
 
 #### Static Samplers
@@ -738,6 +743,7 @@ Operands:
 [root_signature_versions_doc]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-version-1-1
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
 [d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
+[d3d12_descriptor_range_append]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_descriptor_range
 [d3d12_root_descriptor_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_descriptor_flags
 [d3d12_descriptor_range_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_descriptor_range_flags
 [d3d12_filter]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_filter
