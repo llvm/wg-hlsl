@@ -2,7 +2,7 @@
 
 # Allowing multiple address spaces for the `this` pointer
 
-*   Proposal: [NNNN](http://NNNN-this-address-space.md)
+*   Proposal: [0021](http://0021-this-address-space.md)
 *   Author(s): [Nathan Gauer](https://github.com/keenuts),
     [Steven Perron](https://github.com/s-perron)
 *   Status: **Design In Progress**
