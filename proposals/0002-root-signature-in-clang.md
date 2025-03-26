@@ -155,9 +155,8 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 ### Root Signature Grammar
 
 The root signature DSL is defined using a slightly modified version of Extended
-Backus-Naur form. We define the additional symbol `:` to denote a
-comma-seperated list of components in any order:  `A : B = (A ',' B | B ',' A)`.
-Additionally, all keywords and enums are case-insensitive.
+Backus-Naur form. Where we assume there is arbitrary whitespace between any
+subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
 ```
     RootSignature = [ RootElement { ',' RootElement } ];
@@ -182,10 +181,11 @@ Additionally, all keywords and enums are case-insensitive.
               'SAMPLER_HEAP_DIRECTLY_INDEXED';
 
     RootConstants = 'RootConstants' '('
-      ( 'num32BitConstants' '=' POS_INT ) : bReg
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-    ')';
+      ( 'num32BitConstants' '=' POS_INT ) ',' bReg
+      { ',' RootConstantArgs } ')';
+
+    RootConstantArgs =
+      ( 'space' '=' POS_INT ) | ( 'visibility' '=' SHADER_VISIBILITY );
 
     POS_INT = [ + ] DIGITS;
 
@@ -193,16 +193,16 @@ Additionally, all keywords and enums are case-insensitive.
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
                             'DATA_VOLATILE';
 
-    RootCBV = 'CBV' '(' bReg RootParams ')';
+    RootCBV = 'CBV' '(' bReg { ',' RootParamArgs } ')';
 
-    RootSRV = 'SRV' '(' tReg RootParams ')';
+    RootSRV = 'SRV' '(' tReg { ',' RootParamArgs } ')';
 
-    RootUAV = 'UAV' '(' uReg RootParams ')';
+    RootUAV = 'UAV' '(' uReg { ',' RootParamArgs } ')';
 
-    RootParams =
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-      [ : ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ];
+    RootParamArgs =
+      ( 'space' '=' POS_INT ) |
+      ( 'visibility' '=' SHADER_VISIBILITY ) |
+      ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS );
 
     DescriptorTable = 'DescriptorTable' '('
       [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
@@ -224,13 +224,13 @@ Additionally, all keywords and enums are case-insensitive.
 
     UAV = 'UAV' '(' uReg ClauseArgs ')';
 
-    Sampler = 'Sampler' '(' sReg ClauseArgs ')';
+    Sampler = 'Sampler' '(' sReg { ',' ClauseArgs } ')';
 
     ClauseArgs =
-      [ : ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) ]
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) ]
-      [ : ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ];
+      ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) |
+      ( 'space' '=' POS_INT ) |
+      ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) |
+      ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS );
 
     SHADER_VISIBILITY = 'SHADER_VISIBILITY_ALL' |
                         'SHADER_VISIBILITY_VERTEX' |
@@ -245,20 +245,21 @@ Additionally, all keywords and enums are case-insensitive.
 
     DESCRIPTOR_RANGE_OFFSET = 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT;
 
-    StaticSampler = 'StaticSampler' '(' sReg
-      [ : ( 'filter' '=' FILTER ) ]
-      [ : ( 'addressU' '=' TEXTURE_ADDRESS ) ]
-      [ : ( 'addressV' '=' TEXTURE_ADDRESS ) ]
-      [ : ( 'addressW' '=' TEXTURE_ADDRESS ) ]
-      [ : ( 'mipLODBias' '=' NUMBER ) ]
-      [ : ( 'maxAnisotropy' '=' NUMBER ) ]
-      [ : ( 'comparisonFunc' '=' COMPARISON_FUNC ) ]
-      [ : ( 'borderColor' '=' STATIC_BORDER_COLOR ) ]
-      [ : ( 'minLOD' '=' NUMBER ) ]
-      [ : ( 'maxLOD' '=' NUMBER ) ]
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-    ')';
+    StaticSampler = 'StaticSampler' '(' sReg { ',' SamplerArgs }')';
+
+    SamplerArgs =
+      ( 'filter' '=' FILTER ) |
+      ( 'addressU' '=' TEXTURE_ADDRESS ) |
+      ( 'addressV' '=' TEXTURE_ADDRESS ) |
+      ( 'addressW' '=' TEXTURE_ADDRESS ) |
+      ( 'mipLODBias' '=' NUMBER ) |
+      ( 'maxAnisotropy' '=' NUMBER ) |
+      ( 'comparisonFunc' '=' COMPARISON_FUNC ) |
+      ( 'borderColor' '=' STATIC_BORDER_COLOR ) |
+      ( 'minLOD' '=' NUMBER ) |
+      ( 'maxLOD' '=' NUMBER ) |
+      ( 'space' '=' POS_INT ) |
+      ( 'visibility' '=' SHADER_VISIBILITY );
 
     bReg = 'b' DIGITS;
 
