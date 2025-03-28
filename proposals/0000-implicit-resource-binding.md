@@ -356,9 +356,126 @@ part of the HLSL language.
 
 ## Proposed solution
 
-TBD
+While there are many shaders that explicitly specify bindings for their
+resources, a shader without an explicit binding is not at all uncommon. We
+should try to match DXC implicit binding behavior in the most common cases
+and where it makes sense because debugging resource binding mismatches is not
+always straightforward.
+
+### Resources declared directly at global scope
+For resources and resource arrays that are declared directly at the global scope
+Clang should assign the bindings exactly as DXC does. This is the most common
+case and departing from it would be rather impactful breaking change.
+
+That means assigning bindings in `space0` for resources that are identified as
+used (i.e. not optimized away) in the order the resources were declared. Arrays
+of resources will get the full range of descriptors reserved for them
+irrespective of which array elements are accessed, as long as at least of the
+array elements it used. Same rules apply if ther resource has a space-only
+resource binding, except the binding will be assigned from the specified space
+instead of the default `space0`.
+
+### Resources inside user-defined structures and classes
+
+We should consider departure from DXC behavior when a resource or resource array
+is declared inside user-defined structure or class. DXC assigns these bindings
+based on the order in which the resource is used in the code, which is
+impractical and arguably unusable. Any change in the code that reorders the
+resource accesses can result in a different binding assignment, and that just
+seems wrong (see [Example 2.1](#example-21)).
+
+Additionally, resource arrays inside struct should be treated as arrays and not
+as individual resources. The `createHandleFromBinding` calls associated with
+resource arrays should reflect the range of the array/descriptors, and the full
+range of descriptiors should be reserved, the same was it is reserved for
+resource arrays declared at global scope. DXC currently treats these as
+individual resources (see [Example 2.2](#example-22)).
+
+### In which part of the compiler should the implicit binding happen
+
+Since the implicing binding assignments need to happen after unused resources
+are identified and removed from the code, it needs to happen later in the
+compiler after codegen and code optimizations.
+
+If we were to attempt doing it in Sema, we would need to an extensive analysis
+to identify all of the resources that are not used, which includes those that
+are in unreachable code or internal functions not included in the final shader.
+It seems like such analysis would be duplicating the work the existing LLVM
+passes are already doing. And it is very likely we would not be able to identify
+all of the cases where a resource can be optimized away by LLVM optimization
+passes. 
+
+Having the implicit bindings assignments done later in the compiler is probably
+also going to be useful once we get to designing DXIL libraries. Unbound
+resources exist in library shaders and their bindings get assigned once a
+particular entry point is linked to a final shader.
 
 ## Detailed design
+
+### Clang Frontend
+
+Unbound resources will be initialized by a resource class constructor that takes
+2 arguments - the `Binding` struct and an `order_id` number. This constructor
+will be declared in `HLSLExternalSemaSource` as part of resource class setup.
+
+The `Binding` struct will specify the virtual register space (defaulting to 0),
+required descriptor range and an index of the resource in the range. The
+`register` value of the `Bindings` struct will be ignored. The `order_id` number
+will be used to uniquely identify the unbound resource and it will also reflect
+the order in which the resource has been declared, which is the order in which
+the implicit binding should be assigned by the LLVM pass later on.
+
+The constructor will call Clang builtin function
+`__builtin_hlsl_create_handle_from_implicit_binding` and will pass along the
+resource `order_id`, all the values from the `Binding` struct except `register`,
+and it will also include the uninitialized resource handle. The type of the handle
+argument will be used to infer the specific resource handle type returned by the
+buildin function. This will happen in `SemaHLSL::CheckBuiltinFunctionCall` the
+same way we infer return types for HLSL intrinsic builtins based on the builtin
+arguments.
+
+```
+template <typename T> class RWBuffer<T> {
+  RWBuffer(unsigned order_id, Binding B) {
+    __handle = __builtin_hlsl_create_handle_from_implicit_binding(__handle, order_id, B.space, B.range, B.index);
+  }
+}
+```
+
+### Clang Codegen
+
+The builtin function `__builtin_hlsl_create_handle_from_implicit_binding` will be
+translated to LLVM intrinsic `llvm.{dx|spv}.resource.handlefromimplicitbinding`.
+
+The signature of the `@llvm.dx.resource.handlefromimplicitbinding` intrinsic will be:
+
+| Argument | Type |	Description | 
+|-|-|-|
+| Return value | A target() type|	A handle which can be operated on |
+| %order_id | i32 | Number uniquely identifying the unbound resource and declaration order | 
+| %space	|	i32 |	Virtual register space |
+| %range_size	|	i32 |	Range size of the binding |
+| %index	|	i32	 | Index from the beginning of the binding |
+
+_Note: We might need to add a uniformity bit here, unless we can derive it from uniformity analysis._
+
+### LLVM Binding Assignment Pass
+
+The implicit binding assignment for DirectX will happen in an LLVM pass
+`DXILResourceImplicitBindings`. The pass will run after all IR optimizations and
+will use the results of `DXILResourceBindingAnalysis`. It needs to run before
+any other pass that uses this analysis because it will be updating it with the
+newly assigned bindings.
+
+The pass will scan the module to gather all instances of
+`@llvm.dx.resource.handlefromimplicitbinding` calls and sort them by
+`%order_id`. Then it will process the list sequentially based on the
+`%order_id`, and for each group of calls operating on the same unique resource
+it will find an available resource binding based on the required resource class,
+range and space. It will then replace all of the
+`@llvm.dx.resource.handlefromimplicitbinding` calls and all of its uses with new
+`@llvm.dx.resource.handlefrombinding` calls and add the new binding to the
+`DXILResourceBindingAnalysis` map. 
 
 ## Alternatives considered (Optional)
 
