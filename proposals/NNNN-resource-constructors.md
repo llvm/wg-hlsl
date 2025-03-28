@@ -1,0 +1,176 @@
+* Proposal: [NNNN - Resource Constructors](NNNN-resource-constructors.md)
+* Author(s): [Helena Kotas](https://github.com/hekota)
+* Status: **Design In Progress**
+
+## Introduction
+
+HLSL resource classes are represented in Clang as struct types, or template
+struct types with the resource element type as the template argument. The
+resource structs have a member field `__handle` of type `__hlsl_resource_t` that
+is decorated with type attributes specifying the resource class, contained type,
+whether it is a handle for a raw buffer or ROV, and other properties. These
+builtin types are constructed in `HLSLExternalSemaSource`.
+
+For example, the source code for `RWBuffer<T>` would look like this:
+
+```c++
+template <typename T> struct RWBuffer {
+private:
+  using handle_t = __hlsl_resource_t
+      [[hlsl::contained_type(T)]] [[hlsl::resource_class(UAV)]];
+  handle_t __handle;
+};
+```
+_* The resource declaration also includes element type validation via C++20 concepts which I have not included here for readability._ 
+
+Depending on the resource type its definition will include methods for accessing
+or manipulating the resource, such as subscript operators, `Load` and `Store`
+methods, etc.
+
+Note that while the HLSL resources are defined as structs, they are often referred to
+as _resource classes_ or _resource records_. These terms can be used
+interchangebly.
+
+The record classes can be declared at the global scope, used as function in/out
+parameters, or as local variables. They need to be properly initialized
+depending on the declaration scope, and this should be done by resource class
+constructors.
+
+## Proposed solution
+
+Each resource class should have a set of constructors that will initialize its
+`__handle` based on the scope where the resource was declared, its binding, or
+whether it is a dynamically bound resource. Each resource class should also have
+a copy constructor and/or assignment operator that will take care of copying the
+resource handle, for example when an existing resource is assigned to a local
+resource variable.
+
+### Default constructor
+
+Default constructor does not take any arguments and will initialize the
+`__handle` member to `poison` value, which means that its value is undefined.
+This constructor will be used for resources that are declared as local
+variables.
+
+```c++
+template <typename T> struct RWBuffer {
+  ...
+public:
+  // For uninitialized handles
+  RWBuffer() { 
+    __handle = __builtin_hlsl_create_poison_handle(__handle);
+  }
+  ...
+};
+```
+
+The `__handle` argument of the `__builtin_hlsl_create_poison_handle` Clang
+builtin function will be used to infer the return type of that function. This is
+the same way we infer return types for HLSL intrinsic builtins based on their
+arguments, except in the case only the type of the argument is used
+and not its (uninitialized) value.
+
+### Constructor for resources with explicit binding
+
+Resources declared at the global scope can have an explicit binding and will be
+initialized by the following constructor.
+
+```c++
+template <typename T> struct RWBuffer {
+  ...
+public:
+  // For resources with explicit binding
+  RWBuffer(Binding B) { 
+    __handle = __builtin_hlsl_create_handle_from_binding(__handle, B.register, B.space, B.range, B.index);
+  }
+  ...
+};
+```
+
+The `Binding` struct will look like this:
+
+```c++
+struct Binding {
+    unsigned register;
+    unsigned space;
+    unsigned range;
+    unsigned index;
+};
+```
+
+The `__handle` argument passed into the
+`__builtin_hlsl_create_handle_from_binding` Clang builtin function will be used
+to infer the return type of the that function (the same way as for the default
+construtor).
+
+### Constructor for resources with implicit binding
+
+If a resource does not have an explicit binding annotation, or if it has one but
+it only specifies the virtual register space, it has _implicit
+binding_. The actual binding will be assigned later on by the compiler. 
+
+The constructor for resources with implicit binding looks like this:
+
+```c++
+template <typename T> struct RWBuffer {
+  ...
+public:
+  // For resources with implicit binding
+  RWBuffer(unsigned order_id, Binding B) { 
+    __handle = __builtin_hlsl_create_handle_from_implicit_binding(__handle, order_id, B.space, B.range, B.index);
+  }
+  ...
+};
+```
+
+The constructor takes in an `order_id` argument which is a number uniquely
+identifing the unbound resource, and which also reflects the order in which the
+resource has been declared. Implicit binding assignments depend on the order the
+resources were declared, so this will help the compiler to preserve the order.
+Additionally, it will also help the compiler distinquish between individual
+resources with the same type and binding range.
+
+The `Binding` argument will provide the virtual register space, required
+descriptor range and resource index for the implicit binding assignment. The
+`register` field of the `Binding` will be ignored.
+
+_Note: Alternatively the constructor could also take the `space`, `range` and `index`
+as arguments directly._ 
+
+The `__handle` argument passed into the
+`__builtin_hlsl_create_handle_from_implicit_binding` Clang builtin function will
+be used to infer the return type of the that function (the same way as for the
+default construtor).
+
+### Copy constructor and assignment operator
+
+The copy constructor and/or the assignemt operator will take care of copying the
+resource handle between resource class instances.
+
+```c++
+template <typename T> struct RWBuffer {
+  ...
+public:
+  // Resources are copyable.
+  RWBuffer(RWBuffer &LHS) = default;
+
+  // Resources are assignable.
+  RWBuffer &operator=(RWBuffer &LHS) {
+    __handle = LHS.__handle;
+    return *this
+  }
+  ...
+};
+```
+
+### Dynamically-bound resources
+
+TBD
+
+## Alternatives considered (Optional)
+
+## Acknowledgments (Optional)
+
+Chris Bieneman
+
+<!-- {% endraw %} -->
