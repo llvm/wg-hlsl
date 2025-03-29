@@ -111,7 +111,7 @@ construtor).
 
 A call to this constructor will be created by Sema as part of uninitialized
 variable declaration processing (`Sema::ActOnUninitializedDecl`). It will
-basically replace:
+work as if it would replace:
 
 `RWBuffer<float> A : register(u3);`
 
@@ -160,7 +160,7 @@ default construtor).
 
 A call to this constructor will be created by Sema as part of uninitialized
 variable declaration processing (`Sema::ActOnUninitializedDecl`). It will
-basically replace:
+work as if it would replace:
 
 `RWBuffer<float> A;`
 
@@ -168,7 +168,8 @@ with
 
 `RWBuffer<float> A(resource_order_id, Binding(0,0,1,0));`.
 
-Or if the resource has a space-only binding annotation, it will replace:
+Or if the resource has a space-only binding annotation, it will work as if it
+would replace:
 
 `RWBuffer<float> A : register(space13);`
 
