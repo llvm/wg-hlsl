@@ -58,7 +58,7 @@ template <typename T> struct RWBuffer {
   ...
 public:
   // For uninitialized handles
-  RWBuffer() { 
+  RWBuffer() {
     __handle = __builtin_hlsl_create_poison_handle(__handle);
   }
   ...
@@ -86,7 +86,7 @@ template <typename T> struct RWBuffer {
   ...
 public:
   // For resources with explicit binding
-  RWBuffer(Binding B) { 
+  RWBuffer(Binding B) {
     __handle = __builtin_hlsl_create_handle_from_binding(__handle, B.space, B.register, B.range, B.index);
   }
   ...
@@ -99,7 +99,7 @@ The `Binding` struct will look like this:
 struct Binding {
     unsigned space;
     unsigned register;
-    unsigned range;
+    int range; // -1 for unbounded
     unsigned index;
 };
 ```
@@ -132,7 +132,7 @@ template <typename T> struct RWBuffer {
   ...
 public:
   // For resources with implicit binding
-  RWBuffer(unsigned order_id, Binding B) { 
+  RWBuffer(unsigned order_id, Binding B) {
     __handle = __builtin_hlsl_create_handle_from_implicit_binding(__handle, order_id, B.space, B.range, B.index);
   }
   ...
@@ -201,6 +201,51 @@ public:
 ### Dynamically-bound resources
 
 TBD
+
+### Summary
+
+```c++
+struct Binding {
+    unsigned space;
+    unsigned register;
+    int range; // -1 for unbounded
+    unsigned index;
+};
+
+template <typename T> struct RWBuffer {
+private:
+  // resource handle
+  using handle_t = __hlsl_resource_t
+      [[hlsl::contained_type(T)]] [[hlsl::resource_class(UAV)]];
+  handle_t __handle;
+
+public:
+  // For uninitialized handles
+  RWBuffer() {
+    __handle = __builtin_hlsl_create_poison_handle(__handle);
+  }
+
+  // For resources with explicit binding
+  RWBuffer(Binding B) {
+    __handle = __builtin_hlsl_create_handle_from_binding(__handle, B.space, B.register, B.range, B.index);
+  }
+
+  // For resources with implicit binding
+  RWBuffer(unsigned order_id, Binding B) {
+    __handle = __builtin_hlsl_create_handle_from_implicit_binding(__handle, order_id, B.space, B.range, B.index);
+  }
+
+  // Resources are copyable.
+  RWBuffer(RWBuffer &LHS) = default;
+
+  // Resources are assignable.
+  RWBuffer &operator=(RWBuffer &LHS) {
+    __handle = LHS.__handle;
+    return *this
+  }
+  ...
+};
+```
 
 ## Alternatives considered (Optional)
 
