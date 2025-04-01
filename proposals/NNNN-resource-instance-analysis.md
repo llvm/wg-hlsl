@@ -32,7 +32,7 @@ respectively. Then associated instance metadata will be resolved during the
 The following mechanical changes are required to align existing and inflight code
 to the new structure.
 
-- `CounterDirection` will supercede `HasCounter` which will be removed from `TypeInfo`
+- `CounterDirection` will supercede `HasCounter` which will be removed from `ResourceTypeInfo`
 - `CounterDirection` and `GloballyCoherent` will be added to `ResourceInfo`
 - `DXILResourceAnalysis` will have a new step to resolve the instance's counter direction.
 
@@ -45,10 +45,12 @@ To achieve that goal, a step in `DXILResourceAnalysis` may set a terminal or
 invalid value in the ResourceInfo that a later pass `DXILPostOptimizationValidationPass`
 will detect and do more expensive processing to raise useful Diagnostics.
 
-It's important to note that in general Diagnostics should not be raised in passes
-as they may be invalidated an reran several times however in this case there is
-not a more appropiate place to raise them. Impact is minimized by raising the
-Diagnostic only in one pass and minimizing computation in the common case.
+It's important to note that in general Diagnostics should not be raised in
+LLVM analyses or passes, and analyses may be invalidated an re-ran
+several times. However the shader compiler requires certain validations
+ to be done after code optimizations, and that require a Diagnostic to
+ be raised from a pass. Impact is minimized by raising the Diagnostic 
+ only in one pass and minimizing computation in the common case.
 
 ## Alternatives considered
 
