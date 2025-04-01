@@ -10,22 +10,22 @@ from the create handle intrinsics and it is possible to have multiple handles
 pointing at a specific Resource Instance, but each unique instance is
 disambiguated by the handle creation parameters.
 
-Beyond creation parameters, Resource Instances have several pieces of associated
-metadata. Type, CounterDirection (HasCounter), and GloballyCoherent are
-identified examples. Type is currently handled well so this proposal suggests
-no changes. However CounterDirection and GloballyCoherent require careful late 
-stage analysis to derive the correct metadata.
+Beyond creation parameters, Resource Instances have several derived properties.
+Type, CounterDirection (HasCounter), and GloballyCoherent are identified
+examples. Type is currently handled well so this proposal suggests no changes.
+However CounterDirection and GloballyCoherent require careful late stage
+analysis to derive the correct property values.
 
 To serve the needs of CounterDirection and to setup a framework for future
-instance metadata this document proposes that instance analysis be combined
-into the DXILResourceBindingAnalysis pass and that the pass be renamed.
+instance properties this document proposes that instance analysis be combined
+into the `DXILResourceBindingAnalysis` pass and that the pass be renamed.
 
 
 ## Proposed solution
 
 In order to support the generic resource instance analysis `DXILResourceBindingAnalysis` 
 and `ResourceBindingInfo` will be renamed to `DXILResourceAnalysis` and `ResourceInfo`
-respectively. Then associated instance metadata will be resolved during the
+respectively. Then instance properties will be resolved during the
 `DXILResourceAnalysis` pass.
 
 
@@ -36,21 +36,24 @@ to the new structure.
 - `CounterDirection` and `GloballyCoherent` will be added to `ResourceInfo`
 - `DXILResourceAnalysis` will have a new step to resolve the instance's counter direction.
 
-Certain generated DXIL can create an illegal state for the instance metadata
+Certain generated DXIL can create an illegal state for an instance's properties
 such as an instance with both an incremented and decremented counter. When this
 occurs the analysis pass should prioritize performance for the common case and
 defer detailed error message calculation for the uncommon failure code path.
 
 To achieve that goal, a step in `DXILResourceAnalysis` may set a terminal or
-invalid value in the ResourceInfo that a later pass `DXILPostOptimizationValidationPass`
-will detect and do more expensive processing to raise useful Diagnostics.
+invalid value in the `ResourceInfo` that a later pass `DXILPostOptimizationValidationPass`
+(newly introduced by this proposal) will detect and do more expensive processing
+to raise useful Diagnostics.
 
 It's important to note that in general Diagnostics should not be raised in
-LLVM analyses or passes, and analyses may be invalidated an re-ran
-several times. However the shader compiler requires certain validations
- to be done after code optimizations, and that require a Diagnostic to
- be raised from a pass. Impact is minimized by raising the Diagnostic 
- only in one pass and minimizing computation in the common case.
+LLVM analyses or passes. Analyses may be invalidated and re-ran several times
+increasing performance impact and raising repeated diagnostics. Diagnostics
+raised after transformations passes also lose source context resulting in less
+useful error messages. However the shader compiler requires certain validations
+to be done after code optimizations which requires the Diagnostic to be raised
+from a pass. Impact is minimized by raising the Diagnostic only in one pass and
+minimizing computation in the common case.
 
 ## Alternatives considered
 
@@ -63,7 +66,7 @@ which proposed the following solution.
 
 This solution was costly in both perforamance and architecture. It was also
 misaligned with other pass infrastructure. Over several round of reviews the PR
-require significant changes which ultimatly highlighted the underlying issues.
+require significant changes which ultimately highlighted the underlying issues.
 
 Once coined and reframed as a "Resource Instance Problem", the best solution was clear.
 
