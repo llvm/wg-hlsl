@@ -26,7 +26,7 @@ into the DXILResourceBindingAnalysis pass and that the pass be renamed.
 In order to support the generic resource instance analysis `DXILResourceBindingAnalysis` 
 and `ResourceBindingInfo` will be renamed to `DXILResourceAnalysis` and `ResourceInfo`
 respectively. Then associated instance metadata will be resolved during the
-`DXILResourceBindingAnalysis` pass.
+`DXILResourceAnalysis` pass.
 
 
 The following mechanical changes are required to align existing and inflight code
