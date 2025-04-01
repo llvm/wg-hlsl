@@ -10,7 +10,7 @@ from the create handle intrinsics and it is possible to have multiple handles
 pointing at a specific Resource Instance, but each unique instance is
 disambiguated by the handle creation parameters.
 
-Beyond creation parameters, Reource Instances have several pieces of associated
+Beyond creation parameters, Resource Instances have several pieces of associated
 metadata. Type, CounterDirection (HasCounter), and GloballyCoherent are
 identified examples. Type is currently handled well so this proposal suggests
 no changes. However CounterDirection and GloballyCoherent require careful late 
@@ -63,7 +63,7 @@ This solution was costly in both perforamance and architecture. It was also
 misaligned with other pass infrastructure. Over several round of reviews the PR
 require significant changes which ultimatly highlighted the underlying issues.
 
-One coined and reframed as a "Resource Instance Proble", the best solution was clear.
+Once coined and reframed as a "Resource Instance Problem", the best solution was clear.
 
 ## Acknowledgments
 
