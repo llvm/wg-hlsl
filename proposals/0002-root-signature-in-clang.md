@@ -208,7 +208,7 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
       [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
     ')' ;
 
-    DTClause : CBV | SRV | UAV | Sampler
+    DTClause : CBV | SRV | UAV | Sampler ;
 
     DESCRIPTOR_RANGE_FLAGS =
       [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ] ;
