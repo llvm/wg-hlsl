@@ -1,6 +1,6 @@
-* Proposal: [NNNN - Resource Instance Analysis](NNNN-resource-instance-analysis.md)
+* Proposal: [0022 - Resource Instance Analysis](0022-resource-instance-analysis.md)
 * Author(s): [Ashley Coleman](https://github.com/V-FEXrt)
-* Status: **Design In Progress**
+* Status: **Accepted**
 
 ## Introduction
 
