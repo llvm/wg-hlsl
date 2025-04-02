@@ -159,12 +159,12 @@ Backus-Naur form. Where we assume there is arbitrary whitespace between any
 subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
 ```
-    RootSignature = [ RootElement { ',' RootElement } ];
+    RootSignature = [ RootElement { ',' RootElement } ] ;
 
     RootElement = RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
-                  DescriptorTable | StaticSampler;
+                  DescriptorTable | StaticSampler ;
 
-    RootFlags = 'RootFlags' '(' [ RootFlag { '|' RootFlag } ] ')';
+    RootFlags = 'RootFlags' '(' [ RootFlag { '|' RootFlag } ] ')' ;
 
     RootFlag = 0 |
               'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
@@ -178,59 +178,59 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
               'ALLOW_STREAM_OUTPUT' |
               'LOCAL_ROOT_SIGNATURE' |
               'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
-              'SAMPLER_HEAP_DIRECTLY_INDEXED';
+              'SAMPLER_HEAP_DIRECTLY_INDEXED' ;
 
     RootConstants = 'RootConstants' '('
       ( 'num32BitConstants' '=' POS_INT ) ',' bReg
-      { ',' RootConstantArgs } ')';
+      { ',' RootConstantArgs } ')' ;
 
     RootConstantArgs =
-      ( 'space' '=' POS_INT ) | ( 'visibility' '=' SHADER_VISIBILITY );
+      ( 'space' '=' POS_INT ) | ( 'visibility' '=' SHADER_VISIBILITY ) ;
 
-    POS_INT = [ + ] DIGITS;
+    POS_INT = [ + ] DIGITS ;
 
     ROOT_DESCRIPTOR_FLAGS = 0 | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-                            'DATA_VOLATILE';
+                            'DATA_VOLATILE' ;
 
-    RootCBV = 'CBV' '(' bReg { ',' RootParamArgs } ')';
+    RootCBV = 'CBV' '(' bReg { ',' RootParamArgs } ')' ;
 
-    RootSRV = 'SRV' '(' tReg { ',' RootParamArgs } ')';
+    RootSRV = 'SRV' '(' tReg { ',' RootParamArgs } ')' ;
 
-    RootUAV = 'UAV' '(' uReg { ',' RootParamArgs } ')';
+    RootUAV = 'UAV' '(' uReg { ',' RootParamArgs } ')' ;
 
     RootParamArgs =
       ( 'space' '=' POS_INT ) |
       ( 'visibility' '=' SHADER_VISIBILITY ) |
-      ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS );
+      ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ;
 
     DescriptorTable = 'DescriptorTable' '('
       [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-    ')';
+    ')' ;
 
     DTClause : CBV | SRV | UAV | Sampler
 
     DESCRIPTOR_RANGE_FLAGS =
-      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ];
+      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ] ;
 
     DESCRIPTOR_RANGE_FLAG = 0 | 'DESCRIPTORS_VOLATILE' |
                             'DATA_VOLATILE' | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-                            'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS';
+                            'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS' ;
 
-    CBV = 'CBV' '(' bReg ClauseArgs ')';
+    CBV = 'CBV' '(' bReg ClauseArgs ')' ;
 
-    SRV = 'SRV' '(' tReg ClauseArgs ')';
+    SRV = 'SRV' '(' tReg ClauseArgs ')' ;
 
-    UAV = 'UAV' '(' uReg ClauseArgs ')';
+    UAV = 'UAV' '(' uReg ClauseArgs ')' ;
 
-    Sampler = 'Sampler' '(' sReg { ',' ClauseArgs } ')';
+    Sampler = 'Sampler' '(' sReg { ',' ClauseArgs } ')' ;
 
     ClauseArgs =
       ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) |
       ( 'space' '=' POS_INT ) |
       ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) |
-      ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS );
+      ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ;
 
     SHADER_VISIBILITY = 'SHADER_VISIBILITY_ALL' |
                         'SHADER_VISIBILITY_VERTEX' |
@@ -239,13 +239,13 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
                         'SHADER_VISIBILITY_GEOMETRY' |
                         'SHADER_VISIBILITY_PIXEL' |
                         'SHADER_VISIBILITY_AMPLIFICATION' |
-                        'SHADER_VISIBILITY_MESH';
+                        'SHADER_VISIBILITY_MESH' ;
 
-    DESCRIPTOR_RANGE_OFFSET = 'unbounded' | POS_INT;
+    DESCRIPTOR_RANGE_OFFSET = 'unbounded' | POS_INT ;
 
-    DESCRIPTOR_RANGE_OFFSET = 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT;
+    DESCRIPTOR_RANGE_OFFSET = 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT ;
 
-    StaticSampler = 'StaticSampler' '(' sReg { ',' SamplerArgs }')';
+    StaticSampler = 'StaticSampler' '(' sReg { ',' SamplerArgs }')' ;
 
     SamplerArgs =
       ( 'filter' '=' FILTER ) |
@@ -259,15 +259,15 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
       ( 'minLOD' '=' NUMBER ) |
       ( 'maxLOD' '=' NUMBER ) |
       ( 'space' '=' POS_INT ) |
-      ( 'visibility' '=' SHADER_VISIBILITY );
+      ( 'visibility' '=' SHADER_VISIBILITY ) ;
 
-    bReg = 'b' DIGITS;
+    bReg = 'b' DIGITS ;
 
-    tReg = 't' DIGITS;
+    tReg = 't' DIGITS ;
 
-    uReg = 'u' DIGITS;
+    uReg = 'u' DIGITS ;
 
-    sReg = 's' DIGITS;
+    sReg = 's' DIGITS ;
 
     FILTER = 'FILTER_MIN_MAG_MIP_POINT' |
              'FILTER_MIN_MAG_POINT_MIP_LINEAR' |
@@ -304,20 +304,20 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
              'FILTER_MAXIMUM_MIN_LINEAR_MAG_POINT_MIP_LINEAR' |
              'FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT' |
              'FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR' |
-             'FILTER_MAXIMUM_ANISOTROPIC';
+             'FILTER_MAXIMUM_ANISOTROPIC' ;
 
     TEXTURE_ADDRESS = 'TEXTURE_ADDRESS_WRAP' |
                       'TEXTURE_ADDRESS_MIRROR' | 'TEXTURE_ADDRESS_CLAMP' |
-                      'TEXTURE_ADDRESS_BORDER' | 'TEXTURE_ADDRESS_MIRROR_ONCE';
+                      'TEXTURE_ADDRESS_BORDER' | 'TEXTURE_ADDRESS_MIRROR_ONCE' ;
 
     COMPARISON_FUNC = 'COMPARISON_NEVER' | 'COMPARISON_LESS' |
                       'COMPARISON_EQUAL' | 'COMPARISON_LESS_EQUAL' |
                       'COMPARISON_GREATER' | 'COMPARISON_NOT_EQUAL' |
-                      'COMPARISON_GREATER_EQUAL' | 'COMPARISON_ALWAYS';
+                      'COMPARISON_GREATER_EQUAL' | 'COMPARISON_ALWAYS' ;
 
     STATIC_BORDER_COLOR = 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
                           'STATIC_BORDER_COLOR_OPAQUE_BLACK' |
-                          'STATIC_BORDER_COLOR_OPAQUE_WHITE';
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' ;
 ```
 
 ### Root Signature Versioning 
