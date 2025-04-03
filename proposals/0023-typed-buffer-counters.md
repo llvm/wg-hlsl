@@ -1,6 +1,6 @@
 # Representing counter variables for typed buffers
 
-*   Proposal: [NNNN](http://NNNN-typed-buffer-counters.md)
+*   Proposal: [0023](http://0023-typed-buffer-counters.md)
 *   Author(s): [Steven Perron](https://github.com/s-perron)
 *   Status: **Design In Progress**
 
