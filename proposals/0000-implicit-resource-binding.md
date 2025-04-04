@@ -76,7 +76,7 @@ However, if the resources are declared inside a `struct`, their binding seems be
 assigned in the order they are referenced in the code, and not the order in
 which they were declared:
 
-### Example 1.2
+#### Example 1.2
 ```c++
 RWBuffer<float> A : register(u0);
 RWBuffer<float> C: register(u2);   // unused
@@ -133,8 +133,8 @@ struct S {
     RWBuffer<float> B[4]; // s.B.2 gets u3
     RWBuffer<float> C[2]; // s.C.1 gets u1
     RWBuffer<float> E[2]; // s.E.2 gets u0
-                          // s.E.1 gets u4
-};
+};                        // s.E.1 gets u4
+
 
 RWBuffer<float> A : register(u2);
 S s;
@@ -192,7 +192,7 @@ void main() {
   A[0] = D[2][0] + C[0] + B[10][0];
 }
 ```
-https://godbolt.org/z/91MYb5za4
+https://godbolt.org/z/vbvfqjo8h
 
 If there are resources declared after the unbound array that do not fit into the
 remaining space available in `space0`, DXC reports an error. For example
@@ -276,6 +276,25 @@ void main() {
 ```
 https://godbolt.org/z/EeW17MncE
 
+### Space-only register annotations
+
+DXC support binding annotations that only specify the register space from which the descriptor binding should be assigned.
+
+#### Example 5.1
+
+```c++
+RWBuffer<float> A : register(u1);        // defaults to space0
+RWBuffer<float> B[];                     // gets u2 (unbounded range)
+RWBuffer<float> C[3] : register(space1); // gets u0, space1 (range 3)
+RWBuffer<float> D : register(space1);    // gets u3, space1
+
+[numthreads(4,1,1)]
+void main() {
+  A[0] = C[2][0] + D[0] + B[10][0];
+}
+```
+https://godbolt.org/z/3Kc1T3dvs
+
 ### Unused resources
 
 Unused resources are resources that are not referenced in the source code or
@@ -289,7 +308,7 @@ In the following example the resources `B`, `C` and `s.D` are identified as
 unused and optimized away. Resources `A` and `E` get the binding from descriptor
 range originally assigned to `B`:
 
-#### Example 5.1
+#### Example 6.1
 
 ```c++
 struct S {
@@ -329,7 +348,7 @@ https://godbolt.org/z/Mcabxq4jG
 
 Based on resources identified as unused in the example above it is very likely
 that DXC is assigning implicit bindings later in the compiler after codegen and
-code optimizations.  
+code optimizations.
 
 ## Motivation
 
