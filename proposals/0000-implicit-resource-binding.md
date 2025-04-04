@@ -23,10 +23,10 @@ DirectX has four types of descriptors/handles:
 - `Sampler` - sampler (read-only) - using `s` registers
 
 The `register` annotation specifies the first descriptor the resource is bound
- to. For simple resources that is the only descriptor the resource needs. In
- case of arrays the `register` specifies the start of the description range
- needed for the resource array. The dimensions of the array determine the size
- of the description range.
+to. For simple resources that is the only descriptor the resource needs. In case
+of arrays the `register` specifies the start of the description range needed for
+the resource array. The dimensions of the array determine the size of the
+description range.
 
 The annotation can also include virtual register space:
 
@@ -50,7 +50,8 @@ simplicty the examples below use the just the `u` registers and
 register and resource types as well.
 
 ### Simple Resource Declarations
- Resource without binding assignment that are declared directly at the global
+
+Resource without binding assignment that are declared directly at the global
 scope are processed in the order they appear in the source code. They are
 assigned the first available register slot in `space0`. Unused resources are
 optimized away and do not participate in the implicit binding assignment.
@@ -103,8 +104,8 @@ first range of available decriptors in `space0` that fits the array size
 regardless of whether the individual resources in the array are used or not, as
 long as at least one of the them is accessed.
 
-If none of the resources in the are used, the whole resource declaration is
-optimized away and its descriptor range is available for use by other resources.
+If a resource isn't used, the whole resource declaration is optimized away and
+its descriptor range is available for use by other resources.
 
 #### Example 2.1
 ```c++
@@ -184,7 +185,7 @@ whichever is greater. They take up the rest of the descriptor slots in `space0`.
 RWBuffer<float> A : register(u1);
 RWBuffer<float> B[];     // gets u6 (unbounded range)
 RWBuffer<float> C : register(u5);
-RWBuffer<float> D[3];    // gets u2 because it first between A and C but not before A
+RWBuffer<float> D[3];    // gets u2 because it fits between A and C but not before A
 
 [numthreads(4,1,1)]
 void main() {
@@ -212,7 +213,7 @@ void main() {
 ```
 https://godbolt.org/z/6bYoG599P
 
-It looks like DXC never attempts to assing descriptors from virtual register
+It looks like DXC never attempts to assign descriptors from virtual register
 space other than `space0`.
 
 However, moving declaration of `D` before the unbounded array `B` compiles
@@ -233,10 +234,10 @@ void main() {
 ```
 https://godbolt.org/z/cjP35n63d
 
-Since DXC seems to only assigns descriptors from `space0`, it reports error
+Since DXC seems to only assign descriptors from `space0`, it reports an error
 whenever there are:
 - two or more unbound resource arrays without explicit binding
-- one unboud resource array with explicit binding in `space0` and one or more
+- one unbound resource array with explicit binding in `space0` and one or more
   unbound resource arrays without explicit binding
 
 #### Example 3.4
