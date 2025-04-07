@@ -155,120 +155,120 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 ### Root Signature Grammar
 
 The root signature DSL is defined using a slightly modified version of Extended
-Backus-Naur form. We define the additional symbol `:` to denote a
-comma-seperated list of components in any order:  `A : B = (A ',' B | B ',' A)`.
-Additionally, all keywords and enums are case-insensitive.
+Backus-Naur form. Where we assume there is arbitrary whitespace between any
+subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
 ```
-    RootSignature = [ RootElement { ',' RootElement } ];
+    RootSignature = [ RootElement { ',' RootElement } ] ;
 
-    RootElement : RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
-                  DescriptorTable | StaticSampler
+    RootElement = RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
+                  DescriptorTable | StaticSampler ;
 
-    RootFlags = 'RootFlags' '(' [ RootFlag { '|' RootFlag } ] ')';
+    RootFlags = 'RootFlags' '(' [ ROOT_FLAG { '|' ROOT_FLAG } ] ')' ;
 
-    RootFlag : 0 |
-               'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
-               'DENY_VERTEX_SHADER_ROOT_ACCESS' |
-               'DENY_HULL_SHADER_ROOT_ACCESS' |
-               'DENY_DOMAIN_SHADER_ROOT_ACCESS' |
-               'DENY_GEOMETRY_SHADER_ROOT_ACCESS' |
-               'DENY_PIXEL_SHADER_ROOT_ACCESS' |
-               'DENY_AMPLIFICATION_SHADER_ROOT_ACCESS' |
-               'DENY_MESH_SHADER_ROOT_ACCESS' |
-               'ALLOW_STREAM_OUTPUT' |
-               'LOCAL_ROOT_SIGNATURE' |
-               'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
-               'SAMPLER_HEAP_DIRECTLY_INDEXED'
+    ROOT_FLAG = 0 | 'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
+                'DENY_VERTEX_SHADER_ROOT_ACCESS' |
+                'DENY_HULL_SHADER_ROOT_ACCESS' |
+                'DENY_DOMAIN_SHADER_ROOT_ACCESS' |
+                'DENY_GEOMETRY_SHADER_ROOT_ACCESS' |
+                'DENY_PIXEL_SHADER_ROOT_ACCESS' |
+                'DENY_AMPLIFICATION_SHADER_ROOT_ACCESS' |
+                'DENY_MESH_SHADER_ROOT_ACCESS' |
+                'ALLOW_STREAM_OUTPUT' |
+                'LOCAL_ROOT_SIGNATURE' |
+                'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
+                'SAMPLER_HEAP_DIRECTLY_INDEXED' ;
 
     RootConstants = 'RootConstants' '('
-      ( 'num32BitConstants' '=' POS_INT ) : bReg
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-    ')';
+      ( 'num32BitConstants' '=' POS_INT ) ',' BReg
+      { ',' RootConstantArgs } ')' ;
 
-    POS_INT = [ + ] DIGITS
+    RootConstantArgs =
+      ( 'space' '=' POS_INT ) | ( 'visibility' '=' SHADER_VISIBILITY ) ;
 
-    ROOT_DESCRIPTOR_FLAGS : 0 | 'DATA_STATIC' |
+    POS_INT = [ + ] DIGITS ;
+
+    ROOT_DESCRIPTOR_FLAGS = 0 | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-                            'DATA_VOLATILE'
-    RootCBV = 'CBV' '(' bReg RootParams ')';
+                            'DATA_VOLATILE' ;
 
-    RootSRV = 'SRV' '(' tReg RootParams ')';
+    RootCBV = 'CBV' '(' BReg { ',' RootParamArgs } ')' ;
 
-    RootUAV = 'UAV' '(' uReg RootParams ')';
+    RootSRV = 'SRV' '(' TReg { ',' RootParamArgs } ')' ;
 
-    RootParams =
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-      [ : ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ];
+    RootUAV = 'UAV' '(' UReg { ',' RootParamArgs } ')' ;
+
+    RootParamArgs =
+      ( 'space' '=' POS_INT ) |
+      ( 'visibility' '=' SHADER_VISIBILITY ) |
+      ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ;
 
     DescriptorTable = 'DescriptorTable' '('
       [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-    ')';
+    ')' ;
 
-    DTClause : CBV | SRV | UAV | Sampler
+    DTClause : CBV | SRV | UAV | Sampler ;
 
     DESCRIPTOR_RANGE_FLAGS =
-      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ];
+      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ] ;
 
-    DESCRIPTOR_RANGE_FLAG : 0 |
-        'DESCRIPTORS_VOLATILE' |
-        'DATA_VOLATILE' |
-        'DATA_STATIC' |
-        'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-        'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS'
+    DESCRIPTOR_RANGE_FLAG = 0 | 'DESCRIPTORS_VOLATILE' |
+                            'DATA_VOLATILE' | 'DATA_STATIC' |
+                            'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
+                            'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS' ;
 
-    CBV = 'CBV' '(' bReg ClauseArgs ')';
+    CBV = 'CBV' '(' BReg ClauseArgs ')' ;
 
-    SRV = 'SRV' '(' tReg ClauseArgs ')';
+    SRV = 'SRV' '(' TReg ClauseArgs ')' ;
 
-    UAV = 'UAV' '(' uReg ClauseArgs ')';
+    UAV = 'UAV' '(' UReg ClauseArgs ')' ;
 
-    Sampler = 'Sampler' '(' sReg ClauseArgs ')';
+    Sampler = 'Sampler' '(' SReg { ',' ClauseArgs } ')' ;
 
     ClauseArgs =
-      [ : ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) ]
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) ]
-      [ : ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ];
+      ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) |
+      ( 'space' '=' POS_INT ) |
+      ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) |
+      ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ;
 
-    SHADER_VISIBILITY : 'SHADER_VISIBILITY_ALL' | 'SHADER_VISIBILITY_VERTEX' |
+    SHADER_VISIBILITY = 'SHADER_VISIBILITY_ALL' |
+                        'SHADER_VISIBILITY_VERTEX' |
                         'SHADER_VISIBILITY_HULL' |
                         'SHADER_VISIBILITY_DOMAIN' |
                         'SHADER_VISIBILITY_GEOMETRY' |
                         'SHADER_VISIBILITY_PIXEL' |
                         'SHADER_VISIBILITY_AMPLIFICATION' |
-                        'SHADER_VISIBILITY_MESH'
+                        'SHADER_VISIBILITY_MESH' ;
 
-    DESCRIPTOR_RANGE_OFFSET : 'unbounded' | POS_INT
+    DESCRIPTOR_RANGE_OFFSET = 'unbounded' | POS_INT ;
 
-    DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT
+    DESCRIPTOR_RANGE_OFFSET = 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT ;
 
-    StaticSampler = 'StaticSampler' '(' sReg
-      [ : ( 'filter' '=' FILTER ) ]
-      [ : ( 'addressU' '=' TEXTURE_ADDRESS ) ]
-      [ : ( 'addressV' '=' TEXTURE_ADDRESS ) ]
-      [ : ( 'addressW' '=' TEXTURE_ADDRESS ) ]
-      [ : ( 'mipLODBias' '=' NUMBER ) ]
-      [ : ( 'maxAnisotropy' '=' NUMBER ) ]
-      [ : ( 'comparisonFunc' '=' COMPARISON_FUNC ) ]
-      [ : ( 'borderColor' '=' STATIC_BORDER_COLOR ) ]
-      [ : ( 'minLOD' '=' NUMBER ) ]
-      [ : ( 'maxLOD' '=' NUMBER ) ]
-      [ : ( 'space' '=' POS_INT ) ]
-      [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
-    ')';
+    StaticSampler = 'StaticSampler' '(' SReg { ',' SamplerArgs }')' ;
 
-    bReg : 'b' DIGITS
+    SamplerArgs =
+      ( 'filter' '=' FILTER ) |
+      ( 'addressU' '=' TEXTURE_ADDRESS ) |
+      ( 'addressV' '=' TEXTURE_ADDRESS ) |
+      ( 'addressW' '=' TEXTURE_ADDRESS ) |
+      ( 'mipLODBias' '=' NUMBER ) |
+      ( 'maxAnisotropy' '=' NUMBER ) |
+      ( 'comparisonFunc' '=' COMPARISON_FUNC ) |
+      ( 'borderColor' '=' STATIC_BORDER_COLOR ) |
+      ( 'minLOD' '=' NUMBER ) |
+      ( 'maxLOD' '=' NUMBER ) |
+      ( 'space' '=' POS_INT ) |
+      ( 'visibility' '=' SHADER_VISIBILITY ) ;
 
-    tReg : 't' DIGITS
+    BReg = 'b' DIGITS ;
 
-    uReg : 'u' DIGITS
+    TReg = 't' DIGITS ;
 
-    sReg : 's' DIGITS
+    UReg = 'u' DIGITS ;
 
-    FILTER : 'FILTER_MIN_MAG_MIP_POINT' |
+    SReg = 's' DIGITS ;
+
+    FILTER = 'FILTER_MIN_MAG_MIP_POINT' |
              'FILTER_MIN_MAG_POINT_MIP_LINEAR' |
              'FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT' |
              'FILTER_MIN_POINT_MAG_MIP_LINEAR' |
@@ -303,20 +303,20 @@ Additionally, all keywords and enums are case-insensitive.
              'FILTER_MAXIMUM_MIN_LINEAR_MAG_POINT_MIP_LINEAR' |
              'FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT' |
              'FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR' |
-             'FILTER_MAXIMUM_ANISOTROPIC'
+             'FILTER_MAXIMUM_ANISOTROPIC' ;
 
-    TEXTURE_ADDRESS : 'TEXTURE_ADDRESS_WRAP' |
+    TEXTURE_ADDRESS = 'TEXTURE_ADDRESS_WRAP' |
                       'TEXTURE_ADDRESS_MIRROR' | 'TEXTURE_ADDRESS_CLAMP' |
-                      'TEXTURE_ADDRESS_BORDER' | 'TEXTURE_ADDRESS_MIRROR_ONCE'
+                      'TEXTURE_ADDRESS_BORDER' | 'TEXTURE_ADDRESS_MIRROR_ONCE' ;
 
-    COMPARISON_FUNC : 'COMPARISON_NEVER' | 'COMPARISON_LESS' |
+    COMPARISON_FUNC = 'COMPARISON_NEVER' | 'COMPARISON_LESS' |
                       'COMPARISON_EQUAL' | 'COMPARISON_LESS_EQUAL' |
                       'COMPARISON_GREATER' | 'COMPARISON_NOT_EQUAL' |
-                      'COMPARISON_GREATER_EQUAL' | 'COMPARISON_ALWAYS'
+                      'COMPARISON_GREATER_EQUAL' | 'COMPARISON_ALWAYS' ;
 
-    STATIC_BORDER_COLOR : 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
+    STATIC_BORDER_COLOR = 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
                           'STATIC_BORDER_COLOR_OPAQUE_BLACK' |
-                          'STATIC_BORDER_COLOR_OPAQUE_WHITE'
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' ;
 ```
 
 ### Root Signature Versioning 
