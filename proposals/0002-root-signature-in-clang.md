@@ -164,9 +164,9 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
     RootElement = RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
                   DescriptorTable | StaticSampler ;
 
-    RootFlags = 'RootFlags' '(' [ RootFlag { '|' RootFlag } ] ')' ;
+    RootFlags = 'RootFlags' '(' [ ROOT_FLAG { '|' ROOT_FLAG } ] ')' ;
 
-    RootFlag = 0 |
+    ROOT_FLAG = 0 |
               'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
               'DENY_VERTEX_SHADER_ROOT_ACCESS' |
               'DENY_HULL_SHADER_ROOT_ACCESS' |
