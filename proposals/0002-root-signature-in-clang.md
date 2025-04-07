@@ -181,7 +181,7 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
               'SAMPLER_HEAP_DIRECTLY_INDEXED' ;
 
     RootConstants = 'RootConstants' '('
-      ( 'num32BitConstants' '=' POS_INT ) ',' bReg
+      ( 'num32BitConstants' '=' POS_INT ) ',' BReg
       { ',' RootConstantArgs } ')' ;
 
     RootConstantArgs =
@@ -193,11 +193,11 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
                             'DATA_VOLATILE' ;
 
-    RootCBV = 'CBV' '(' bReg { ',' RootParamArgs } ')' ;
+    RootCBV = 'CBV' '(' BReg { ',' RootParamArgs } ')' ;
 
-    RootSRV = 'SRV' '(' tReg { ',' RootParamArgs } ')' ;
+    RootSRV = 'SRV' '(' TReg { ',' RootParamArgs } ')' ;
 
-    RootUAV = 'UAV' '(' uReg { ',' RootParamArgs } ')' ;
+    RootUAV = 'UAV' '(' UReg { ',' RootParamArgs } ')' ;
 
     RootParamArgs =
       ( 'space' '=' POS_INT ) |
@@ -218,13 +218,13 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
                             'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS' ;
 
-    CBV = 'CBV' '(' bReg ClauseArgs ')' ;
+    CBV = 'CBV' '(' BReg ClauseArgs ')' ;
 
-    SRV = 'SRV' '(' tReg ClauseArgs ')' ;
+    SRV = 'SRV' '(' TReg ClauseArgs ')' ;
 
-    UAV = 'UAV' '(' uReg ClauseArgs ')' ;
+    UAV = 'UAV' '(' UReg ClauseArgs ')' ;
 
-    Sampler = 'Sampler' '(' sReg { ',' ClauseArgs } ')' ;
+    Sampler = 'Sampler' '(' SReg { ',' ClauseArgs } ')' ;
 
     ClauseArgs =
       ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) |
@@ -245,7 +245,7 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
     DESCRIPTOR_RANGE_OFFSET = 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT ;
 
-    StaticSampler = 'StaticSampler' '(' sReg { ',' SamplerArgs }')' ;
+    StaticSampler = 'StaticSampler' '(' SReg { ',' SamplerArgs }')' ;
 
     SamplerArgs =
       ( 'filter' '=' FILTER ) |
@@ -261,13 +261,13 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
       ( 'space' '=' POS_INT ) |
       ( 'visibility' '=' SHADER_VISIBILITY ) ;
 
-    bReg = 'b' DIGITS ;
+    BReg = 'b' DIGITS ;
 
-    tReg = 't' DIGITS ;
+    TReg = 't' DIGITS ;
 
-    uReg = 'u' DIGITS ;
+    UReg = 'u' DIGITS ;
 
-    sReg = 's' DIGITS ;
+    SReg = 's' DIGITS ;
 
     FILTER = 'FILTER_MIN_MAG_MIP_POINT' |
              'FILTER_MIN_MAG_POINT_MIP_LINEAR' |
