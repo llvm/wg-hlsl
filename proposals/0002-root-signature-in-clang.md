@@ -166,19 +166,18 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
     RootFlags = 'RootFlags' '(' [ ROOT_FLAG { '|' ROOT_FLAG } ] ')' ;
 
-    ROOT_FLAG = 0 |
-              'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
-              'DENY_VERTEX_SHADER_ROOT_ACCESS' |
-              'DENY_HULL_SHADER_ROOT_ACCESS' |
-              'DENY_DOMAIN_SHADER_ROOT_ACCESS' |
-              'DENY_GEOMETRY_SHADER_ROOT_ACCESS' |
-              'DENY_PIXEL_SHADER_ROOT_ACCESS' |
-              'DENY_AMPLIFICATION_SHADER_ROOT_ACCESS' |
-              'DENY_MESH_SHADER_ROOT_ACCESS' |
-              'ALLOW_STREAM_OUTPUT' |
-              'LOCAL_ROOT_SIGNATURE' |
-              'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
-              'SAMPLER_HEAP_DIRECTLY_INDEXED' ;
+    ROOT_FLAG = 0 | 'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
+                'DENY_VERTEX_SHADER_ROOT_ACCESS' |
+                'DENY_HULL_SHADER_ROOT_ACCESS' |
+                'DENY_DOMAIN_SHADER_ROOT_ACCESS' |
+                'DENY_GEOMETRY_SHADER_ROOT_ACCESS' |
+                'DENY_PIXEL_SHADER_ROOT_ACCESS' |
+                'DENY_AMPLIFICATION_SHADER_ROOT_ACCESS' |
+                'DENY_MESH_SHADER_ROOT_ACCESS' |
+                'ALLOW_STREAM_OUTPUT' |
+                'LOCAL_ROOT_SIGNATURE' |
+                'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
+                'SAMPLER_HEAP_DIRECTLY_INDEXED' ;
 
     RootConstants = 'RootConstants' '('
       ( 'num32BitConstants' '=' POS_INT ) ',' BReg
