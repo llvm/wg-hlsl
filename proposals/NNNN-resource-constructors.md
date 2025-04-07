@@ -59,13 +59,13 @@ template <typename T> struct RWBuffer {
 public:
   // For uninitialized handles
   RWBuffer() {
-    __handle = __builtin_hlsl_create_poison_handle(__handle);
+    __handle = __builtin_hlsl_resource_createpoisonhandle(__handle);
   }
   ...
 };
 ```
 
-The `__handle` argument of the `__builtin_hlsl_create_poison_handle` Clang
+The `__handle` argument of the `__builtin_hlsl_resource_createpoisonhandle` Clang
 builtin function will be used to infer the return type of that function. This is
 the same way we infer return types for HLSL intrinsic builtins based on their
 arguments, except in the case only the type of the argument is used and not its
@@ -91,14 +91,14 @@ template <typename T> struct RWBuffer {
 private:
   // For resources with explicit binding
   RWBuffer(unsigned register, unsigned space, int range, unsigned index) {
-    __handle = __builtin_hlsl_create_handle_from_binding(__handle, register, space, range, index);
+    __handle = __builtin_hlsl_resource_createhandlefrombinding(__handle, register, space, range, index);
   }
   ...
 };
 ```
 
 The `__handle` argument passed into the
-`__builtin_hlsl_create_handle_from_binding` Clang builtin function will be used
+`__builtin_hlsl_resource_createhandlefrombinding` Clang builtin function will be used
 to infer the return type of the that function (the same way as for the default
 construtor).
 
@@ -126,14 +126,14 @@ template <typename T> struct RWBuffer {
 private:
   // For resources with implicit binding
   RWBuffer(unsigned space, int range, unsigned index) {
-    __handle = __builtin_hlsl_create_handle_from_implicit_binding(__handle, space, range, index);
+    __handle = __builtin_hlsl_resource_createhandlefromimplicitbinding(__handle, space, range, index);
   }
   ...
 };
 ```
 
 The `__handle` argument passed into the
-`__builtin_hlsl_create_handle_from_implicit_binding` Clang builtin function will
+`__builtin_hlsl_resource_createhandlefromimplicitbinding` Clang builtin function will
 be used to infer the return type of the that function (the same way as for the
 default construtor).
 
@@ -193,18 +193,18 @@ private:
 
   // For resources with explicit binding
   RWBuffer(unsigned register, unsigned space, int rage, unsigned index) {
-    __handle = __builtin_hlsl_create_handle_from_binding(__handle, register, space, range, index);
+    __handle = __builtin_hlsl_resource_createhandlefrombinding(__handle, register, space, range, index);
   }
 
   // For resources with implicit binding
   RWBuffer(unsigned space, int rage, unsigned index) {
-    __handle = __builtin_hlsl_create_handle_from_implicit_binding(__handle, space, range, index);
+    __handle = __builtin_hlsl_resource_createhandlefromimplicitbinding(__handle, space, range, index);
   }
 
 public:
   // For uninitialized handles
   RWBuffer() {
-    __handle = __builtin_hlsl_create_poison_handle(__handle);
+    __handle = __builtin_hlsl_resource_createpoisonhandle(__handle);
   }
 
   // Resources are copyable.
