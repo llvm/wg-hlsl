@@ -466,20 +466,23 @@ between individual resources with the same type and binding range.
 ### LLVM Binding Assignment Pass
 
 The implicit binding assignment for DirectX will happen in an LLVM pass
-`DXILResourceImplicitBindings`. The pass will run after all IR optimizations and
-will use the results of `DXILResourceBindingAnalysis`. It needs to run before
-any other pass that uses this analysis because it will be updating it with the
-newly assigned bindings.
-
-The pass will scan the module to gather all instances of
+`DXILResourceImplicitBindings`. The pass will scan the module for all instances of
+`@llvm.dx.resource.handlefrombinding` and create a map of available register
+slots. Then it will gather all instances of
 `@llvm.dx.resource.handlefromimplicitbinding` calls and sort them by
-`%order_id`. Then it will process the list sequentially based on the
-`%order_id`, and for each group of calls operating on the same unique resource
-it will find an available resource binding based on the required resource class,
-range and space. It will then replace all of the
-`@llvm.dx.resource.handlefromimplicitbinding` calls and all of its uses with new
-`@llvm.dx.resource.handlefrombinding` calls and add the new binding to the
-`DXILResourceBindingAnalysis` map. 
+`%order_id`. Then for each group of calls operating on the same unique resource
+it will:
+- find an available space to bind the resource based on the resource class,
+required range and space
+- replace the `@llvm.dx.resource.handlefromimplicitbinding` calls and all of their
+uses with `@llvm.dx.resource.handlefrombinding` using the new binding
+
+The `DXILResourceImplicitBindings` pass needs to run after all IR optimizations
+passes but before any pass or analysis that relies on
+`@llvm.dx.resource.handlefrombinding` calls to exist for all non-dynamically
+bound resources used by the shader. For example, it needs to run before any pass
+that requires `DXILResourceAnalysis`. The pass invalidate any existing
+`DXILResourceAnalysis` if it assigns any new bindings.
 
 ## Alternatives considered (Optional)
 
