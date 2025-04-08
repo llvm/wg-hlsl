@@ -114,7 +114,7 @@ RWBuffer<float> A : register(u2);
 RWBuffer<float> B[4];    // gets u3 because it does not fit before A (range 4)
 RWBuffer<float> C[2];    // gets u0 because it fits before A (range 2)
 RWBuffer<float> D[50] : register(u6); // unused
-RWBuffer<float> E[2];    // gets u7 which is right after B (range 4)
+RWBuffer<float> E[2];    // gets u7 which is right after B (range 2)
 
 [numthreads(4,1,1)]
 void main() {
@@ -124,9 +124,10 @@ void main() {
 https://godbolt.org/z/qha84sjvT
 
 However, if the resource array is defined in a `struct`, the binding seems to be
-assigned to the individual array elements in the order they are used in the
-code. In other words, the array elements are treated as unrelated individual
-resources:
+assigned to the individual array elements in the order they are referenced
+(used) in the source code, and possibly in the order the IR code to access the
+resource is generated. Additionally, the array elements are treated as
+unrelated individual resources:
 
 #### Example 2.2
 ```c++
