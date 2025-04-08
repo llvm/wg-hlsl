@@ -154,113 +154,121 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
 
 ### Root Signature Grammar
 
+The root signature DSL is defined using a slightly modified version of Extended
+Backus-Naur form. Where we assume there is arbitrary whitespace between any
+subsequent tokens. Additionally, all keywords and enums are case-insensitive.
+
 ```
-    RootSignature : (RootElement(,RootElement)?)?
+    RootSignature = [ RootElement { ',' RootElement } ] ;
 
-    RootElement : RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
-                  DescriptorTable | StaticSampler
+    RootElement = RootFlags | RootConstants | RootCBV | RootSRV | RootUAV |
+                  DescriptorTable | StaticSampler ;
 
-    RootFlags : 'RootFlags' '(' (RootFlag(|RootFlag)?)? ')'
+    RootFlags = 'RootFlags' '(' [ ROOT_FLAG { '|' ROOT_FLAG } ] ')' ;
 
-    RootFlag : 0 |
-               'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
-               'DENY_VERTEX_SHADER_ROOT_ACCESS' |
-               'DENY_HULL_SHADER_ROOT_ACCESS' |
-               'DENY_DOMAIN_SHADER_ROOT_ACCESS' |
-               'DENY_GEOMETRY_SHADER_ROOT_ACCESS' |
-               'DENY_PIXEL_SHADER_ROOT_ACCESS' |
-               'DENY_AMPLIFICATION_SHADER_ROOT_ACCESS' |
-               'DENY_MESH_SHADER_ROOT_ACCESS' |
-               'ALLOW_STREAM_OUTPUT' |
-               'LOCAL_ROOT_SIGNATURE' |
-               'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
-               'SAMPLER_HEAP_DIRECTLY_INDEXED' |
-               'AllowLowTierReservedHwCbLimit'
+    ROOT_FLAG = 0 | 'ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT' |
+                'DENY_VERTEX_SHADER_ROOT_ACCESS' |
+                'DENY_HULL_SHADER_ROOT_ACCESS' |
+                'DENY_DOMAIN_SHADER_ROOT_ACCESS' |
+                'DENY_GEOMETRY_SHADER_ROOT_ACCESS' |
+                'DENY_PIXEL_SHADER_ROOT_ACCESS' |
+                'DENY_AMPLIFICATION_SHADER_ROOT_ACCESS' |
+                'DENY_MESH_SHADER_ROOT_ACCESS' |
+                'ALLOW_STREAM_OUTPUT' |
+                'LOCAL_ROOT_SIGNATURE' |
+                'CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED' |
+                'SAMPLER_HEAP_DIRECTLY_INDEXED' ;
 
-    RootConstants : 'RootConstants' '(' 'num32BitConstants' '=' NUMBER ','
-           bReg (',' 'space' '=' NUMBER)?
-           (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    RootConstants = 'RootConstants' '('
+      ( 'num32BitConstants' '=' POS_INT ) ',' BReg
+      { ',' RootConstantArgs } ')' ;
 
-    ROOT_DESCRIPTOR_FLAGS : 0 | 'DATA_STATIC' |
+    RootConstantArgs =
+      ( 'space' '=' POS_INT ) | ( 'visibility' '=' SHADER_VISIBILITY ) ;
+
+    POS_INT = [ + ] DIGITS ;
+
+    ROOT_DESCRIPTOR_FLAGS = 0 | 'DATA_STATIC' |
                             'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-                            'DATA_VOLATILE'
+                            'DATA_VOLATILE' ;
 
-    RootCBV : 'CBV' '(' bReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootCBV = 'CBV' '(' BReg { ',' RootParamArgs } ')' ;
 
-    RootSRV : 'SRV' '(' tReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootSRV = 'SRV' '(' TReg { ',' RootParamArgs } ')' ;
 
-    RootUAV : 'UAV' '(' uReg (',' 'space' '=' NUMBER)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)?
-          (',' 'flags' '=' ROOT_DESCRIPTOR_FLAGS)? ')'
+    RootUAV = 'UAV' '(' UReg { ',' RootParamArgs } ')' ;
 
-    DescriptorTable : 'DescriptorTable' '(' (DTClause(|DTClause)?)?
-          (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    RootParamArgs =
+      ( 'space' '=' POS_INT ) |
+      ( 'visibility' '=' SHADER_VISIBILITY ) |
+      ( 'flags' '=' ROOT_DESCRIPTOR_FLAGS ) ;
 
-    DTClause : CBV | SRV | UAV | Sampler
+    DescriptorTable = 'DescriptorTable' '('
+      [ DTClause { : DTClause } ] [ : ( 'visibility' '=' SHADER_VISIBILITY ) ]
+    ')' ;
 
-    DESCRIPTOR_RANGE_FLAGS : DESCRIPTOR_RANGE_FLAGS(|DESCRIPTOR_RANGE_FLAGS)?
+    DTClause : CBV | SRV | UAV | Sampler ;
 
-    DESCRIPTOR_RANGE_FLAG : 0 |
-        'DESCRIPTORS_VOLATILE' |
-        'DATA_VOLATILE' |
-        'DATA_STATIC' |
-        'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
-        'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS'
+    DESCRIPTOR_RANGE_FLAGS =
+      [ DESCRIPTOR_RANGE_FLAG { '|' DESCRIPTOR_RANGE_FLAG } ] ;
 
-    CBV : 'CBV' '(' bReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    DESCRIPTOR_RANGE_FLAG = 0 | 'DESCRIPTORS_VOLATILE' |
+                            'DATA_VOLATILE' | 'DATA_STATIC' |
+                            'DATA_STATIC_WHILE_SET_AT_EXECUTE' |
+                            'DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS' ;
 
-    SRV : 'SRV' '(' tReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    CBV = 'CBV' '(' BReg ClauseArgs ')' ;
 
-    UAV : 'UAV' '(' uReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)?
-          (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    SRV = 'SRV' '(' TReg ClauseArgs ')' ;
 
-    Sampler : 'Sampler' '(' sReg (',' 'numDescriptors' '=' NUMBER)?
-          (',' 'space' '=' NUMBER)?
-          (',' 'offset' '=' DESCRIPTOR_RANGE_OFFSET)? (',' 'flags' '=' DESCRIPTOR_RANGE_FLAGS)? ')'
+    UAV = 'UAV' '(' UReg ClauseArgs ')' ;
 
-    SHADER_VISIBILITY : 'SHADER_VISIBILITY_ALL' | 'SHADER_VISIBILITY_VERTEX' |
+    Sampler = 'Sampler' '(' SReg { ',' ClauseArgs } ')' ;
+
+    ClauseArgs =
+      ( 'numDescriptors' '=' NUM_DESCRIPTORS_UNBOUNDED ) |
+      ( 'space' '=' POS_INT ) |
+      ( 'offset' '=' DESCRIPTOR_RANGE_OFFSET ) |
+      ( 'flags' '=' DESCRIPTOR_RANGE_FLAGS ) ;
+
+    SHADER_VISIBILITY = 'SHADER_VISIBILITY_ALL' |
+                        'SHADER_VISIBILITY_VERTEX' |
                         'SHADER_VISIBILITY_HULL' |
                         'SHADER_VISIBILITY_DOMAIN' |
                         'SHADER_VISIBILITY_GEOMETRY' |
                         'SHADER_VISIBILITY_PIXEL' |
                         'SHADER_VISIBILITY_AMPLIFICATION' |
-                        'SHADER_VISIBILITY_MESH'
+                        'SHADER_VISIBILITY_MESH' ;
 
-    DESCRIPTOR_RANGE_OFFSET : 'DESCRIPTOR_RANGE_OFFSET_APPEND' | NUMBER
+    DESCRIPTOR_RANGE_OFFSET = 'unbounded' | POS_INT ;
 
-    StaticSampler : 'StaticSampler' '(' sReg (',' 'filter' '=' FILTER)?
-             (',' 'addressU' '=' TEXTURE_ADDRESS)?
-             (',' 'addressV' '=' TEXTURE_ADDRESS)?
-             (',' 'addressW' '=' TEXTURE_ADDRESS)?
-             (',' 'mipLODBias' '=' NUMBER)?
-             (',' 'maxAnisotropy' '=' NUMBER)?
-             (',' 'comparisonFunc' '=' COMPARISON_FUNC)?
-             (',' 'borderColor' '=' STATIC_BORDER_COLOR)?
-             (',' 'minLOD' '=' NUMBER)?
-             (',' 'maxLOD' '=' NUMBER)? (',' 'space' '=' NUMBER)?
-             (',' 'visibility' '=' SHADER_VISIBILITY)? ')'
+    DESCRIPTOR_RANGE_OFFSET = 'DESCRIPTOR_RANGE_OFFSET_APPEND' | POS_INT ;
 
-    bReg : 'b' NUMBER
+    StaticSampler = 'StaticSampler' '(' SReg { ',' SamplerArgs }')' ;
 
-    tReg : 't' NUMBER
+    SamplerArgs =
+      ( 'filter' '=' FILTER ) |
+      ( 'addressU' '=' TEXTURE_ADDRESS ) |
+      ( 'addressV' '=' TEXTURE_ADDRESS ) |
+      ( 'addressW' '=' TEXTURE_ADDRESS ) |
+      ( 'mipLODBias' '=' NUMBER ) |
+      ( 'maxAnisotropy' '=' NUMBER ) |
+      ( 'comparisonFunc' '=' COMPARISON_FUNC ) |
+      ( 'borderColor' '=' STATIC_BORDER_COLOR ) |
+      ( 'minLOD' '=' NUMBER ) |
+      ( 'maxLOD' '=' NUMBER ) |
+      ( 'space' '=' POS_INT ) |
+      ( 'visibility' '=' SHADER_VISIBILITY ) ;
 
-    uReg : 'u' NUMBER
+    BReg = 'b' DIGITS ;
 
-    sReg : 's' NUMBER
+    TReg = 't' DIGITS ;
 
-    FILTER : 'FILTER_MIN_MAG_MIP_POINT' |
+    UReg = 'u' DIGITS ;
+
+    SReg = 's' DIGITS ;
+
+    FILTER = 'FILTER_MIN_MAG_MIP_POINT' |
              'FILTER_MIN_MAG_POINT_MIP_LINEAR' |
              'FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT' |
              'FILTER_MIN_POINT_MAG_MIP_LINEAR' |
@@ -295,20 +303,20 @@ to ensure that our solution doesn't unnecessarily tie the non-HLSL parts to it.
              'FILTER_MAXIMUM_MIN_LINEAR_MAG_POINT_MIP_LINEAR' |
              'FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT' |
              'FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR' |
-             'FILTER_MAXIMUM_ANISOTROPIC'
+             'FILTER_MAXIMUM_ANISOTROPIC' ;
 
-    TEXTURE_ADDRESS : 'TEXTURE_ADDRESS_WRAP' |
+    TEXTURE_ADDRESS = 'TEXTURE_ADDRESS_WRAP' |
                       'TEXTURE_ADDRESS_MIRROR' | 'TEXTURE_ADDRESS_CLAMP' |
-                      'TEXTURE_ADDRESS_BORDER' | 'TEXTURE_ADDRESS_MIRROR_ONCE'
+                      'TEXTURE_ADDRESS_BORDER' | 'TEXTURE_ADDRESS_MIRROR_ONCE' ;
 
-    COMPARISON_FUNC : 'COMPARISON_NEVER' | 'COMPARISON_LESS' |
+    COMPARISON_FUNC = 'COMPARISON_NEVER' | 'COMPARISON_LESS' |
                       'COMPARISON_EQUAL' | 'COMPARISON_LESS_EQUAL' |
                       'COMPARISON_GREATER' | 'COMPARISON_NOT_EQUAL' |
-                      'COMPARISON_GREATER_EQUAL' | 'COMPARISON_ALWAYS'
+                      'COMPARISON_GREATER_EQUAL' | 'COMPARISON_ALWAYS' ;
 
-    STATIC_BORDER_COLOR : 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
+    STATIC_BORDER_COLOR = 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
                           'STATIC_BORDER_COLOR_OPAQUE_BLACK' |
-                          'STATIC_BORDER_COLOR_OPAQUE_WHITE'
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' ;
 ```
 
 ### Root Signature Versioning 
@@ -392,7 +400,7 @@ RootSignature[
  "StaticSampler(s1),"
  "DescriptorTable("
  "  SRV(t0, numDescriptors=unbounded),"
- "  UAV(u5, space=1, numDescriptors=10))"
+ "  UAV(u5, space=1, numDescriptors=10, offset=5))"
 ]
 ```
 
@@ -406,8 +414,8 @@ parsedRootSignature = RootSignature{
     RootCBV(0, 1), // register 0, space 1
     StaticSampler(1, 0), // register 1, space 0
     DescriptorTable({
-      SRV(0, 0, unbounded), // register 0, space 0, unbounded
-      UAV(5, 1, 10) // register 5, space 1, 10 descriptors
+      SRV(0, 0, unbounded, append), // register 0, space 0, unbounded, offset append
+      UAV(5, 1, 10, 5) // register 5, space 1, 10 descriptors, offset 5
     })
   }
 };
@@ -482,8 +490,8 @@ Example for same root signature as above:
 !5 = !{ !"RootCBV", i32 0, i32 1, i32 0, i32 0 } ; register 0, space 1, 0 = visiblity, 0 = flags
 !6 = !{ !"StaticSampler", i32 1, i32 0, ... } ; register 1, space 0, (additional params omitted)
 !7 = !{ !"DescriptorTable", i32 0, !8, !9 } ;  0 = visibility, range list !8, !9
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 } ; register 0, space 0, unbounded, flags 0
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 } ; register 5, space 1, 10 descriptors, flags 0
+!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 -1, i32 4 } ; register 0, space 0, unbounded descriptors, offset append, flags 4
+!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 5, i32 2 } ; register 5, space 1, 10 descriptors, offset 5, flags 2
 ```
 
 See [Metadata Schema](#metadata-schema) for details.
@@ -513,8 +521,8 @@ rootSignature = RootSignature(
   { // parameters
     RootCBV(0, 1),
     DescriptorTable({
-      SRV(0, 0, unbounded, 0),
-      UAV(5, 1, 10, 0)
+      SRV(0, 0, unbounded, append, 0),
+      UAV(5, 1, 10, 5, 0)
     })
   },
   { // static samplers
@@ -581,16 +589,22 @@ The additional semantic rules not already covered by the grammar are listed here
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
 
+- Register Value
+  The value `0xFFFFFFFF` is invalid.
+  `CBV(b4294967295)` will result in an error as it refers past a valid address.
+
 - Register Space
   -The range 0xFFFFFFF0 to 0xFFFFFFFF is reserved.
 
   `CBV(b0, space=4294967295)` is invalid due to the use of reserved space 0xFFFFFFFF.
 
-
 - Resource ranges must not overlap.
 
   `CBV(b2), DescriptorTable(CBV(b0, numDescriptors=5))` will result in an error
   due to overlapping at b2.
+
+  Note that a valid value for `numDescriptors` is `unbounded` and requires
+  overlap analysis.
 
 
 ### Metadata Schema
@@ -702,16 +716,24 @@ Operands:
 ##### Descriptor Ranges
 
 ```LLVM
-!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 0 }
-!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 0 }
+!8 = !{ !"SRV", i32 0, i32 0, i32 -1, i32 -1, i32 4 }
+!9 = !{ !"UAV", i32 5, i32 1, i32 10, i32 5, i32 2 }
 ```
 
 Operands:
 
 * string: type of range - "SRV", "UAV", "CBV" or "Sampler"
 * i32: number of descriptors in the range
+  - number of descriptors can take the value of `-1` to denote an `unbounded`
+  descriptor range during root signature creation. This must denote the end of
+  the table and does not allow the next descriptor range to be appended.
 * i32: base shader register
 * i32: register space
+* i32: offset ([D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND][d3d12_descriptor_range_append])
+  - offset can take the value of `-1` which will be interpreted as
+  `D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND` when the root signature is created.
+  This denotes that this descriptor range will immediately follow the preceding
+  range, or, there is no offset from the table start.
 * i32: descriptor range flags ([D3D12_DESCRIPTOR_RANGE_FLAGS][d3d12_descriptor_range_flags])
 
 #### Static Samplers
@@ -738,6 +760,7 @@ Operands:
 [root_signature_versions_doc]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-version-1-1
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
 [d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
+[d3d12_descriptor_range_append]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_descriptor_range
 [d3d12_root_descriptor_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_descriptor_flags
 [d3d12_descriptor_range_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_descriptor_range_flags
 [d3d12_filter]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_filter
