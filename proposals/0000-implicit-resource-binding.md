@@ -132,7 +132,7 @@ resources:
 struct S {
     RWBuffer<float> B[4]; // s.B.2 gets u3
     RWBuffer<float> C[2]; // s.C.1 gets u1
-    RWBuffer<float> E[2]; // s.E.2 gets u0
+    RWBuffer<float> E[3]; // s.E.2 gets u0
 };                        // s.E.1 gets u4
 
 
@@ -144,7 +144,7 @@ void main() {
   A[0] = s.E[2][0] + s.C[1][0] + s.B[3][0] + s.E[1][0];
 }
 ```
-https://godbolt.org/z/45j8aqTaf
+https://godbolt.org/z/Kano8WeYs
 
 This seems wrong. Resource arrays should be bound to a continuous description
 range and the range should be reflected in the `createHandleFromBinding`
