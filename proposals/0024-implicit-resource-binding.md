@@ -1,4 +1,4 @@
-* Proposal: [NNNN](NNNN-implicit-resource-binding.md)
+* Proposal: [0024](NNNN-implicit-resource-binding.md)
 * Author(s): [Helena Kotas](https://github.com/hekota)
 * Status: **Design In Progress**
 
