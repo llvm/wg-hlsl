@@ -158,7 +158,7 @@ with
 
 ### Copy constructor and assignment operator
 
-The copy constructor and/or the assignemt operator will take care of copying the
+The copy constructor and/or the assignment operator will take care of copying the
 resource handle between resource class instances.
 
 ```c++
@@ -169,10 +169,7 @@ public:
   RWBuffer(RWBuffer &LHS) = default;
 
   // Resources are assignable.
-  RWBuffer &operator=(RWBuffer &LHS) {
-    __handle = LHS.__handle;
-    return *this
-  }
+  RWBuffer &operator=(RWBuffer &LHS) = default;
   ...
 };
 ```
@@ -211,10 +208,7 @@ public:
   RWBuffer(RWBuffer &LHS) = default;
 
   // Resources are assignable.
-  RWBuffer &operator=(RWBuffer &LHS) {
-    __handle = LHS.__handle;
-    return *this
-  }
+  RWBuffer &operator=(RWBuffer &LHS) = default;
   ...
 };
 ```
