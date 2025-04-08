@@ -39,19 +39,19 @@ details._
 
 Specifying resource binding on a resource is not mandatory. If a binding is not
 provided by the user, it is up to the compiler to assign a descriptor to such
-resource. This is called _implicit resource binding_ and it is the focus of this
-document.
+resources. This is called _implicit resource binding_ and it is the focus of
+this document.
 
 ## Current behavior in DXC
 
 This section documents the implicit resource binding assignment in DXC. For
-simplicty the examples below use the just the `u` registers and
-`RWBuffer<float>` resource, but same binding assignment rules apply to other
-register and resource types as well.
+simplicity the examples below use just the `u` registers and `RWBuffer<float>`
+resource, but same binding assignment rules apply to other register and resource
+types as well.
 
 ### Simple Resource Declarations
 
-Resource without binding assignment that are declared directly at the global
+Resources without binding assignment that are declared directly at the global
 scope are processed in the order they appear in the source code. They are
 assigned the first available register slot in `space0`. Unused resources are
 optimized away and do not participate in the implicit binding assignment.
@@ -73,8 +73,9 @@ https://godbolt.org/z/sMs3c8j7T
 If `C` is used then `D` gets assigned descriptor `u3`. 
 
 However, if the resources are declared inside a `struct`, their binding seems be
-assigned in the order they are referenced in the code, and not the order in
-which they were declared:
+assigned in the order they are referenced (used) in the source code, and not the
+order in which they were declared. It is even possible it depends on the order
+in which the IR code is generated when a resource is accessed.
 
 #### Example 1.2
 ```c++
@@ -94,7 +95,7 @@ void main() {
 https://godbolt.org/z/6a1b7Kvz3
 
 The maximum value of the register slot and virtual space number is `UINT_MAX`
-(max. value of 32-unsigned integer).
+(max. value of 32-bit unsigned integer).
 
 ### Constant-size Resource Arrays
 
@@ -153,7 +154,7 @@ changes and is not something that can be relied upon.
 
 Array resources inside structs are also not allowed to use dynamic indexing. In
 the following example DXC reports error when the resource array `B` is accessed
-while the dynamic indexing of `A` with is fine.
+while the dynamic indexing of `A` is fine.
 
 #### Example 2.3
 
@@ -235,10 +236,8 @@ void main() {
 https://godbolt.org/z/cjP35n63d
 
 Since DXC seems to only assign descriptors from `space0`, it reports an error
-whenever there are:
-- two or more unbound resource arrays without explicit binding
-- one unbound resource array with explicit binding in `space0` and one or more
-  unbound resource arrays without explicit binding
+whenever there are two or more unbounded resource arrays in the same register
+space.
 
 #### Example 3.4
 
@@ -278,7 +277,8 @@ https://godbolt.org/z/EeW17MncE
 
 ### Space-only register annotations
 
-DXC support binding annotations that only specify the register space from which the descriptor binding should be assigned.
+DXC supports binding annotations that only specify the register space from which
+the descriptor binding should be assigned.
 
 #### Example 5.1
 
