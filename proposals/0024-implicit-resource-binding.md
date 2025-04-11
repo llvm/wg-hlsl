@@ -137,7 +137,6 @@ struct S {
     RWBuffer<float> E[3]; // s.E.2 gets u0
 };                        // s.E.1 gets u4
 
-
 RWBuffer<float> A : register(u2);
 S s;
 
@@ -148,16 +147,44 @@ void main() {
 ```
 https://godbolt.org/z/Kano8WeYs
 
-This seems wrong. Resource arrays should be bound to a continuous description
+This seems wrong. Resource arrays should be bound to a continuous descriptor
 range and the range should be reflected in the `createHandleFromBinding`
 arguments. It also makes the binding susceptible to change whenever the code
 changes and is not something that can be relied upon. 
+
+Another interesting case is when a resource array inside a struct has explicit
+binding but not all of the array elements are used. DXC seems to pre-assign the
+register slots to the array elements, but does not actually reserve them, which
+seems like a bug. So when a particular array element is not used, its register
+slot can be (implicitly or explicitly) assigned to another resource.
+
+#### Example 2.3
+```c++
+RWBuffer<float> A : register(u0);
+
+struct S {
+  RWBuffer<float> D[3];
+};
+S s1[2] : register(u0); // s1.0.D.1 gets u1
+S s2[2] : register(u1); // s2.0.D.1 gets u5
+RWBuffer<float> B; // gets u2
+
+[numthreads(1,1,1)]
+void main() {
+  A[0] = s1[0].D[1][0] + s2[1].D[1][0] + B[0];
+}
+```
+https://godbolt.org/z/5rf47heTe
+
+This example shows that when if we reserve a continuous descriptor range for
+resource array in structs we might break existing code that uses explicit
+binding and relies on the current behavior.
 
 Array resources inside structs are also not allowed to use dynamic indexing. In
 the following example DXC reports error when the resource array `B` is accessed
 while the dynamic indexing of `A` is fine.
 
-#### Example 2.3
+#### Example 2.4
 
 ```c++
 RWBuffer<float> A[10];
@@ -392,6 +419,11 @@ resource arrays should reflect the range of the array/descriptors, and the full
 range of descriptiors should be reserved, the same was it is reserved for
 resource arrays declared at global scope. DXC currently treats these as
 individual resources (see [Example 2.2](#example-22)).
+
+There is a chance that this break existing user code that relies on the the
+current DXC behavior, even if it uses only explicit binding (see [Example
+2.3](#example-23)). We should re-evaluate the impact of this decision when we
+start working on the support of resources in user-defined structs.
 
 ### In which part of the compiler should the implicit binding happen
 
