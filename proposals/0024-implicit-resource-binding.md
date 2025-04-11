@@ -176,9 +176,9 @@ void main() {
 ```
 https://godbolt.org/z/5rf47heTe
 
-This example shows that when if we reserve a continuous descriptor range for
-resource array in structs we might break existing code that uses explicit
-binding and relies on the current behavior.
+This example shows that if we reserve a continuous descriptor range for resource
+array in structs we might break existing code that uses explicit binding and
+relies on the current behavior.
 
 Array resources inside structs are also not allowed to use dynamic indexing. In
 the following example DXC reports error when the resource array `B` is accessed
@@ -420,7 +420,7 @@ range of descriptiors should be reserved, the same was it is reserved for
 resource arrays declared at global scope. DXC currently treats these as
 individual resources (see [Example 2.2](#example-22)).
 
-There is a chance that this break existing user code that relies on the the
+There is a chance that this breaks existing user code that relies on the
 current DXC behavior, even if it uses only explicit binding (see [Example
 2.3](#example-23)). We should re-evaluate the impact of this decision when we
 start working on the support of resources in user-defined structs.
