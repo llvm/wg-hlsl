@@ -1,7 +1,0 @@
-query($issueIds: [ID!]!) {
-    nodes(ids: $issueIds) {
-        ... on Issue {
-            body
-        }
-    }
-}
