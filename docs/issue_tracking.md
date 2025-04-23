@@ -40,8 +40,7 @@ The main body for a Milestone issue follows this format:
 
 The Workstreams section starts with the heading `## Workstreams` and ends either
 at the end of the body, or at a horizontal rule (`---`). The contents of this
-section is entirely derived from the Workstream issues and is kept up to date
-using the [hlslpm](../tools/hlslpm/README.md) tool.
+section is entirely derived from the Workstream issues.
 
 ## Workstreams
 
