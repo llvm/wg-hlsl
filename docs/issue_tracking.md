@@ -2,63 +2,137 @@
 
 # Issue Tracking
 
-Issues are used to track all aspects of the project, from the roadmap, through
-to milestones and workstreams, to individual tasks / bugs.
+We use github issues to track the scenarios, deliverables, tasks and bugs for
+the HLSL working group.
 
 ## HLSL Support project
 
 The [HLSL Support](https://github.com/orgs/llvm/projects/4) github project
 brings together issues in the [wg-hlsl](https://github.com/llvm/wg-hlsl) and
-[llvm-project](https://github.com/llvm/llvm-project) repos. This project is used
-to manage scheduling work, tracking size and priority estimates as well as
-workstreams and milestones.
+[llvm-project](https://github.com/llvm/llvm-project) repos. Sometimes issues are
+tracked from external repos if they contribute to the overall goals of the HLSL
+working group.
 
-## Project Milestones
+Github projects add custom fields to issues / pull requests that are contained.
+The main fields HLSL Support adds are:
 
-In order to understand progress being made across the entire project, a set of
-Milestones are defined. We track these with issues rather than using github's
-first-class milestone feature since github milestones are set per-repo and we
-want to be able to link issues to milestones across repos.
+### State
 
-A milestone issue can be identified by the HLSL Support project's "Category"
-field being set to "Project Milestone".
+* Not set - newly created issues are in this state and are not being actively
+  managed.
+* Planning - scoping, creating sub-issues. Some amount of review required
+  before this can move to the next state.
+* Ready - planning is complete, but it isn't being worked on.
+* Active - it is being worked on.
+* Closed - issue is closed
 
-The current target date for hitting a milestone is in the "Target" field.
+### Epic
 
-The current list of milestones can be seen on the [Milestones
-view](https://github.com/orgs/llvm/projects/4/views/15). The [Roadmap
-view](https://github.com/orgs/llvm/projects/4/views/12) also provides a
-graphical view of the milestones over time.
+An "Epic" is our name for some large piece of functionality we're working
+towards.  All work items associated with an Epic have this field set.
 
-The main body for a Milestone issue follows this format:
+### Kind
 
-* Preamble - text providing information about the milestone, what the goals are,
-  what the challenges might be, why it is an interesting milestone etc.
-* Workstreams - a list of workstreams, and the workstream milestones that
-  contribute to this one.
-* Postnote - additional text after the workstream list.
+Issues can be:
+* Scenario
+* Deliverable
+* Task
+* Bug
 
-The Workstreams section starts with the heading `## Workstreams` and ends either
-at the end of the body, or at a horizontal rule (`---`). The contents of this
-section is entirely derived from the Workstream issues and is kept up to date
-using the [hlslpm](../tools/hlslpm/README.md) tool.
+Note that we don't use githubs new "Type" field because that isn't necessarily
+consistent across repos.
 
-## Workstreams
+More details on what the different kinds of issues are can be found below.
 
-The work involved in adding HLSL Support has been split into a number of
-workstreams. The [Workstreams
-view](https://github.com/orgs/llvm/projects/4/views/16) shows a list of current
-workstreams.
+### Iteration
 
-A workstream issue can be identified by the "Category" field set to "Workstream".
+The iteration field specifies when we expect an issue to be closed. 
 
-The workstream issue is formatted similarly to a milestone issue:
+### Estimate
 
-* Preamble
-* Milestones
-* Postnote
+This is a rough estimate of how long an issue will take to complete.  Values
+include:
 
-The Milestones section starts with the header `## Milestones`. This section is the authority for what gets aggregated into the milestone issues.
+* Hours, Days, Week, Sprint, Multiple Sprints
+* Break Up - this estimate is set to indicate that we think this issues need to
+  be broken up into smaller chunks
+* Umbrella - this indicates that this issue is actually an "umbrella" one that
+  exists to hold multiple sub-issues that are estimated separately.
+* n/a - it doesn't always make sense to provide an estimate for an issue, in
+  which case we can set it to n/a.
+
+### Blocked
+
+Issues can be blocked for some different reasons:
+
+* PR - waiting for a PR to complete
+* Refinement - waiting for agreement that it is ready to go from Planning to
+  Ready
+* Blocked - waiting for some other dependency before work on this one can
+  continus.
+
+When marking an issue as blocked we try and add a comment on the issue
+explaining why.
+
+
+### Priority
+
+We use the priority field to determine what's most important to work on next.
+
+## Kinds of Issue
+
+### Scenario
+
+A scenario describes a set of things we want to accomplish as part of delivering
+an Epic.  Example scenarios: "Implicit Resource Binding", "Offload Testing
+Framework".
+
+Generally, we timebox **Planning** for a scenario, usually around 1 week, but
+some scenarios may require more planning than others. We track the planning work
+with deliverable and task sub-issues. The main goal of planning is to determine
+the scope of the scenario and the deliverables that make it up.  Once the
+planning deliverable is complete, and has been reviewed, the scenario can move
+to the Ready state.
+
+The scenario becomes **Active** once any of its sub-issues become active.  The
+scenario is **Closed** once all of its sub-issues are closed.
+
+### Deliverable
+
+Deliverables are sub-issues of Scenarios.  These are major chunks of work that
+we expect to complete, usually sequentially, for the scenario.  Example
+deliverables: "Build functional tests", "Design", "Implement".
+
+As with scenarios, we timebox **Planning** for a deliverable and work on scoping
+the deliverable and identifying tasks during this time. Before the deliverable
+can move to the Ready state it needs to be reviewed and all of the task
+sub-issues are also Ready. This means that all of the sub-issues have been
+estimated.
+
+We move a deliverable to **Active** once we start working on one of the tasks.
+At this point we can set the deliverable's iteration based on the estimates of
+those tasks.
+
+Once all the tasks are closed, the deliveable can be closed.
+
+### Task
+
+Tasks are the smallest unit of work we track (although we do allow for umbrella
+tasks with sub-issues if appropriate). We aim to have tasks that can be
+completed in a single iteration.
+
+During task **planning** we work on the scope and plan for the task. If there's
+significant design work then this is likely to have been tracked by another
+task. After the task has been reviewed and an estimate set it can move to Ready.
+
+When a task goes from **ready** to **active**, we set the iteration to when we
+expect to complete it.
+
+### Bug
+
+Bugs are things we don't plan to do, so we don't spent a lot of time estimating
+them. If significant work is involved in fixing it then we'll need to create
+other issues to track that as appropriate.
 
 
 ## Implementation Tasks / Bug Tracking
