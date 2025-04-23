@@ -71,7 +71,7 @@ Issues can be blocked for some different reasons:
 * Blocked - waiting for some other dependency before work on this one can
   continus.
 
-When marking an issue as blocked we try and add a comment on the issue
+When marking an issue as "Blocked" we try and add a comment on the issue
 explaining why.
 
 
