@@ -130,7 +130,7 @@ expect to complete it.
 
 ### Bug
 
-Bugs are things we don't plan to do, so we don't spent a lot of time estimating
+Bugs are things we don't plan to do, so we don't spend a lot of time estimating
 them. If significant work is involved in fixing it then we'll need to create
 other issues to track that as appropriate.
 
