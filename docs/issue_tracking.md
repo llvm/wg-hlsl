@@ -69,7 +69,8 @@ Issues can be blocked for some different reasons:
 * Refinement - waiting for agreement that it is ready to go from Planning to
   Ready
 * Blocked - waiting for some other dependency before work on this one can
-  continus.
+  continue
+* Review - waiting on design review
 
 When marking an issue as "Blocked" we try and add a comment on the issue
 explaining why.
