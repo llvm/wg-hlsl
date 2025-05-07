@@ -145,39 +145,50 @@ it is used.
 
 ### Structured Buffers
 
-The handle for structured buffers will be
+The handle for structured buffers will be:
 
-| HLSL Resource Type                   | Handle Type                          |
-| ------------------------------------ | ------------------------------------ |
-| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, |
-:                                      : false)                               :
-| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true)                                :
-| RasterizerOrderedStructuredBuffer<T> | TODO                                 |
-| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true)                                :
-| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, |
-:                                      : true)                                :
+| HLSL Resource Type                   | Handle Type                           |
+| ------------------------------------ | ------------------------------------- |
+| StructuredBuffer<T>                  | target("spirv.VulkanBuffer", [0 x T], |
+:                                      : StorageBuffer, false)                 :
+| RWStructuredBuffer<T>                | target("spirv.VulkanBuffer", [0 x T], |
+:                                      : StorageBuffer, true)                  :
+| RasterizerOrderedStructuredBuffer<T> | TODO                                  |
+| AppendStructuredBuffer<T>            | target("spirv.VulkanBuffer", [0 x T], |
+:                                      : StorageBuffer, true)                  :
+| ConsumeStructuredBuffer<T>           | target("spirv.VulkanBuffer", [0 x T], |
+:                                      : StorageBuffer, true)                  :
 
 ### Texture buffers
 
 Texture buffers are implemented in SPIR-V as storage buffers. From a SPIR-V
-perspective, this makes it the same as a `StructureBuffer`, and will be
+perspective, this makes it the same as a `StructuredBuffer`, and will be
 represented the same way:
 
-```
-spirv.VulkanBuffer(T, StorageBuffer, false)
+```llvm-ir
+target("spirv.VulkanBuffer", LayoutStruct, StorageBuffer, false)
 ```
 
 ### Constant buffers
 
-In SPIR-V, constant buffers are implemented as uniform buffers. The only
-difference between a uniform buffer and storage buffer is the storage class.
-Uniform buffers use the `Uniform` storage class. The handle type will be:
+Our design for constant buffers is in line with proposal
+[0016 constant buffers](0016-constant-buffers.md) and proposal
+[0034 explicit padding](0034-explicit-padding.md).
 
+The constant buffer will be represented by a `spirv.VulkanBuffer` target type
+where the element type is a struct representing the buffer layout. This layout
+struct uses `spirv.Padding` to ensure all members are at their correct offsets
+according to HLSL packing rules.
+
+The handle type will be:
+
+```llvm-ir
+target("spirv.VulkanBuffer", LayoutStruct, Uniform, false)
 ```
-spirv.VulkanBuffer(T, Uniform, false, false)
-```
+
+`LayoutStruct` is the explicit layout struct created by the
+`HLSLBufferLayoutBuilder`. `Uniform` is the SPIR-V storage class for constant
+buffers. `false` indicates that the buffer is not writable.
 
 ### Samplers
 
