@@ -1,14 +1,8 @@
 # Global symbol visibility
 
-*   Proposal: [NNNN](http://NNNN-filename.md)
-*   Author(s): [Steven Perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
-
-*During the review process, add the following fields as needed:*
-
-*   PRs: [\#NNNN](https://github.com/llvm/llvm-project/pull/NNNN)
-*   Issues: [\#NNNN](https://github.com/llvm/llvm-project/issues/NNNN)
-*   Posts: [LLVM Discourse](https://discourse.llvm.org/)
+* Proposal: [NNNN](http://NNNN-filename.md)
+* Author(s): [Steven Perron](https://github.com/s-perron)
+* Status: **Design In Progress**
 
 ## Introduction
 
@@ -16,29 +10,39 @@ Section 3.6 of the
 [HLSL specification](https://microsoft.github.io/hlsl-specs/specs/hlsl.pdf)
 defined the possible linkages for names. This proposal updates how these
 linkages are represented in LLVM IR. The current implementation presents
-challenges for the SPIR-V backend due to inconsistencies with OpenCL. We propose
+challenges for the SPIR-V backend due to inconsistencies with OpenCL. In HLSL, a
+name can have external linkage and program linkage, among other. If a name has
+external linkage, it is visible outside the translation unit, but not outside a
+linked program.
+A name with program linkage is visible outside a partially linked program.
+We propose
 that names with program linkage in HLSL should have external linkage and default
 visibility in LLVM IR, while names with external linkage in HLSL should have
-external linkage and hidden visibility in LLVM IR.
+external linkage and hidden visibility in LLVM IR. They both have external
+linkage because they are visible outside the translation unit. Default
+visibility means the name is visible outside a shared library (program). Hidden
+visibility means the name is not visible outside the shared library (program).
 
 ## Motivation
 
-Consider the following HLSL snippet:
+The way HLSL linkage is represented in the current clang compiler is
+inconsistent with how OpenCL SPIRV represents equivalent concepts. Consider the
+following HLSL snippet:
 
 ```
-void external_linkage() { … }
-export void program_linkage() { … }
+void external_linkage() {}
+export void program_linkage() {}
 ```
 
 In llvm-ir, these function will be represented as:
 
 ```
-define void @external_linkage()() local_unnamed_addr #0 !dbg !8 {
-  ret void, !dbg !12
+define void @external_linkage()() local_unnamed_addr [#0](#0) {
+  ret void
 }
 
-define void @program_linkage()() local_unnamed_addr #1 !dbg !13 {
-  ret void, !dbg !14
+define void @program_linkage()() local_unnamed_addr [#1](#1) {
+  ret void
 }
 
 attributes #0 = { ... } # no hlsl.export
@@ -58,17 +62,17 @@ the `Export` linkage attribute in the SPIR-V.
 
 To be consistent with OpenCL, we must represent function with program linkage
 the way we currently represent functions with `external_linkage`. Then we can
-represent functions with external linkage as with some other attribute.
+distinguish functions with external linkage with some other attribute.
 
 ## Proposed solution
 
 I propose mapping HLSL concepts found in section 3.6 of the HLSL specification
 as follows:
 
-HLSL concept                        | LLVM-IR concept
-:---------------------------------- | :---------------
-Translation unit                    | Translation unit
-Program (partially or fully linked) | Shared library
+ HLSL concept                        | LLVM-IR concept  
+:------------------------------------|:-----------------
+ Translation unit                    | Translation unit 
+ Program (partially or fully linked) | Shared library   
 
 Then, we can map the HLSL linkages to LLVM IR as follows:
 
@@ -77,7 +81,6 @@ Then, we can map the HLSL linkages to LLVM IR as follows:
 | **Program linkage**:<br> Visible outside the program                                                           | **Linkage type: external**<br> **Visibility style: default**<br> These symbols are potentially visible outside the shared library.                                                                                                                       |
 | **External linkage**:<br> These symbols are visible outside the translation unit, but not outside the program. | **Linkage type: external**<br> **Visibility style: hidden**<br> These symbols are visible outside the translation unit and therefore participate in linking. However, the hidden visibility style means they are not visible outside the shared library. |
 | **Internal linkage**:<br> Visible anywhere in the translation unit, but not outside it.                        | **Linkage type: internal**<br> **Visibility style: default**<br> These symbols are accessible in the current translation unit but will be renamed to avoid collisions during linking. That is, they are not visible outside the translation unit.        |
-
 
 See the LLVM language reference for definitions of the
 [linkage types](https://llvm.org/docs/LangRef.html) and
