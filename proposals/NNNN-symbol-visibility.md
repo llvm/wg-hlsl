@@ -1,8 +1,8 @@
 # Global symbol visibility
 
-*   Proposal: [NNNN](http://NNNN-filename.md)
-*   Author(s): [Steven Perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
+* Proposal: [NNNN](http://NNNN-filename.md)
+* Author(s): [Steven Perron](https://github.com/s-perron)
+* Status: **Design In Progress**
 
 ## Introduction
 
@@ -13,14 +13,15 @@ linkages are represented in LLVM IR. The current implementation presents
 challenges for the SPIR-V backend due to inconsistencies with OpenCL. In HLSL, a
 name can have external linkage and program linkage, among other. If a name has
 external linkage, it is visible outside the translation unit, but not outside a
-linked program. A name with program linkage is visible outside a partially
-linked program. We propose that names with program linkage in HLSL should have
-external linkage and default visibility in LLVM IR, while names with external
-linkage in HLSL should have external linkage and hidden visibility in LLVM IR.
-They both have external linkage because they are visible outside the translation
-unit. Default visibility means the name is visible outside a shared library
-(program). Hidden visibility means the name is not visible outside the shared
-library (program).
+linked program.
+A name with program linkage is visible outside a partially linked program.
+We propose
+that names with program linkage in HLSL should have external linkage and default
+visibility in LLVM IR, while names with external linkage in HLSL should have
+external linkage and hidden visibility in LLVM IR. They both have external
+linkage because they are visible outside the translation unit. Default
+visibility means the name is visible outside a shared library (program). Hidden
+visibility means the name is not visible outside the shared library (program).
 
 ## Motivation
 
@@ -68,33 +69,18 @@ distinguish functions with external linkage with some other attribute.
 I propose mapping HLSL concepts found in section 3.6 of the HLSL specification
 as follows:
 
-HLSL concept                        | LLVM-IR concept
-:---------------------------------- | :---------------
-Translation unit                    | Translation unit
-Program (partially or fully linked) | Shared library
+ HLSL concept                        | LLVM-IR concept  
+:------------------------------------|:-----------------
+ Translation unit                    | Translation unit 
+ Program (partially or fully linked) | Shared library   
 
 Then, we can map the HLSL linkages to LLVM IR as follows:
 
-| HLSL Linkage                      | LLVM-IR representation                   |
-| --------------------------------- | ---------------------------------------- |
-| **Program linkage**:<br> Visible  | **Linkage type: external**<br>           |
-: outside the program               : **Visibility style\: default**<br> These :
-:                                   : symbols are potentially visible outside  :
-:                                   : the shared library.                      :
-| **External linkage**:<br> These   | **Linkage type: external**<br>           |
-: symbols are visible outside the   : **Visibility style\: hidden**<br> These  :
-: translation unit, but not outside : symbols are visible outside the          :
-: the program.                      : translation unit and therefore           :
-:                                   : participate in linking. However, the     :
-:                                   : hidden visibility style means they are   :
-:                                   : not visible outside the shared library.  :
-| **Internal linkage**:<br> Visible | **Linkage type: internal**<br>           |
-: anywhere in the translation unit, : **Visibility style\: default**<br> These :
-: but not outside it.               : symbols are accessible in the current    :
-:                                   : translation unit but will be renamed to  :
-:                                   : avoid collisions during linking. That    :
-:                                   : is, they are not visible outside the     :
-:                                   : translation unit.                        :
+| HLSL Linkage                                                                                                   | LLVM-IR representation                                                                                                                                                                                                                                   |
+|----------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Program linkage**:<br> Visible outside the program                                                           | **Linkage type: external**<br> **Visibility style: default**<br> These symbols are potentially visible outside the shared library.                                                                                                                       |
+| **External linkage**:<br> These symbols are visible outside the translation unit, but not outside the program. | **Linkage type: external**<br> **Visibility style: hidden**<br> These symbols are visible outside the translation unit and therefore participate in linking. However, the hidden visibility style means they are not visible outside the shared library. |
+| **Internal linkage**:<br> Visible anywhere in the translation unit, but not outside it.                        | **Linkage type: internal**<br> **Visibility style: default**<br> These symbols are accessible in the current translation unit but will be renamed to avoid collisions during linking. That is, they are not visible outside the translation unit.        |
 
 See the LLVM language reference for definitions of the
 [linkage types](https://llvm.org/docs/LangRef.html) and
