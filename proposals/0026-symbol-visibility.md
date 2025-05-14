@@ -11,7 +11,7 @@ Section 3.6 of the
 defined the possible linkages for names. This proposal updates how these
 linkages are represented in LLVM IR. The current implementation presents
 challenges for the SPIR-V backend due to inconsistencies with OpenCL. In HLSL, a
-name can have external linkage and program linkage, among other. If a name has
+name can have external linkage and program linkage, among others. If a name has
 external linkage, it is visible outside the translation unit, but not outside a
 linked program.
 A name with program linkage is visible outside a partially linked program.
