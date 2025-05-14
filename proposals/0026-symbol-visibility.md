@@ -1,6 +1,6 @@
 # Global symbol visibility
 
-* Proposal: [NNNN](http://NNNN-filename.md)
+* Proposal: [0026](http://0026-filename.md)
 * Author(s): [Steven Perron](https://github.com/s-perron)
 * Status: **Design In Progress**
 
