@@ -66,7 +66,7 @@ type. For now, the counter variable will not be handled. We will create a target
 type `spirv.VulkanBuffer` to represent a storage or uniform buffer:
 
 ```
-target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable, IsROV)
+target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable)
 ```
 
 `ElementType` is the type for the storage buffer array, and `StorageClass` is
@@ -149,13 +149,13 @@ it is used.
 
 The handle for structured buffers will be
 
-| HLSL Resource Type                   | Handle Type                                        |
-|--------------------------------------|----------------------------------------------------|
-| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, false, false) |
-| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, true, false)  |
-| RasterizerOrderedStructuredBuffer<T> | spirv.VulkanBuffer(T, StorageBuffer, true, true)   |
-| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, true, false)  |
-| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, true, false)  |
+| HLSL Resource Type                   | Handle Type                                 |
+|--------------------------------------|---------------------------------------------|
+| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, false) |
+| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, true)  |
+| RasterizerOrderedStructuredBuffer<T> | TODO                                        |
+| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, true)  |
+| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, true)  |
 
 ### Texture buffers
 
@@ -164,17 +164,28 @@ perspective, this makes it the same as a `StructureBuffer`, and will be
 represented the same way:
 
 ```
-spirv.VulkanBuffer(T, StorageBuffer, false, false)
+spirv.VulkanBuffer(T, StorageBuffer, false)
 ```
 
 ### Constant buffers
 
-In SPIR-V, constant buffers are implemented as uniform buffers. The only
-difference between a uniform buffer and storage buffer is the storage class.
-Uniform buffers use the `Uniform` storage class. The handle type will be:
+Our design for constant buffers will be in line with
+proposal [0016 constant buffers](0016-constant-buffers.md).
+As in that proposal, we will use `spirv.LayoutType` for the struct in the
+buffer. We use the layout type
+because we cannot reorder or add new members to the layout type in allow the
+standard offset calculations for structs to work. That will break the `hlsl.cbs`
+metadata.
+
+TODO: Still unclear how to lay out the members of `T` that are structs.
+
+The `spirv.Layout` will then be wrapped in a `spirv.VulkanBuffer` type to
+represent a uniform buffer:
+
+The handle type will be:
 
 ```
-spirv.VulkanBuffer(T, Uniform, false, false)
+spirv.VulkanBuffer(spirv.LayoutType(T, sizeof(T), Offsets...), Uniform, false)
 ```
 
 ### Samplers
