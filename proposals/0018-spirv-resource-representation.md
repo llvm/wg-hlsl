@@ -173,7 +173,7 @@ Our design for constant buffers will be in line with
 proposal [0016 constant buffers](0016-constant-buffers.md).
 As in that proposal, we will use `spirv.LayoutType` for the struct in the
 buffer. We use the layout type
-because we cannot reorder or add new members to the layout type in allow the
+because we cannot reorder or add new members to the layout type to allow the
 standard offset calculations for structs to work. That will break the `hlsl.cbs`
 metadata.
 
