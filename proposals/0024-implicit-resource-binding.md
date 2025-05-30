@@ -515,7 +515,7 @@ in more detail and report exactly which resources are overlapping and where.
 
 This is the same principle that we use when detecting invalid counter usage for
 structured buffers as described
-[here](D:\wg-hlsl\proposals\0022-resource-instance-analysis.md).
+[here](0022-resource-instance-analysis.md).
 
 While scanning for the `@llvm.dx.resource.handlefrombinding` calls the analysis
 can also take note on whether there are any
