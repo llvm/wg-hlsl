@@ -1,3 +1,5 @@
+# Resource Element Type Validation
+
 * Proposal: [0011](0011-resource-element-type-validation.md)
 * Author(s): [Joshua Batista](https://github.com/bob80905)
 * Sponsor: Joshua Batista

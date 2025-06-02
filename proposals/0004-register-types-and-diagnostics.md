@@ -1,3 +1,5 @@
+# Register Types and Diagnostics
+
 <!-- {% raw %} -->
 * Proposal: [0004](0004-register-types-and-diagnostics.md)
 * Author(s): [Joshua Batista](https://github.com/bob80905)

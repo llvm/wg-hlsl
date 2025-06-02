@@ -1,3 +1,5 @@
+# Implicit Resource Binding
+
 * Proposal: [0024](0024-implicit-resource-binding.md)
 * Author(s): [Helena Kotas](https://github.com/hekota)
 * Status: **Design In Progress**
