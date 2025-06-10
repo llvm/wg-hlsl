@@ -56,18 +56,24 @@ be:
 | `-HLSLVkConstantIdAttr 0x5595791c29c8 <col:3, col:20> 0
 ```
 
-During code generation, this built-in will be replaced with a call to a new LLVM
-intrinsic, `@llvm.spv.get.specialization.constant`, which has the same
-semantics:
+During code generation, this built-in will be replaced with a call to the
+existing SPIR-V builtin, `__spirv_SpecConstant`, which has the same semantics:
 
-...llvm @_ZL11my_constant = internal addrspace(10) global float 0.000000e+00,
-align 4 ... define internal spir_func void @__cxx_global_var_init() #4 { entry:
-%0 = call token @llvm.experimental.convergence.entry() \
-%1 = call reassoc nnan ninf nsz arcp afn spir_func float
-@llvm.spv.get.specialization.constant.f32(i32 0, float 1.000000e+00) store float
-%1, ptr addrspace(10) @_ZL11my_constant, align 4, !tbaa !3 %2 = call ptr
-@llvm.invariant.start.p10(i64 4, ptr addrspace(10) @_ZL11my_constant) ret void }
 ```
+llvm @_ZL11my_constant = internal addrspace(10) global float 0.000000e+00, align 4
+...
+define internal spir_func void @__cxx_global_var_init() #4 {
+entry:
+  %0 = call token @llvm.experimental.convergence.entry()
+  %1 = call reassoc nnan ninf nsz arcp afn float @_Z20__spirv_SpecConstantif(i32 0, float 1.000000e+00)
+  store float %1, ptr addrspace(10) @_ZL11my_constant, align 4, !tbaa !3
+  %2 = call ptr @llvm.invariant.start.p10(i64 4, ptr addrspace(10) @_ZL11my_constant)
+  ret void
+}
+```
+
+Note that the mangled name for `__spirv_SpecConstant` must be used in case there
+a multiple specialization constants with different types.
 
 The SPIR-V backend will lower the LLVM intrinsic to the appropriate
 `OpSpecConstant*` instruction (e.g., OpSpecConstant for scalar floats) along
@@ -92,5 +98,12 @@ intrinsic would require special handling for all uses of such variables, making
 the design error-prone as every LLVM instruction interacting with it would need
 to be aware of its special nature. The intrinsic approach makes the source of
 the value explicit.
+
+### Using the SPIR-V builtin during SEMA
+
+We considered add a call to the SPIR-V builtin recognized by the backend
+directly during SEMA. This was considered less desirable incase there is a
+future backend that want to implement the feature, but not have to use the same
+builtin. The design we used places the specific code went in CodeGen.
 
 <!-- {% endraw %} -->
