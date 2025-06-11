@@ -20,7 +20,7 @@ SPIR-V has a feature called
 that allows shader code to have constants that are set by the driver. This
 feature is exposed in HLSL via the `vk::constant_id` attribute.
 
-## Motivationus
+## Motivations
 
 This feature is commonly used in Vulkan to avoid creating multiple versions of
 the same shader for each value of the constant. It was implemented in DXC, so we
@@ -65,7 +65,7 @@ llvm @_ZL11my_constant = internal addrspace(10) global float 0.000000e+00, align
 define internal spir_func void @__cxx_global_var_init() #4 {
 entry:
   %0 = call token @llvm.experimental.convergence.entry()
-  %1 = call reassoc nnan ninf nsz arcp afn float @_Z20__spirv_SpecConstantif(i32 0, float 1.000000e+00)
+  %1 = call float @_Z20__spirv_SpecConstantif(i32 0, float 1.000000e+00)
   store float %1, ptr addrspace(10) @_ZL11my_constant, align 4, !tbaa !3
   %2 = call ptr @llvm.invariant.start.p10(i64 4, ptr addrspace(10) @_ZL11my_constant)
   ret void
