@@ -34,7 +34,7 @@ but same rules apply to other resource types as well.
 
 #### Fixed-size One-dimensional Array
 
-A group of resources can be declared as one-dimensional array of fixed size:
+A group of resources can be declared as a one-dimensional array of fixed size:
 
 ```
 RWBuffer<float> A[4] : register(u10);
@@ -79,7 +79,7 @@ single dimension.
 That means the array `B[4][4]` is treated as if it was declared as `B[16]`, and
 `C[2][2][5]` as if it was `C[20]`.
 
-For example a call to initialize `C[1][0][3][0]` from the array declared above
+For example, a call to initialize `C[1][0][3][0]` from the array declared above
 would have lower bound value `10`, upper bound `29`, space `1`, and array index
 `23` = `10 + 1*2*5 + 0*5 + 3`:
 ```
@@ -106,23 +106,24 @@ https://godbolt.org/z/hx99s5dzP
 
 #### Unbounded-size Arrays and Multiple Dimensions
 
-For multi-dimensional arrays of resources only the first dimension can be
+For multi-dimensional arrays of resources, only the first dimension can be
 unbounded:
 ```
 RWBuffer<float> E[][4] : register(u5);
 ```
 When initializing individual resources of an unbounded multi-dimensional array,
-the arguments of `@dx.op.createHandleFromBinding` again look like as if the
+the arguments of `@dx.op.createHandleFromBinding` again look as if the
 array was flattened to a single dimension. For example the call to create
-resource handle `E[100][4]` from array `E` declared above will have index `409`
-= `5 + 4 x 100 + 4`:
+resource handle `E[100][3]` from array `E` declared above will have index `408`
+= `5 + 4 x 100 + 3`:
 ```
-call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 5, i32 -1, i32 0, i8 1 }, i32 409, i1 false),
+call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 5, i32 -1, i32 0, i8 1 }, i32 408, i1 false),
 ```
 https://godbolt.org/z/YrEnYhrEj
 
-Arrays with unbounded sizes in the other dimensions are not allowed, though the
-error message DXC reports does not clearly indicate this:
+Arrays with unbounded sizes in the other dimensions are not allowed. The error
+message DXC reports does not clearly indicate this, though it matches the
+diagnostic message produced by Clang for similar case in C++.
 
 ```
 RWBuffer<float> F[4][];
@@ -135,11 +136,13 @@ https://godbolt.org/z/osq7dzvdh
 
 #### Local Resource Arrays with Fixed Size
 
-Resources array with fixed size can be declared as local variables in a function.
-Resource handles for the individual resources in the array are uninitialized
-until they are assigned a value from an initialized resource. DXC does not
-report error when an uninitialized resource is accessed and instead creates a
-call to `dx.op.annotateHandle` with zero-initialized handle value.
+Resources array with fixed size can be declared as local variables in a
+function. Resource handles for the individual resources in the array are
+uninitialized until they are assigned a value from an initialized resource. DXC
+does not report an error when an uninitialized resource is accessed and instead
+creates a call to `dx.op.annotateHandle` with zero-initialized handle value (bug
+filed:
+[microsoft/DirectXShaderCompiler#4415](https://github.com/microsoft/DirectXShaderCompiler/issues/4415)).
 
 ```
 RWBuffer<float> Buf;
@@ -161,13 +164,13 @@ https://godbolt.org/z/Gdc3q674W
 
 #### Unbounded Local Resource Arrays
 
-DXC even allows unbounded resource arrays as local variables in a function. This
-seems wrong from a language point of view. How is the compiler supposed to
-allocate such variable? 
+DXC even allows unbounded resource arrays as local variables in a function. From
+a language point of view, this seems very wrong. How is the compiler supposed to
+allocate such variable? The fact that DXC allows this should be considered a bug.
 
-And as in the previous example, DXC does not report error when an uninitialized
-resource in an unbounded array is accessed and instead creates a call to
-`dx.op.annotateHandle` with zero-initialized handle value.
+Additionally, and as in the previous example, DXC does not report an error when an
+uninitialized resource in an unbounded array is accessed and instead creates a
+call to `dx.op.annotateHandle` with zero-initialized handle value.
 
 ```
 RWBuffer<float> Buf;
@@ -190,8 +193,10 @@ https://godbolt.org/z/43rGnY4Ee
 #### Resource Arrays as Function Arguments
 
 Both fixed-size and unbounded resource arrays can be used as function arguments.
-The dimensions of array passed into a function must match exactly the dimension
-of the declared argument
+For fixed-size arrays, the dimensions of the array passed into a function must
+exactly match the dimensions of the declared argument. For unbounded arrays this
+restriction does not exist; a fixed-size array can be used as an argument of a
+function that accepts an unbounded array.
 
 ```
 RWBuffer<float> K[3] : register(u0);
@@ -200,21 +205,24 @@ RWBuffer<float> M[] : register(u0, space1);
 RWBuffer<float> Out;
 
 float foo(RWBuffer<float> LK[3], RWBuffer<float> LL[2][2],
-          RWBuffer<float> LM[]) {
-  return LK[2][0] + LL[1][1][0] + LM[100][0];
+          RWBuffer<float> LM1[], RWBuffer<float> LM2[]) {
+  return LK[2][0] + LL[1][1][0] + LM1[100][0] + LM2[100][0];
 }
 
 [numthreads(4,1,1)]
 void main() {
-  Out[0] = foo(K, L, M);
+  Out[0] = foo(K, L, M, K);
 }
 ```
 https://godbolt.org/z/W8fx7MnWK
 
+Note that array `K` of size `3` is passed into function `foo` via an unbounded
+array argument and it is indexed beyond its size.
+
 #### Subsets of Multi-Dimensional Arrays
  
 Multi-dimensional array can be indexed to refer to a lower-dimensional subset of
-the array. For example for `RWBuffer<float> N[10][5];` the expression `N[7]`
+the array. For example, for `RWBuffer<float> N[10][5];` the expression `N[7]`
 refers to a sub-array in `N` of size `5`.
 
 ```
@@ -234,17 +242,94 @@ void main() {
 https://godbolt.org/z/5cG8xWWa6
 
 Note that while the function argument `RWBuffer<float> P[5]` is a local array of
-size `5`, it actually refers to a subset of a larger multi-dimensional array `N`.
-The handle initialization call for resources in `P` must contain information
-about the original array's range.
+size `5`, it actually refers to a subset of a larger multi-dimensional array
+`N`. The handle initialization call for resources in `P` must contain
+information about the original array's range.
 
-For example the handle initialization for resource that is referenced by `P[3]`
-will have lower bound `0`, upper bound `49`, and index `38 = 0 + 7*5 + 3`: 
+For example, the handle initialization for the resource that is referenced by `P[3]`
+will have lower bound `0`, upper bound `49`, and index `38 = 0 + 7*5 + 3`:
 
 ```
 call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 0, i32 49, i32 0, i8 1 }, i32 38, i1 false)
 ```
 https://godbolt.org/z/YejsdsTKc
+
+At the same time, `P` is a local variable and as such it is editable. It gets
+initialized by copy-in array semantics to refer to resource handles from the
+original larger array `N`, but its individual array elements can be overridden,
+and that must not affect the global array `N` or the resources it contains in
+any way.
+
+This is an area where DXC has lots of bugs because it does not adhere to copy-in
+semantics for resource arrays. For example, in the following case the shader
+should write `1` to `Y` and `2` to `X`, but instead both writes go to `Y`, so
+the end result is that `X` is unused and is optimized away.
+
+```
+RWBuffer<int> X : register(u0);
+RWBuffer<int> Y : register(u1);
+
+void SomeFn(RWBuffer<int> Arr[2], uint Idx, int Val0) {
+  Arr[0] = Y;
+  Arr[0][Idx] = Val0;
+}
+
+[numthreads(4,1,1)]
+void main(uint GI : SV_GroupIndex) {
+  RWBuffer<int> Arr[2] = {X, Y};
+  SomeFn(Arr, GI, 1);
+  Arr[0][GI] = 2;
+}
+```
+https://godbolt.org/z/YxM5M6zqo
+
+#### Resource Arrays in User-defined Structs
+
+Resources and resource arrays can also be included in user-defined structs which
+can be declared at local or global scope. While this feature will covered by a
+separate proposal (issues [#175](https://github.com/llvm/wg-hlsl/issues/175) and
+[#212](https://github.com/llvm/wg-hlsl/issues/212)), one example is included
+here for completeness:
+
+```
+struct S {
+  int a;
+  RWBuffer<float> P[5];
+};
+
+S s : register(u10);
+
+cbuffer CB {
+    S s_array[4];
+};
+
+RWBuffer<float> Out;
+
+[numthreads(4,1,1)]
+void main() {
+  Out[0] = s.P[2][0] + s_array[1].P[4][0];
+}
+```
+https://godbolt.org/z/Y8h3cWMov
+
+In DXC, when a user-defined struct contains an array of resources, each element
+of the array is treated as individual standalone resource instance. For `s.P[2]`
+in the example above the compiler creates a resource named `s.P.2` mapped to
+register `u12` with range `1`. Its handle initialization does not reflect that
+it is part of a larger array - the upper bound, lower bound and index values are
+all the same (`12`):
+
+```
+ call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 12, i32 12, i32 0, i8 1 }, i32 12, i1 false)
+ ```
+
+Similarly for `s_array[1].P[4]` the compiler creates a resource named
+`s_array.1.P.4` with size `1` and implicitly maps it to register `u1`. Handle
+initialization again does not include range `5` of the original array:
+
+```
+call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 1, i32 1, i32 0, i8 1 }, i32 1, i1 false)
+```
 
 ## Proposed solution
 
