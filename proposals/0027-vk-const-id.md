@@ -2,11 +2,9 @@
 
 # SPIR-V Specialization Constants
 
-*   Proposal: [NNNN](NNNN-vk-const-id.md)
+*   Proposal: [0027](0027-vk-const-id.md)
 *   Author(s): [Steven Perron](https://github.com/s-perron)
 *   Status: **Design In Progress**
-
-*During the review process, add the following fields as needed:*
 
 *   PRs:
 
