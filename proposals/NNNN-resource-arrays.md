@@ -25,7 +25,7 @@ user-defined structs will be covered in a separate proposal
 Resource arrays are fundamental part of the HLSL language. We need to support
 them in Clang.
 
-## Current behavior in DXC
+## Current Behavior in DXC
 
 For simplicity the examples below use just the `RWBuffer<float>` resource type,
 but same rules apply to other resource types as well.
@@ -254,16 +254,18 @@ call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind 
 ```
 https://godbolt.org/z/YejsdsTKc
 
-At the same time, `P` is a local variable and as such it is editable. It gets
-initialized by copy-in array semantics to refer to resource handles from the
+At the same time, `P` is a local variable and as such it is editable. It should
+be initialized by copy-in array semantics to refer to resource handles from the
 original larger array `N`, but its individual array elements can be overridden,
 and that must not affect the global array `N` or the resources it contains in
 any way.
 
-This is an area where DXC has lots of bugs because it does not adhere to copy-in
-semantics for resource arrays. For example, in the following case the shader
-should write `1` to `Y` and `2` to `X`, but instead both writes go to `Y`, so
-the end result is that `X` is unused and is optimized away.
+#### Example where DXC Does Not Handle Local Arrays Correctly
+
+Handling of local arrays in DXC is notoriously buggy. For example, in the
+following case the shader should write `1` to `Y` and `2` to `X`, but instead
+both writes go to `Y`, so the end result is that `X` is unused and is optimized
+away.
 
 ```
 RWBuffer<int> X : register(u0);
@@ -282,6 +284,17 @@ void main(uint GI : SV_GroupIndex) {
 }
 ```
 https://godbolt.org/z/YxM5M6zqo
+
+A brief inspection of the DXC code generation and optimization pipeline shows
+that DXC allows Clang to handle resource arrays as if they were regular arrays
+of objects until after the LLVM optimization phase. Once all functions have been
+inlined in the generated code, DXC locates all references to resource arrays and
+replaces them with calls to initialize the resource handle.
+
+This process quickly becomes complex because local arrays are moved using
+`memcpy`, and since they are editable, correctly resolving all resource array
+accesses is not always straightforward. Given this, the incorrect behavior in
+the above example is not surprising.
 
 #### Resource Arrays in User-defined Structs
 
