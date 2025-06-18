@@ -569,7 +569,7 @@ The additional semantic rules not already covered by the grammar are listed here
     - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV
-  - For version 1.0, only the value DATA_VOLATILE is valid.
+  - For version 1.0, only the value DATA_VOLATILE | DESCRIPTORS_VOLATILE is valid.
   - For version 1.1, the following values are valid:  
     - 0
     - DESCRIPTORS_VOLATILE
@@ -803,7 +803,7 @@ Operands:
   - DataStatic
 
 - Valid values for DescriptorRangeFlags on CBV/SRV/UAV
-  - For root signature version 1.0 must be DESCRIPTORS_VOLATILE.
+  - For root signature version 1.0 must be DATA_VOLATILE | DESCRIPTORS_VOLATILE.
   - For root signature version 1.1:
     - 0
     - DESCRIPTORS_VOLATILE
@@ -818,7 +818,7 @@ Operands:
     - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS | DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 - Valid values for DescriptorRangeFlags on Sampler
-  - For root signature version 1.0 must be 0.
+  - For root signature version 1.0 must be DESCRIPTORS_VOLATILE.
   - For root signature version 1.1:
     - 0
     - DESCRIPTORS_VOLATILE
