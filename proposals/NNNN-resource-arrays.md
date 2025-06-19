@@ -214,7 +214,7 @@ void main() {
   Out[0] = foo(K, L, M, K);
 }
 ```
-https://godbolt.org/z/W8fx7MnWK
+https://godbolt.org/z/6Eh3fnME9
 
 Note that array `K` of size `3` is passed into function `foo` via an unbounded
 array argument and it is indexed beyond its size.
