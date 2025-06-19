@@ -11,7 +11,8 @@
 *   PRs: [#114273](https://github.com/llvm/llvm-project/pull/114273),
     [#111052](https://github.com/llvm/llvm-project/pull/111052),
     [#111564](https://github.com/llvm/llvm-project/pull/111564),
-    [#115178](https://github.com/llvm/llvm-project/pull/115178)
+    [#115178](https://github.com/llvm/llvm-project/pull/115178),
+    [#144774](https://github.com/llvm/llvm-project/pull/144774)
 
 ## Introduction
 
@@ -66,7 +67,7 @@ type. For now, the counter variable will not be handled. We will create a target
 type `spirv.VulkanBuffer` to represent a storage or uniform buffer:
 
 ```
-target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable, IsROV)
+target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable)
 ```
 
 `ElementType` is the type for the storage buffer array, and `StorageClass` is
@@ -115,13 +116,18 @@ image type matching the resource type:
 
 ```llvm-ir
 target("spirv.Image", ...)
+target("spirv.SignedImage", ...)
 ```
 
-The details of the `spirv.Image` type depend on the specific declaration. Except
-for the image format, the value for each operand is given in the
+The details of the `spirv.*Image` type depend on the specific declaration.
+Except for the image format, the value for each operand is given in the
 [Mapping Resource Attributes to DXIL and SPIR-V](https://github.com/llvm/wg-hlsl/blob/main/proposals/0015-resource-attributes-in-dxil-and-spirv.md)
 proposal. For all resource types other than `RWBuffer<T>` and `RWTexture*<T>`,
 the image format will be `Unknown`.
+
+Note that if `T` is a signed integer type, the the `spirv.SignedImage` type will
+be used. Otherwise `spirv.Image` will be used. This allows the backend to
+generate sampling operation that do a sign extend when necessary.
 
 For `RWBuffer<T>` and `RWTexture*<T>` resource types, if the Vulkan version is
 1.3 or later, the image format will be `Unknown`. This satisfies
@@ -149,13 +155,13 @@ it is used.
 
 The handle for structured buffers will be
 
-| HLSL Resource Type                   | Handle Type                                        |
-|--------------------------------------|----------------------------------------------------|
-| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, false, false) |
-| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, true, false)  |
-| RasterizerOrderedStructuredBuffer<T> | spirv.VulkanBuffer(T, StorageBuffer, true, true)   |
-| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, true, false)  |
-| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, true, false)  |
+| HLSL Resource Type                   | Handle Type                                 |
+|--------------------------------------|---------------------------------------------|
+| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, false) |
+| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, true)  |
+| RasterizerOrderedStructuredBuffer<T> | TODO                                        |
+| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, true)  |
+| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, true)  |
 
 ### Texture buffers
 
@@ -164,7 +170,7 @@ perspective, this makes it the same as a `StructureBuffer`, and will be
 represented the same way:
 
 ```
-spirv.VulkanBuffer(T, StorageBuffer, false, false)
+spirv.VulkanBuffer(T, StorageBuffer, false)
 ```
 
 ### Constant buffers
@@ -203,11 +209,11 @@ Note that if
 [untyped pointers](https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_untyped_pointers.html)
 are available, this will map naturally to untyped pointers.
 
-| HLSL Resource Type                 | Handle Type                                           |
-|------------------------------------|-------------------------------------------------------|
-| ByteAddressBuffer                  | spirv.VulkanBuffer(void, StorageBuffer, false, false) |
-| RWByteAddressBuffer                | spirv.VulkanBuffer(void, StorageBuffer, true, false)  |
-| RasterizerOrderedByteAddressBuffer | spirv.VulkanBuffer(void, StorageBuffer, true, true)   |
+| HLSL Resource Type                 | Handle Type                                    |
+|------------------------------------|------------------------------------------------|
+| ByteAddressBuffer                  | spirv.VulkanBuffer(void, StorageBuffer, false) |
+| RWByteAddressBuffer                | spirv.VulkanBuffer(void, StorageBuffer, true)  |
+| RasterizerOrderedByteAddressBuffer | TODO                                           |
 
 ### Feedback textures
 
@@ -269,8 +275,8 @@ void main() {
 2. Do we need `vk::image_format` for Vulkan 1.3 and later?
 
 We need to determine whether we can deprecate the use of `vk::image_format` for
-Vulkan 1.3 and later. We could potentially use unknown for all resource types. 
-We need to assess if there is any advantage to specifying a particular format. 
+Vulkan 1.3 and later. We could potentially use unknown for all resource types.
+We need to assess if there is any advantage to specifying a particular format.
 If no advantage exists, then we should not attempt to support specific formats.
 
 3. Determine how to add the appropriate decorations for matrices.
