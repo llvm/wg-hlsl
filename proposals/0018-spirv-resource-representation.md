@@ -72,7 +72,7 @@ target("spirv.VulkanBuffer", ElementType, StorageClass, IsWriteable)
 
 `ElementType` is the type for the storage buffer array, and `StorageClass` is
 the storage class for the array. `IsWriteable` is true if the resource can be
-written to, and `IsROV` is true if it is a rasterizer order view.
+written to.
 
 In the SPIR-V backend, there will be a legalization pass that will lower the
 `spirv.VulkanBuffer` type to code closer to the SPIR-V to be generated:
@@ -155,13 +155,17 @@ it is used.
 
 The handle for structured buffers will be
 
-| HLSL Resource Type                   | Handle Type                                 |
-|--------------------------------------|---------------------------------------------|
-| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, false) |
-| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, true)  |
-| RasterizerOrderedStructuredBuffer<T> | TODO                                        |
-| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, true)  |
-| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, true)  |
+| HLSL Resource Type                   | Handle Type                          |
+| ------------------------------------ | ------------------------------------ |
+| StructuredBuffer<T>                  | spirv.VulkanBuffer(T, StorageBuffer, |
+:                                      : false)                               :
+| RWStructuredBuffer<T>                | spirv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true)                                :
+| RasterizerOrderedStructuredBuffer<T> | TODO                                 |
+| AppendStructuredBuffer<T>            | spirv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true)                                :
+| ConsumeStructuredBuffer<T>           | spirv.VulkanBuffer(T, StorageBuffer, |
+:                                      : true)                                :
 
 ### Texture buffers
 
@@ -209,11 +213,13 @@ Note that if
 [untyped pointers](https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_untyped_pointers.html)
 are available, this will map naturally to untyped pointers.
 
-| HLSL Resource Type                 | Handle Type                                    |
-|------------------------------------|------------------------------------------------|
-| ByteAddressBuffer                  | spirv.VulkanBuffer(void, StorageBuffer, false) |
-| RWByteAddressBuffer                | spirv.VulkanBuffer(void, StorageBuffer, true)  |
-| RasterizerOrderedByteAddressBuffer | TODO                                           |
+| HLSL Resource Type                 | Handle Type                             |
+| ---------------------------------- | --------------------------------------- |
+| ByteAddressBuffer                  | spirv.VulkanBuffer(void, StorageBuffer, |
+:                                    : false)                                  :
+| RWByteAddressBuffer                | spirv.VulkanBuffer(void, StorageBuffer, |
+:                                    : true)                                   :
+| RasterizerOrderedByteAddressBuffer | TODO                                    |
 
 ### Feedback textures
 
@@ -272,14 +278,14 @@ void main() {
   c = b; // It must also match the type for b.
 ```
 
-2. Do we need `vk::image_format` for Vulkan 1.3 and later?
+1.  Do we need `vk::image_format` for Vulkan 1.3 and later?
 
 We need to determine whether we can deprecate the use of `vk::image_format` for
 Vulkan 1.3 and later. We could potentially use unknown for all resource types.
 We need to assess if there is any advantage to specifying a particular format.
 If no advantage exists, then we should not attempt to support specific formats.
 
-3. Determine how to add the appropriate decorations for matrices.
+1.  Determine how to add the appropriate decorations for matrices.
 
 If a matrix is part of a storage buffer, it must have an explicit layout with
 MatrixStride and either RowMajor or ColMajor decorations. Because matrices are
