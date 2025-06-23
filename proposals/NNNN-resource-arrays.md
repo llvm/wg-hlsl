@@ -348,330 +348,141 @@ call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind 
 
 To avoid issues described
 [above](#example-where-dxc-does-not-handle-local-arrays-correctly), we should
-aim to resolve initialization of resource array handles early in Clang. One
-approach is to encapsulate resource arrays in a class that handles the
-initialization of individual resource handles when they are accessed.
-
-The class could be named `BoundResourceRange` to emphasize that it represents a
-set of resources mapped/bound to a descriptor range, rather than a traditional
-array.
-
-The `BoundResourceRange` class would be a built-in template defined in
-`HLSLExternalSemaSource`, taking two parameters: the resource type and the
-number of elements in the array. In Sema, all global-scope variable declarations
-that define a resource array would have their type replaced with the
-corresponding `BoundResourceRange` specialization.
-
-For example:
-
-```
-RWBuffer<float> A[10] : register(u1);
-```
-
-would be equivalent to
-
-```
-BoundResourceRange<RWBuffer<float, 10>> A : register(u1);
-```
-
-Only resource classes or other `BoundResourceRange` types could be used as the
-type parameter for the `BoundResourceRange` template. This restriction would be
-enforced using a template concept.
-
-Nested `BoundResourceRange` types will represent multi-dimensional resource
-arrays.
-
-For example:
-
-```
-RWBuffer<float> B[10][5] : register(u0, space1);
-```
-
-would be represented by
-
-```
-BoundResourceRange<BoundResourceRange<RWBuffer<float, 5>, 10> B : register(u0, space1);
-```
-
-The class would provide a subscript operator (`[]`) that returns an initialized
-instance of a resource class from the resource range. For multi-dimensional
-arrays, the operator would return a `BoundResourceRange` representing the
-lower-dimensional resource array.
-
-Passing a `BoundResourceRange` instance to a function that expects a fixed-size
-resource array would create a local copy of the array, per HLSL copy-in array
-semantics. Each element of the local array would be initialized using the
-resource class instance returned by the `BoundResourceRange` subscript operator
-(`[]`).
-
-Resource arrays of unknown size, also known as _unbounded arrays_, would be
-represented by the `BoundResourceRange` type with a `Size` template argument of
-`-1`. Local declarations of unbounded resource arrays will not be allowed.
-
-It is still under consideration whether unbounded resource arrays should be
-supported as function arguments. If supported, these could be passed as
-`BoundResourceRange` instances marked as `constant inout`.
-
-## Detailed design
-
-### BoundResourceRange Class Declaration
-
-The `BoundResourceRange` template class will be defined in
-`HLSLExternalSemaSource` and will take two template parameters:
-- `ResourceT` - the type of resource classes in the array, or another `BoundResourceRange`
-- `Size` - number of elements in the array
-
-```
-template <typename ResourceT, int Size>
-requires ...
-class BoundResourceRange {
-...
-};
-```
-
-For fixed-size resource arrays, the `Size` parameter will always be greater than
-`0`. For unbounded resource arrays, `Size` will be set to `-1`.
-
-`ResourceT` can be a resource class, such as `RWBuffer<int>` or `Texture`. For
-multi-dimensional arrays, `ResourceT` will be `BoundResourceRange` representing
-the lower-dimensional resource array.
-
-These constrains will be enforced by a template concept that is described in
-more detail [here](#concept-restricting-the-template-type-argument).
-
-### BoundResourceRange Constructors
-
-The `BoundResourceRange` class will have 2 constructors: one for explicitly
-bound resource ranges and another for implicit binding. Both constructors will
-have signatures matching those of the resource classes.
-
-The `BoundResourceRange` will store binding information for the resource range
-in its member fields. This information will be used when accessing individual
-resources, i.e. when individual resource classes are initialized and returned
-from the subscript operator.
-
-Although it may seem that the class needs to store a lot of information to
-capture the resource bindings, all of this data is constant and should get
-inlined and resolved by the compiler. No `BoundResourceRange` instances should
-exist in the final module. All of this infrastructure should be optimized away,
-leaving only the appropriate `llvm.dx.resource.handlefrombinding` and
-`llvm.dx.resource.handlefromimplicitbinding` calls with the right values.
-
-```
-template <typename ResourceT, unsigned Size>
-class BoundResourceRange {
-private:
-    bool hasImplicitBinding;
-    unsigned registerNo; // explicit binding register
-    unsigned spaceNo;
-    int range;
-    unsigned startIndex;
-    unsigned implicitBindingOrderID; //  order_id used for implicit binding
-    const char *name; // name of the resource array
-
-public:
-    // constructor for explicit binding
-    BoundResourceRange(unsigned registerNo, unsigned spaceNo, int range,
-                  unsigned startIndex, const char *name)
-                : hasImplicitBinding(false), registerNo(registerNo),
-                spaceNo(spaceNo), range(range), startIndex(startIndex),
-                implicitBindingOrderID(unsigned(-1)), name(name) {}
-
-    // constructor for implicit binding
-    BoundResourceRange(unsigned spaceNo, int range, unsigned startIndex,
-                  unsigned orderId, const char *name)
-                : hasImplicitBinding(true), registerNo((unsigned)-1),
-                spaceNo(spaceNo), range(range), startIndex(startIndex),
-                implicitBindingOrderID(orderId), name(name) {}
-...
-};
-```
-
-The `startIndex` argument indicates which part the resource range the class
-represents. For a `BoundResourceRange` class representing full one-dimensional
-resource array, this will be `0`. For `BoundResourceRange` instances
-representing lower-dimensional subsets of multi-dimensional arrays, `startIndex`
-specifies where the subset begins within the original range.
-
-This is important because initializing resource handles from a multi-dimensional
-array requires knowledge of the original range size, while a specific
-`BoundResourceRange` may only represent a subset starting at `startIndex` with a
-length determined by `Size`. The following section explains how `startIndex` is
-used in resource index calculations.
-
-### Subscript Operator
-
-The `BoundResourceRange` class will provide a subscript operator (`[]`). For
-one-dimensional arrays, it will return an initialized instance of a resource
-class from the range. For multi-dimensional arrays, the operator will return a
-`BoundResourceRange` representing the lower-dimensional resource array.
-
-```
-template <typename ResourceT, unsigned Size>
-class BoundResourceRange {
-  ...
-  ResourceT operator[](unsigned index) {
-    unsigned rangeIndex = startIndex + index * ResourceT::GetRequiredBindingSize();
-    if (hasImplicitBinding)
-      return ResourceT(spaceNo, range, rangeIndex, implicitBindingOrderID, name);
-    else
-      return ResourceT(registerNo, spaceNo, range, rangeIndex, name);
-  }
-  ...
-};
-```
-
-The subscript operator will use a static method `GetRequiredBindingSize`
-(described below) to determine the binding size required for each array element.
-
-Because the constructor signature of `BoundResourceRange` matches that of the
-resource classes, implementing the subscript operator is greatly simplified.
-
-### GetRequiredBindingSize Method
-
-To correctly compute the range index, the subscript operator must know how many
-register slots each element of the array requires. For a `BoundResourceRange`
-representing a one-dimensional resource array, this is straightforward — each
-resource uses exactly one register slot.
-
-However, for multi-dimensional arrays, the number of required slots per element
-can vary as the array element can be another array. To address this, all
-resource classes and the `BoundResourceRange` class will implement a static
-`GetRequiredBindingSize()` method which returns the number of register slots
-needed for each array element.
-
-```
-template <typename ResourceT, unsigned Size>
-class BoundResourceRange {
-  ...
-  static unsigned GetRequiredBindingSize() {
-    if (Size == -1)
-      return -1;
-    return Size * ResourceT::GetRequiredBindingSize();
-  }
-  ...
-};
-
-template <typename element_type>
-class RWBuffer {
-  ...
-  static unsigned GetRequiredBindingSize() { return 1; }
-  ...
-};
-```
-
-### Converting to Local Array
-
-Passing a `BoundResourceRange` instance to a function that expects a fixed-size
-resource array will create a local copy of the array. Each element of the local
-array will be initialized using the resource class instance returned by the
-`BoundResourceRange` subscript operator (`[]`). This applies to
-multi-dimensional arrays as well, they must be fully copied into the local array
-instance.
-
-Originally, it seemed this could be achieved using a conversion operator, such as:
-
-```
-template <typename ResourceT, unsigned Size>
-class BoundResourceRange {
-  ...
-  typedef ResourceT ResourceTArray[Size];
-  operator ResourceTArray() {
-    ResourceT tmp[Size];
-    [unroll]
-    for (unsigned i = 0; i < Size, i++)
-      tmp[i] = (*this)[i];
-    return tmp;
-  }
-  ...
-};
-```
-
-However, this approach does not work for multi-dimensional arrays, since
-`BoundResourceRange` instances representing lower-dimensional array subsets must
-also be converted to local arrays.
-
-It appears that converting `BoundResourceRange` instances to local arrays would
-need to be handled in Clang code generation.
-
-### Concepts Restricting the BoundResourceRange Template Parameters
-
-The value of the `Size` template parameter of `BoundResourceRange` must be
-greater than `0`, or equal to `-1`. This requirement will be enforced by the
-following concept:
-```
-template<int N>
-concept ValidBoundResourceRangeSize = (N > 0 || N == -1);
-```
-
-The `ResourceT` type parameter must have a static `GetRequiredBindingSize`
-method that returns `int`. The following concept will be used to enforce this
-requirement:
-
-```
-template<typename T>
-concept HasGetRequiredBindingSize =
-requires {
-    { T::GetRequiredBindingSize() } -> std::same_as<int>;
-};
-```
-
-Additionally, the `ResourceT` type parameter must be an intangible type:
-
-```
-template<typename ResourceT>
-concept IsHLSLIntangibleType = __builtin_hlsl_is_intangible(ResourceT);
-```
-
-The complete `BoundResourceRange` class declaration will look like this:
-```
-template<typename ResourceT, int Size>
-requires ValidBoundResourceRangeSize<Size> &&
-  IsHLSLIntangibleType<ResourceT> &&
-  HasGetRequiredBindingSize<ResourceT>
-class BoundResourceRange {
-  ...
-}
-```
+aim to resolve initialization of resource array handles early in Clang. That
+involves intercepting the codegen for array access to emit the a resource class
+constructor call, which will eventually be transformed to
+`@dx.op.createHandleFromBinding` DXIL intrinsic. Creating local copies of
+resource arrays is mostly handled by the existing array parameter passing code,
+but additional work will likely be needed to support indexing subsets of
+multi-dimensional arrays.
 
 ### Changes from DXC
 
-- Local declarations of unbounded resource arrays will not be allowed.
+One notable difference from DXC behavior that we propose for Clang concerns the
+handling of unbounded resource arrays:
 
-- Unbounded resource arrays as function arguments:
-  - Should we allow them?
-  - If yes, these will accept only other unbounded array instances and will be
-    marked as `constant inout`. Using a fixed-size resource array as an argument
-    to a function that expects unbounded array will not be allowed.
+*Local declarations of unbounded resource arrays will not be allowed.*
 
-### Issues found during prototyping
+Locally-scoped unbounded resource arrays are incorrect from a language
+perspective, as are unbounded arrays used as function arguments. Local arguments
+are initialized by creating a local copy of the array, which does not make sense
+for arrays of unknown size.
 
-- local vars remnants from array copying
-- pass expecting handle loads from global vars complains about load not being
-  from a global
+Unbounded resource array declarations will only be allowed at global scope and
+can only be referenced through the global variable with which they are declared.
 
-### Open questions
-- Will users have an option to use either syntax - resource array or
-  `BoundResourceRange`? Or should we make it "unspellable"?
+## Detailed design
 
-- Should we allow explicit `BoundResourceRange` functions arguments?
+### Codegen for Resource Array Indexing
 
-- Does rewriter need to preserve array declaration syntax or is it ok to replace
-  resource arrays with `BoundResourceRange`?
+We need to intercept codegen for `ArraySubscriptExpr` in Clang codegen. If the
+indexed array is a resource array declared at global scope and the expected
+result is a single resource, the array element access should be generated as a
+resource class constructor call with the appropriate indexing and binding
+values.
 
-## Alternatives considered (Optional)
+For example in this simple shader:
 
-- Following the DXC approach, leaving resource array handle resolution until
-  after optimization, to be performed in a dedicated LLVM pass.
+```
+RWBuffer<float> A[4] : register(u10);
+RWStructuredBuffer<float> Out;
 
-- Another approach would be to implement the functionality of
-  `BoundResourceRange` directly within Clang code generation, without
-  introducing an explicit encapsulating class or replacing variable declaration
-  types. This would involve associating binding information with individual
-  resource array instances — which is straightforward for global-scope
-  resources, but may be more complex for resource arrays inside user-defined
-  structs — and intercepting array indexing during code generation to emit the
-  correct `@dx.op.createHandleFromBinding` calls or handle local array copying.
+[numthreads(4,1,1)]
+void main() {
+  Out[0] = A[2][1];
+}
+```
+
+The code generated for the `A[2][1]` expression should be equivalent
+`RWBuffer<float>(10, 0, 4, 2, "A")[1]` - that is, a constructor call followed by a
+subscript operator invoked on the resource class. Note that the constructor
+arguments represent the resource binding register `10`, space `0`, size of the
+array `4`, and index in the resource array `2`.
+
+Unlike individual resource declarations, resource arrays will not be initialized
+by Sema. However, Sema must ensure that the constructor for the specific
+resource template class is instantiated and its definition is emitted, so that
+Clang codegen can call it.
+
+### Codegen Changes to Handle Local Resource Arrays
+
+Local copies of resource arrays should be mostly handled by the existing code
+that creates array copies for function arguments and by the presence of copy
+constructors on resource classes. Some additional work will likely be required
+to support indexing sub-arrays of multi-dimensional resource arrays.
+
+Consider this example:
+
+```
+RWBuffer<float> N[10][5] : register(u0);
+RWBuffer<float> Out;
+
+float foo(RWBuffer<float> P[5]) {
+  return P[3][0];
+}
+
+[numthreads(4,1,1)]
+void main() {
+  Out[0] = foo(N[7]);
+}
+```
+
+The `N[7]` expression should create a local copy of the sub-array of size `5`. The
+changes needed to support this will most likely be required in the same part of
+Clang code generation that handles `ArraySubscriptExpr`.
+
+### Changed Needed in LLVM Passes
+
+After Clang code generation and LLVM optimizations, the code related to resource
+arrays will most likely require some changes in LLVM backend passes.
+
+The existing `DXILForwardHandleAccesses` pass aims to eliminate redundant stores
+and loads from resource handle globals. However, it currently expects resource
+handles to be loaded from a global variable, which is not the case for resource
+array element handles.
+
+Additionally, local resource arrays and their copies tend to generate IR code
+that includes resource handles stored in local variables (using `alloca` and
+lifetime markers), with `load` and `store` operations on those handles through
+ an `i32` type.These will need to be either cleaned up in the
+ `DXILForwardHandleAccesses` pass, or changes may need to be made to Clang
+ codegen for array copying or to subsequent LLVM array optimizations to
+ eliminate these unwanted constructs. The scope of this work is currently TBD.
+ 
+## Alternatives Considered (Optional)
+
+### Resolving Resource Array Indexing in LLVM Pass
+
+Following the DXC approach, leaving resource array handle resolution until after
+optimization, to be performed in a dedicated LLVM pass. We would like to avoid
+this because this can get very complicated very fast. The DXC pass that handles
+this is notoriously buggy (see example
+[here](#example-where-dxc-does-not-handle-local-arrays-correctly)).
+
+### Use Builtin Template Class to Represent Resource Arrays
+
+Another approach considered is to encapsulate resource arrays in a built-in
+template class defined in `HLSLExternalSemaSource`. The class could be named
+`BoundResourceRange` to emphasize that it represents a set of resources
+mapped/bound to a descriptor range, rather than a traditional array. The
+template arguments would specify the array size and the resource type it
+contains.Any resource array variable declaration at global scope would have its
+type replaced with the corresponding `BoundResourceRange` specialization.
+
+The class would provide a subscript operator (`[]`) that initializes individual
+resource handles as they are accessed. It would support unbounded arrays, and
+multi-dimensional arrays could be represented by nesting `BoundResourceRange`
+
+Introducing such a class raises several new questions:
+- Should it be directly spellable by users?
+- Should users have the option to use either syntax?
+- Should we allow explicit `BoundResourceRange` function arguments?
+- Does the rewriter need to preserve the original array declaration syntax, or
+  is it acceptable to replace resource arrays with `BoundResourceRange`?
+- Handling of resources arrays in Sema would need to support both
+  `BoundResourceRange` and resource arrays types.
+- reating a local copy of a multi-dimensional array cannot be implemented by the
+  class alone and would require changes in Clang code generation anyway.
 
 ## Acknowledgments (Optional)
 
