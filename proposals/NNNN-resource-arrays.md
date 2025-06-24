@@ -79,9 +79,9 @@ single dimension.
 That means the array `B[4][4]` is treated as if it was declared as `B[16]`, and
 `C[2][2][5]` as if it was `C[20]`.
 
-For example, a call to initialize `C[1][0][3][0]` from the array declared above
-would have lower bound value `10`, upper bound `29`, space `1`, and array index
-`23` = `10 + 1*2*5 + 0*5 + 3`:
+For example, a call to initialize `C[1][0][3]` from the array declared above
+would have lower bound value `10`, upper bound `29`, space `1`, and the index
+within the range is `23` = `10 + 1*2*5 + 0*5 + 3`:
 ```
 %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 10, i32 29, i32 1, i8 1 }, i32 23, i1 false), 
 ```
@@ -112,10 +112,10 @@ unbounded:
 RWBuffer<float> E[][4] : register(u5);
 ```
 When initializing individual resources of an unbounded multi-dimensional array,
-the arguments of `@dx.op.createHandleFromBinding` again look as if the
-array was flattened to a single dimension. For example the call to create
-resource handle `E[100][3]` from array `E` declared above will have index `408`
-= `5 + 4 x 100 + 3`:
+the arguments of `@dx.op.createHandleFromBinding` again look as if the array was
+flattened to a single dimension. For example the call to create resource handle
+`E[100][3]` from array `E` declared above will have index `408` = `5 + 4 x 100 +
+3`:
 ```
 call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 5, i32 -1, i32 0, i8 1 }, i32 408, i1 false),
 ```
@@ -166,11 +166,12 @@ https://godbolt.org/z/Gdc3q674W
 
 DXC even allows unbounded resource arrays as local variables in a function. From
 a language point of view, this seems very wrong. How is the compiler supposed to
-allocate such variable? The fact that DXC allows this should be considered a bug.
+allocate such variables? The fact that DXC allows this should be considered a
+bug.
 
-Additionally, and as in the previous example, DXC does not report an error when an
-uninitialized resource in an unbounded array is accessed and instead creates a
-call to `dx.op.annotateHandle` with zero-initialized handle value.
+Additionally, and as in the previous example, DXC does not report an error when
+an uninitialized resource in an unbounded array is accessed and instead creates
+a call to `dx.op.annotateHandle` with zero-initialized handle value.
 
 ```
 RWBuffer<float> Buf;
@@ -221,8 +222,8 @@ array argument and it is indexed beyond its size.
 
 #### Subsets of Multi-Dimensional Arrays
  
-Multi-dimensional array can be indexed to refer to a lower-dimensional subset of
-the array. For example, for `RWBuffer<float> N[10][5];` the expression `N[7]`
+A multi-dimensional array can be indexed to refer to a lower-dimensional subset
+of the array. For example, for `RWBuffer<float> N[10][5];` the expression `N[7]`
 refers to a sub-array in `N` of size `5`.
 
 ```
@@ -256,9 +257,9 @@ https://godbolt.org/z/YejsdsTKc
 
 At the same time, `P` is a local variable and as such it is editable. It should
 be initialized by copy-in array semantics to refer to resource handles from the
-original larger array `N`, but its individual array elements can be overridden,
-and that must not affect the global array `N` or the resources it contains in
-any way.
+original larger array `N`, but its individual resource handles can be
+overridden, and that must not affect the global array `N` or the resources it
+contains in any way.
 
 #### Example where DXC Does Not Handle Local Arrays Correctly
 
@@ -291,17 +292,18 @@ of objects until after the LLVM optimization phase. Once all functions have been
 inlined in the generated code, DXC locates all references to resource arrays and
 replaces them with calls to initialize the resource handle.
 
-This process quickly becomes complex because local arrays are moved using
-`memcpy`, and since they are editable, correctly resolving all resource array
-accesses is not always straightforward. Given this, the incorrect behavior in
-the above example is not surprising.
+The bug in the above example stems from an intentional (but incorrect) decision
+not to create a local copy of the resource array argument. If a copy had been
+made, the result would likely be correct. However, in some cases, this approach
+may still fail to correctly map resource accesses to the bound resource globals
+if the code becomes too complex.
 
 #### Resource Arrays in User-defined Structs
 
 Resources and resource arrays can also be included in user-defined structs which
-can be declared at local or global scope. While this feature will covered by a
-separate proposal (issues [#175](https://github.com/llvm/wg-hlsl/issues/175) and
-[#212](https://github.com/llvm/wg-hlsl/issues/212)), one example is included
+can be declared at local or global scope. While this feature will be covered by
+a separate proposal (issues [#175](https://github.com/llvm/wg-hlsl/issues/175)
+and [#212](https://github.com/llvm/wg-hlsl/issues/212)), one example is included
 here for completeness:
 
 ```
@@ -326,11 +328,11 @@ void main() {
 https://godbolt.org/z/Y8h3cWMov
 
 In DXC, when a user-defined struct contains an array of resources, each element
-of the array is treated as individual standalone resource instance. For `s.P[2]`
-in the example above the compiler creates a resource named `s.P.2` mapped to
-register `u12` with range `1`. Its handle initialization does not reflect that
-it is part of a larger array - the upper bound, lower bound and index values are
-all the same (`12`):
+of the array is treated as an individual standalone resource instance. For
+`s.P[2]` in the example above the compiler creates a resource named `s.P.2`
+mapped to register `u12` with range `1`. Its handle initialization does not
+reflect that it is part of a larger array - the upper bound, lower bound and
+index values are all the same (`12`):
 
 ```
  call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 12, i32 12, i32 0, i8 1 }, i32 12, i1 false)
