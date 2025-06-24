@@ -461,7 +461,10 @@ As specified in the grammar, '0' denotes there are no flags set.
 - `RootFlags = 0`
 - `ROOT_DESCRIPTOR_FLAGS` and `DESCRIPTOR_RANGE_FLAGS`
   - Version 1.0:
-    - `DATA_VOLATILE`
+    - `CBV`: `DATA_VOLATILE | DESCRIPTORS_VOLATILE`
+    - `SRV`: `DATA_VOLATILE | DESCRIPTORS_VOLATILE`
+    - `UAV`: `DATA_VOLATILE | DESCRIPTORS_VOLATILE`
+    - `Sampler`: `DESCRIPTORS_VOLATILE`
   - Version 1.1:
     - `CBV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
     - `SRV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
@@ -560,6 +563,14 @@ for Root Signature Blob or DX Container.
 Most values like ShaderVisibility/ParameterType are covered by syntactical
 checks in Sema.
 The additional semantic rules not already covered by the grammar are listed here.
+
+- For ROOT_DESCRIPTOR_FLAGS, only the following values are valid
+  - For version 1.0, only the value DATA_VOLATILE is valid.
+  - For version 1.1, the following values are valid:  
+    - 0
+    - DATA_STATIC
+    - DATA_STATIC_WHILE_SET_AT_EXECUTE
+    - DATA_VOLATILE
 
 - For DESCRIPTOR_RANGE_FLAGS on a Sampler, only the following values are valid
   - For version 1.0, only the value DESCRIPTORS_VOLATILE is valid.
