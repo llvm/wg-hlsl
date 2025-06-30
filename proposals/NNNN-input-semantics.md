@@ -1,4 +1,4 @@
-# Input semantics
+# HLSL shader semantics
 
 * Proposal: [NNNN](http://NNNN-input-semantics.md)
 * Author(s): [Nathan Gauër](https://github.com/Keenuts)
@@ -6,109 +6,228 @@
 
 ## Introduction
 
-HLSL shaders can read form the pipeline state using [semantics](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics).
-This proposal looks into how to implement input semantics in Clang.
-Output semantics are out of scope of this proposal, but some parts will be
-similar.
+HLSL shaders can read/write form/to the pipeline state using [semantics](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics).
+This proposal looks into how to implement semantics in Clang.
 
 ## Motivation
 
-HLSL input semantics are a core part of the shading language.
+HLSL shader semantics are a core part of the shading language.
 
 ## Behavior
 
 ### HLSL
 
-Input semantics are used by the API to determine how to connect pipeline
-data to the shader.
-
-Input semantic attributes can be applied to a function parameter, or a struct
-field's declaration. They only carry meaning when used on an entry point
-parameter, or a struct type used by one of the entry point parameters.
-All other uses are simply ignored.
-
-HLSL has two kinds of semantics: System and User.
+Shader semantics are used by the API to determine how to connect pipeline
+data to the shader. HLSL has two kinds of semantics: System and User.
 System semantics are linked to specific parts of the pipeline, while
 user semantics are just a way for the user to link the output of a stage
 to the input of another stage.
 
-When the semantic attribute is applied to a struct (type or value), it applies
-recursively to each inner fields, shadowing any other semantic.
+
+Shader semantic attributes can be applied to:
+  - a function parameter
+  - function return value
+  - a struct field's declaration
+
+They only carry meaning when used on:
+  - an entry point parameter
+  - entrypoint return value
+  - a struct type used by an entry point parameter or return value.
+All other uses are simply ignored.
+
+When a semantic is applied to both a parameter/return value, and its type,
+the parameter/return value semantic applies, and the type's semantics are
+ignored.
 
 Each scalar in the entrypoint must have a semantic attribute attached, either
 directly or inherited from the parent struct type.
 
-Example:
+When a semantic applies to an array type, each element of the array
+is considered to take one index space in the semantic.
+When a semantic applies to a struct, each scalar field (recursively) takes
+one index in the semantic.
+
+Shader semantics on function return value are output semantics.
+When applying to an entrypoint parameter, the `in`/`out`/`inout` qualifiers
+will determine if this is an input or output semantic.
+
+Each semantic is *usually* composed of two elements:
+ - a case insensitive name
+ - an index
+
+Any semantic starting with the `SV_` prefix is considered to be a system
+semantic. Some system semantics do not have indices, while other have. All
+user semantics have an index (implicit or explicit).
+
+The index can be either implicit (equal to 0), or explicit:
+
+ - `Semantic`, Name = SEMANTIC, Index = 0
+ - `SEMANTIC0`, Name = SEMANTIC, Index = 0
+ - `semANtIC12`, Name = SEMANTIC, Index = 12
+
+
+The HLSL language does not impose restriction on the indices except it has to
+be a positive integer or zero. Target APIs can apply additional restrictions.
+The same semantic (name+index) must only appear once on the inputs, and once
+on the outputs.
+
+Each stage has a fixed list of allowed system semantics for its
+inputs or outputs. If user semantics are allowed as input or output semantics
+depends on the shader stage being
+targeted.
+
+Examples:
 
 ```hlsl
-struct B {
-  int b1 : SB1;
-  int b2 : SB2;
-};
-
-struct C {
-  int c1 : SC1;
-  int c2 : SC2;
-};
-
-struct D {
-  int d1;
-};
-
-struct E {
-  int e1 : EC;
-  int e2 : EC;
-};
-
-struct F {
-  int f1 : FC;
-  int f2 : FC;
-};
-
-[[shader("pixel")]]
-void main(float a : SA, B b : SB, C c, D d, E e, F f : SF) { }
+float main(float a : A) : B {}
+// a : A0
+// main() : B0
 ```
 
-In this example:
-- `a` is linked to the semantic `SA`.
-- `b.b1` and `b.b2` are linked to the semantic `SB` because `SB` shadows the
-  semantics attached to each field.
-- `c.c1` has the semantic `SC1`, and `c.c2` the semantic `SC2`.
-- `d.d1`, hence `d`, is illegal: no semantic is attached to `d.d1`.
-- `e.e1` and `e.e2` are invalid: `EC` usage is duplicated without being inherited.
-- `f.f1` and `f.f2` semantic is `SF`, shadowing the duplicated `FC` semantic.
+```hlsl
+struct S {
+  int f1 : A;
+  int f2 : B;
+};
 
-**Note**: HLSL forbids explicit **non-shadowed** semantic duplication. In this
-sample, the parameter `e` uses `E`, which explicitly declares two fields with
-the same semantic. This is illegal. \
-`b` has the semantic `SB` applied on the whole struct. Meaning all its fields
-share the same semantic `SB`. This is legal because the duplication comes
-from inheritance.
-Lastly, `f` explicitly duplicates the semantic `FC`. But because those are
-shadowed by the semantic `SF`, this is valid HLSL.
+void main(S s) {}
+// s.f1 : A0
+// s.f2 : B0
+```
 
-**Note**: Implicit semantic duplication is allowed for user semantics, but
-always forbidden for system semantics.
+```hlsl
+struct S {
+  int f1;
+  int f2;
+};
+
+void main(S s : A) {}
+// s.f1 : A0
+// s.f2 : A1
+```
+
+```hlsl
+struct S {
+  int f1 : B0;
+  int f2 : C0;
+};
+
+void main(S s : A) {}
+// s.f1 : A0
+// s.f2 : A1
+```
+
+```hlsl
+struct C {
+  int c1;
+  int c2;
+};
+
+struct S {
+  int f1;
+  C   f2;
+  int f3;
+};
+
+void main(S s : A) {}
+// s.f1    : A0
+// s.f2.c1 : A1
+// s.f2.c2 : A2
+// s.f3    : A3
+```
+
+```hlsl
+struct C {
+  int c1;
+  int c2;
+};
+
+struct S {
+  int f1[2];
+  C   f2;
+  int f3;
+};
+
+void main(S s : A) {}
+// s.f1[0]    : A0
+// index takes by the second element in s.f1[]
+// s.f2.c1    : A2
+// s.f2.c2    : A3
+// s.f3       : A4
+```
+
+```hlsl
+void main(int a : A0, int b : A) {}
+// Illegal: Semantic A0 is used twice (A0 and A, implicit A0).
+```
+
+```hlsl
+struct S {
+  int f1 : A0;
+};
+
+void main(S s, int b : A0) {}
+// Illegal: A0 is used twice, S.f1 and b.
+```
+
+```hlsl
+struct S {
+  int f1 : A0;
+};
+
+void main(S s : A1, int b : A0) {}
+// s.f1 : A1, b : A0, this is legal.
+```
+
+```hlsl
+struct S {
+  int f1[2] : A0;
+};
+
+void main(S s, int b : A1) {}
+// Illegal: s.f1[] is an array of 2 elements. Semantic is A0, but A1 is taken
+// by the second element. Meaning there is a semantic overlap for A1.
+```
+
+```hlsl
+void main(float4 a : POSITION0, out float4 b : POSITION0);
+// a : POSITION0
+// b : POSITION 0
+// Legal: The semantic appears only once per input, and once per output.
+```
 
 ### SPIR-V
 
 On the SPIR-V side, user semantics are translated into `Location`
-decorated `Input` variables. The `Location` decoration takes an index.
-System semantics are either translated to `Location` decorated `Input`
-variables, or `BuiltIn` decorated `Input` variables.
+decorated `Input` or `Output` variables. The `Location` decoration takes an
+index.
+System semantics are either translated to `Location` or `BuiltIn` decorated
+variables depending on the stage and semantic.
 
 In the example above, there are no system semantics, meaning every
 parameter would get a `Location` decorated variable associated.
 Each scalar field/parameter is associated with a unique index starting at 0,
 from the first parameter's field to the last parameter's field.
+Each scalar takes one index, and arrays of size N takes N indices.
+The semantic index does not impact the Location assignment.
+Indices are independent between `Input` and `Output` semantics.
 
-In the sample above:
+Example:
 
-- `a` would have the `Location 0`.
-- `b.b1` would have the `Location 1`.
-- `b.b2` would have the `Location 2`.
-- `c.c1` would have the `Location 3`.
-- ...
+```hlsl
+```hlsl
+struct S {
+  int f1[2] : A5;
+};
+
+void main(S s, out int c : A2, int b : A0, out int d : A0) {}
+// s.f1 : A5 -> Location 0
+// b    : A0 -> Location 2
+// c    : A2 -> Location 0
+// d    : A0 -> Location 1
+// Semantic index does not contribute, only the parameter ordering does.
+// Input and Outputs are sorted independently.
+```
 
 It is also possible to explicitly set the index, using the
 `[[vk::location(/* Index */)]]` attribute. \
@@ -146,73 +265,94 @@ rules. The System vs User semantics handling is also divergent.
 This means we will be able to share the Sema checks, but will have to build
 two distinct paths during codegen.
 
-### Sema
+Also, the validity of the semantic attribute depends on its usage, meaning
+we to facilitate code-reuse, some validation will have to be deferred to
+CodeGen.
 
-Type check for semantics is currently handled in `SemaDeclAttr.cpp`. \
-Iteration is done on each declaration, and if a semantic attribute is present,
-the type is checked.
-Each declaration being handled independently, this method does not support
-inherited/shadowed semantic attributes.
+### Parser
 
-Sema checks are divided into three parts:
- - check for type compatibility between the variable and the semantic.
- - check for semantic duplication.
- - check for invalid system semantic usage depending on shader stage.
+Clang has a built-in mechanism for attribute parsing using a `.td` file.
+But this requires enumerating the list of known semantics, which is not
+possible for user semantics.
 
-Proposition is to remove the type validation from the `SemaDeclAttr` and
-move it later into SemaHLSL, with the other checks.
-Idea is we need to have the inheritance rules to check types, so we should
-avoid duplicating this logic in two places.
+The attribute `.td` file must be changed to allow syntax-free semantics
+to be parsed.
+**NOTE**: All Spellings will be removed on already checked-in semantics.
 
-The pseudo-code for this check should be:
+```
+class HLSLSemanticAttr : HLSLAnnotationAttr;
 
-```cpp
-  void checkSemantic(std::unordered_set<HLSLAnnotationAttr> &UsedSemantics,
-                DeclaratorDecl *Decl,
-                HLSLAnnotationAttr *InheritedSemantic = nullptr) {
+def HLSLUnparsedSemantic : HLSLSemanticAttr {
+  let Spellings = [];
+  let Args = [];
+  let Subjects = SubjectList<[ParmVar, Field, Function]>;
+  let LangOpts = [HLSL];
+  let Documentation = [InternalOnly];
+}
 
-    HLSLAnnotationAttr *Semantic = InheritedSemantic ? InheritedSemantic : Decl->get<HLSLAnnotationAttr>();
-    RecordDecl *RD = dyn_cast<RecordDecl>(Decl);
+def HLSLUserSemantic : HLSLSemanticAttr {
+  let Spellings = [];
+  let Args = [DefaultIntArgument<"Location", 0>, DefaultBoolArgument<"Implicit", 0>];
+  let Subjects = SubjectList<[ParmVar, Field, Function]>;
+  let LangOpts = [HLSL];
+  let Documentation = [InternalOnly];
+}
 
-    // Case 1: type is a scalar, and we have a semantic. End case.
-    if (Semantic && !RD) {
-      if (UsedSemantics.contains(Semantic) && !InheritedSemantic)
-        Fail("Explicit semantic duplication", Decl->getLocation())
-
-      UsedSemantics.insert(Semantic)
-      diagnoseSemanticType(Decl, Semantic);
-      diagnoseSemanticEnvironment(Decl, Context.ShaderEnv);
-      return;
-    }
-
-    // Case 2: type is scalar, but we have no semantic: error
-    if (!RD)
-      Fail("Missing semantic", Decl->getLocation());
-
-    // Case 3: it's a struct. Simply recurse, optionnally inherit semantic.
-    if (RecordDecl *RD = dyn_cast<RecordDecl>(Decl)) {
-      for (FieldDecl *FD : Decl->asRecordDecl()->getFields())
-        checkSemantic(UsedSemantics, FD, Semantic);
-    }
-  }
-
-  ...
-
-  std::unordered_set<clang::HLSLAnnotationAttr> UsedSemantics;
-  for (ParmVarDecl Decl : entrypoint->getParams()) {
-    checkSemantic(UsedSemantics, Decl, /* InheritedSemantic= */ nullptr);
-  }
+def HLSLSV_GroupThreadID: HLSLSemanticAttr {
+  let Spellings = [];
 ```
 
-At this point, we are guaranteed to have only valid and unique semantics, as
-well as valid types.
+During an attribute parsing, we first assign the `HLSLUnparsedSemantic` kind
+to any HLSL semantic-like notation.
+
+When, when this attribute kind is parsed, we rely on Sema to emit the correct
+`HLSLUserSemanticAttr` or `HLSLSV_*Attr`, etc.
+
+Sema will do stateless checks like:
+  - Is this system semantic compatible with this shader stage?
+  - Is this system semantic compatible with the type it's associated with?
+
+We must also consider `MY_SEMANTIC0` to be equal to `MY_semantic`.
+The solution is to modify the `ParseHLSLAnnotations` function to add a custom
+attribute parsing function.
+
+```cpp
+struct ParsedSemantic {
+  // The normalized name of the semantic without index.
+  StringRef Name;
+  // The index of the semantic. 0 if implicit.
+  unsigned Index;
+  // Was the index explicit in the name or not.
+  bool Implicit;
+};
+
+Parser::ParsedSemantic Parser::ParseHLSLSemantic();
+```
+
+### Sema
+
+Sema check is only stateless, and done during parsing.
+The parser first emits an `HLSLUnparsedSemantic` attribute, which is passed
+down to Sema.
+Sema goal is to:
+ - convert this class into a valid semantic class like `HLSLUserSemantic` or `HLSLSV_*`.
+ - check shader stage compatibility with the system semantic.
+ - check type compability with the system semantic.
+
+At this stage, we have either `HLSLUserSemanticAttr` attributes, or known
+compatible `HLSLSV_*Attr` attributes.
+All non-converted `HLSLUnparsedSemantic` would have raised a diagnostic to
+say `unknown HLSL system semantic X`.
+
+No further checking is done as we must wait for codegen to move forward.
 
 ### CodeGen
 
 DXIL and SPIR-V codegen will be very different, but the flattening/inheritance
 bit can be shared.
 
-The proposal is to provide a sorted list in `CGHLSLRuntime`:
+The proposal is to provide a sorted list of valid semantics in `CGHLSLRuntime`,
+and then we can have a per-backend implementation for index assignment.
 
 ```cpp
 struct SemanticIO {
@@ -231,6 +371,36 @@ struct SemanticIO {
 Vector<SemanticIO> InputSemantics;
 ```
 
+The pseudo code would be as follows
+
+```python
+
+  def emitEntryFunction():
+    # Current emitEntryFunction code in CGHLSLRuntime.cpp.
+    ...
+
+    semantics = {}
+
+    foreach (Parameter, ReturnValue) in FunctionDecl:
+      if item is output:
+        # output parameters.
+        var = createLocalVar(item)
+        semantics[item.semantic_name] = getPointerTo(var)
+      elif item is byval:
+        # Semantic structs passed as input.
+        var = createLocalVar(item)
+        loadSemanticRecursivelyToVariable(item, var)
+        semantics[item.semantic_name] = getPointerTo(var)
+      elif item is input:
+        semantics[item.semantic_name] = loadSemanticRecursively(item)
+
+
+    Args = [ semantics[x->semantic_name] for x in AllParameters ]
+    call = createCall(MainFunction, Args)
+    if not call->isVoid():
+      StoreOutputSemanticRecursively(call, semantics)
+```
+
 The proposal is to let each target implement the logic in CGHLSLRuntime to
 load the semantics, and set the `Value` field of the `SemanticIO` struct.
 The order of the vector represents the flattening order.
@@ -243,3 +413,10 @@ parameter/field (DFS), and each will point to an `llvm::Value`.
 
 The common code will then build the arguments list for the entrypoint call
 using the provided `llvm::Value`. This is shared across targets.
+
+The pseudo-code for this check should be:
+
+
+At this point, we are guaranteed to have only valid and unique semantics, as
+well as valid types.
+
