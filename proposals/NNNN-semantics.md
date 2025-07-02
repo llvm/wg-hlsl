@@ -279,27 +279,41 @@ The attribute `.td` file must be changed to allow syntax-free semantics
 to be parsed.
 **NOTE**: All Spellings will be removed on already checked-in semantics.
 
-```
-class HLSLSemanticAttr : HLSLAnnotationAttr;
+```python
+class HLSLSemanticAttr<bit Indexable> : HLSLAnnotationAttr {
+  # SV_GroupID for ex cannot be indexed.
+  bit SemanticIndexable = Indexable;
+  # The index and wether it is explicit of not, ex: `USER0` vs `USER`.
+  int SemanticIndex = 0;
+  bit SemanticExplicitIndex = 0;
 
-def HLSLUnparsedSemantic : HLSLSemanticAttr {
   let Spellings = [];
-  let Args = [];
+  let Subjects = SubjectList<[ParmVar, Field, Function]>;
+  let LangOpts = [HLSL];
+}
+
+# This is is used by the first parsing stage: all semantics are initially
+# set to HLSLUnparsedSemantic. Sema will then convert them to the final
+# form.
+def HLSLUnparsedSemantic : HLSLAnnotationAttr {
+  let Spellings = [];
+  let Args = [DefaultIntArgument<"Index", 0>,
+              DefaultBoolArgument<"ExplicitIndex", 0>];
   let Subjects = SubjectList<[ParmVar, Field, Function]>;
   let LangOpts = [HLSL];
   let Documentation = [InternalOnly];
 }
 
-def HLSLUserSemantic : HLSLSemanticAttr {
-  let Spellings = [];
-  let Args = [DefaultIntArgument<"Location", 0>, DefaultBoolArgument<"Implicit", 0>];
-  let Subjects = SubjectList<[ParmVar, Field, Function]>;
-  let LangOpts = [HLSL];
-  let Documentation = [InternalOnly];
+# User semantics will use this class.
+def HLSLUserSemantic : HLSLSemanticAttr</* Indexable= */ 1> {
+  let Documentation = [HLSLUserSemanticDocs];
 }
 
-def HLSLSV_GroupThreadID: HLSLSemanticAttr {
-  let Spellings = [];
+# Known system semantics will have their own class with documentation.
+# Note: here indexable is set to false.
+def HLSLSV_GroupThreadID: HLSLSemanticAttr</* Indexable= */ 0> {
+  let Documentation = [HLSLSV_GroupThreadIDDocs];
+}
 ```
 
 During an attribute parsing, we first assign the `HLSLUnparsedSemantic` kind
@@ -311,22 +325,20 @@ When, when this attribute kind is parsed, we rely on Sema to emit the correct
 Sema will do stateless checks like:
   - Is this system semantic compatible with this shader stage?
   - Is this system semantic compatible with the type it's associated with?
+  - Is this system semantic indexable if an explicit index is used?
 
 We must also consider `MY_SEMANTIC0` to be equal to `MY_semantic`.
 The solution is to modify the `ParseHLSLAnnotations` function to add a custom
 attribute parsing function.
 
-```cpp
-struct ParsedSemantic {
-  // The normalized name of the semantic without index.
-  StringRef Name;
-  // The index of the semantic. 0 if implicit.
-  unsigned Index;
-  // Was the index explicit in the name or not.
-  bool Implicit;
-};
+The base-class `HLSLSemanticAttr` will expose two methods. During parsing,
+the index is parsed from the name, and stored in each attribute.
+The `SemanticExplicitIndex` is a bit useful for reflection and variable
+name regeneration.
 
-Parser::ParsedSemantic Parser::ParseHLSLSemantic();
+```cpp
+  bool isSemanticIndexable() const;
+  unsigned getSemanticIndex() const;
 ```
 
 ### Sema
@@ -351,27 +363,11 @@ No further checking is done as we must wait for codegen to move forward.
 DXIL and SPIR-V codegen will be very different, but the flattening/inheritance
 bit can be shared.
 
-The proposal is to provide a sorted list of valid semantics in `CGHLSLRuntime`,
-and then we can have a per-backend implementation for index assignment.
+The proposal is to have the whole semantic inheritance & validation shared,
+and at the very end allow each target to emit the BuiltIn/Location codegen.
 
-```cpp
-struct SemanticIO {
-  // The active semantic for this scalar/field.
-  HLSLAnnotationAttr *Semantic;
 
-  // Info about this field/scalar.
-  DeclaratorDecl *Decl;
-  llvm::Type *Type;
-
-  // The loaded value in the wrapper for this scalar/field. Each target
-  // must provide this value.
-  llvm::Value *Value = nullptr;
-};
-
-Vector<SemanticIO> InputSemantics;
-```
-
-The pseudo code would be as follows
+The pseudo code for the `emitEntryFunction` would be as follows:
 
 ```python
 
@@ -379,44 +375,115 @@ The pseudo code would be as follows
     # Current emitEntryFunction code in CGHLSLRuntime.cpp.
     ...
 
-    semantics = {}
+    args = []
+    outputs = []
 
-    foreach (Parameter, ReturnValue) in FunctionDecl:
-      if item is output:
-        # output parameters.
-        var = createLocalVar(item)
-        semantics[item.semantic_name] = getPointerTo(var)
-      elif item is byval:
+    foreach item in FunctionDecl.GetParamDecl():
+      if item is sret_output:
+        # Struct return values are using sret mechanism.
+        var = createLocalVar(item.type)
+        outputs.append({ item, var })
+      elif item is byval_input:
         # Semantic structs passed as input.
         var = createLocalVar(item)
-        loadSemanticRecursivelyToVariable(item, var)
-        semantics[item.semantic_name] = getPointerTo(var)
+        value = loadSemanticRecursively(item, var)
+        store(value, var)
+        args.append(var.getPointer())
       elif item is input:
-        semantics[item.semantic_name] = loadSemanticRecursively(item)
+        # Values passed by copy
+        args.append(loadSemanticRecursively(item))
 
+    call_return_value = createCall(MainFunction, args)
 
-    Args = [ semantics[x->semantic_name] for x in AllParameters ]
-    call = createCall(MainFunction, Args)
     if not call->isVoid():
-      StoreOutputSemanticRecursively(call, semantics)
+      output.append(FunctionDecl, call_return_value)
+
+    for [decl, item] in outputs:
+      value = load(item)
+      storeSemanticRecusively(decl, value)
+```
+
+In this code, two main functions are to write:
+ - `storeSemanticRecursively`
+ - `loadSemanticRecursively`
+
+Both will be quite similar, since both follow the same semantic
+indexing/inheritance rules.
+
+Pseudo code would be:
+
+```python
+
+def loadSemanticRecursively(decl, appliedSemantic = None):
+  if (decl->isStruct())
+    return loadSemanticStructRecurively()
+  return loadSemanticScalarRecursively()
+
+def loadSemanticStructRecurively(decl, &appliedSemantic)
+
+  if appliedSemantic is None:
+    appliedSemantic = decl->getSemantic()
+
+  output = createEmptyStruct(decl->getType())
+  for field in decl->structDecl():
+    tmp = copy(appliedSemantic)
+    val = loadSemanticRecursively(decl, tmp)
+    output.insert(val, field.index)
+  return output
+
+def loadSemanticScalarRecursively(decl, &appliedSemantic):
+  if appliedSemantic is None:
+    appliedSemantic = decl->getSemantic()
+
+  if appliedSemantic is None:
+    raise ("semantic is required")
+
+  if appliedSemantic->isUserSemantic():
+    return emitUserSemanticLoad(decl, appliedSemantic)
+  return emitSystemSemanticLoad(decl, appliedSemantic)
+
+def emitSystemSemanticLoad(decl, &appliedSemantic):
+  if appliedSemantic == SV_Position:
+    # For SPIR-V for ex, logic is the same as user semantics.
+    return emitUserSemanticLoad(decl, appliedSemantic)
+
+  # But compute semantics based on builtins are different.
+  if not this->ActiveInputSemantic.insert(appliedSemantic.Name):
+    raise "duplicate semantic"
+
+  if appliedSemantic == SV_GroupID:
+    return emitSystemSemanticLoad_TARGET(decl, appliedSemantic)
+
+  raise "Unknown system semantic"
+
+def emitUserSemanticLoad(decl, &appliedSemantic):
+  Length = decl->isArray() ? decl->getArraySize() : 1
+
+  # Mark each index as busy. Some system semantics also require this,
+  # the example above shows the compute semantic which has no index.
+  for I in Length:
+    SemanticName = appliedSemantic.SemanticName + I
+    if not this->ActiveInputSemantic.insert(semanticName):
+      raise "Duplicate semantic index"
+    appliedSemantic.Index += 1
+
+  # For SPIR-V, emit a global with a Location ID.
+  return emitUserSemanticLoad_TARGET(decl, appliedSemantic)
+
+def emitSystemSemanticLoad_TARGET(decl, &appliedSemantic):
+  # Each target will emit the required code. This lives in CGHLSLRuntime,
+  # meaning we can have state to determine packing rules, etc.
+
 ```
 
 The proposal is to let each target implement the logic in CGHLSLRuntime to
-load the semantics, and set the `Value` field of the `SemanticIO` struct.
-The order of the vector represents the flattening order.
+load the semantics after all checks. What we expect is to get a single
+value with the input semantic loaded.
+For store, same scenario: the target-specific code will take an `llvm::Value`
+with a non-aggregate value, and will have to store it to a semantic.
+Index collision, semantic inheritance and invalid system semantics are handled
+by the shared code.
 
-Providing the full list should allow DXIL to easily implement packing rules.
-
-At this stage, `CGHLSLRuntime` will have an ordered list of `SemanticIO`
-structs. The order is from the first parameter/field to the last
-parameter/field (DFS), and each will point to an `llvm::Value`.
-
-The common code will then build the arguments list for the entrypoint call
-using the provided `llvm::Value`. This is shared across targets.
-
-The pseudo-code for this check should be:
-
-
-At this point, we are guaranteed to have only valid and unique semantics, as
-well as valid types.
+A demo branch can be found here:
+https://github.com/Keenuts/llvm-project/tree/hlsl-semantics
 
