@@ -65,6 +65,17 @@ The Clang code generation algorithm is as follows:
 4.  If a declaration has no `register` or `vk::binding` attribute:
     *   Clang assigns the resource to the default descriptor set.
     *   Clang does not assign a binding; this is an implicit binding.
+5.  If a resource has an associated counter buffer, Clang creates a second
+    resource handle for it. The binding for the counter buffer is determined as
+    follows:
+    *   If the resource has the `vk::counter_binding(b)` attribute, Clang assigns
+        the counter buffer an explicit binding `b`. The counter buffer resides
+        in the same descriptor set as the main resource.
+    *   Otherwise, Clang assigns the counter buffer an implicit binding in the
+        same descriptor set as the main resource. The `OrderId` for the counter
+        buffer is assigned as if it were declared immediately after the
+        associated resource, ensuring a predictable order for implicit binding
+        allocation.
 
 ### Implicit Binding in the SPIR-V Backend
 
@@ -468,6 +479,146 @@ before the cbuffer itself. In this case, `A` will be assigned binding 0, and `My
 
 TODO: The exact binding assignment behavior in Clang for
 this scenario is one of the open questions to be resolved by this proposal.
+
+### Unused RWStructuredBuffer with Counter
+
+This example shows how bindings are assigned to counter buffers associated with
+`RWStructuredBuffer`s when the main resource is unused.
+
+```hlsl
+RWStructuredBuffer<float4> rw_buf1 : register(u0);
+[[vk::counter_binding(3)]] RWStructuredBuffer<int> rw_buf2 : register(u1);
+
+[numthreads(1, 1, 1)]
+void main()
+{
+    rw_buf1.IncrementCounter();
+    rw_buf2.IncrementCounter();
+}
+```
+
+The binding assignments are as follows:
+
+*   `rw_buf1` and `rw_buf2` are considered unused because `IncrementCounter` is
+    the only operation performed on them. As a result, they are optimized away
+    and do not receive bindings.
+*   The counter for `rw_buf2` is explicitly assigned binding 3 via the
+    `vk::counter_binding(3)` attribute.
+*   The counter for `rw_buf1` has an implicit binding. It is assigned the first
+    available binding in the default descriptor set, which is 0.
+
+### Used RWStructuredBuffer with Counter
+
+Here is the same example, but with the main resources being used.
+
+```hlsl
+RWStructuredBuffer<float4> rw_buf1 : register(u0);
+[[vk::counter_binding(3)]] RWStructuredBuffer<int> rw_buf2 : register(u1);
+
+[numthreads(1, 1, 1)]
+void main()
+{
+    rw_buf1.IncrementCounter();
+    rw_buf2.IncrementCounter();
+    rw_buf1[0] = rw_buf2[0];
+}
+```
+
+The binding assignments are as follows:
+
+*   `rw_buf1` is explicitly bound to `register(u0)`, so it is assigned binding 0
+    in the default descriptor set (set 0).
+*   `rw_buf2` is explicitly bound to `register(u1)`, so it is assigned binding 1
+    in the default descriptor set (set 0). Its counter buffer is explicitly
+    assigned binding 3 via the `vk::counter_binding(3)` attribute.
+*   The counter for `rw_buf1` has an implicit binding. It is assigned the first
+    available binding in the default descriptor set, which is 2 (since 0, 1,
+    and 3 are already used).
+
+### Implicitly Bound RWStructuredBuffer with Counter
+
+Here is an example where the resources and counters are all implicitly bound.
+
+```hlsl
+RWStructuredBuffer<float4> rw_buf1;
+RWStructuredBuffer<int> rw_buf2;
+
+[numthreads(1, 1, 1)]
+void main()
+{
+    rw_buf1.IncrementCounter();
+    rw_buf2.IncrementCounter();
+    rw_buf1[0] = rw_buf2[0];
+}
+```
+
+The binding assignments are as follows:
+
+*   `rw_buf1` is the first resource declared, so it is assigned binding 0. Its
+    associated counter is treated as if declared immediately after, so it is
+    assigned binding 1.
+*   `rw_buf2` is the next resource, so it is assigned the next available
+    binding, which is 2. Its counter is then assigned binding 3.
+
+This behavior differs from DXC, which assigns bindings to all main resources
+first, followed by the counter resources. In DXC, `rw_buf1` would get binding 0,
+`rw_buf2` would get binding 1, the counter for `rw_buf1` would get binding 2,
+and the counter for `rw_buf2` would get binding 3.
+
+### RWStructuredBuffer in a Non-Default Descriptor Set
+
+This example shows a resource in a non-default descriptor set.
+
+```hlsl
+RWStructuredBuffer<float4> rw_buf1 : register(u0, space1);
+
+[numthreads(1, 1, 1)]
+void main()
+{
+    rw_buf1.IncrementCounter();
+    rw_buf1[0] = 0;
+}
+```
+
+The binding assignments are as follows:
+
+*   `rw_buf1` is explicitly assigned to `register(u0, space1)`, so it receives
+    binding 0 in descriptor set 1.
+*   The counter for `rw_buf1` has an implicit binding and is placed in the same
+    descriptor set as the main resource. It is assigned the first available
+    binding in set 1, which is 1.
+
+### Append/Consume Buffers with Counters
+
+This example demonstrates `AppendStructuredBuffer` and `ConsumeStructuredBuffer`,
+which have implicit counters and implicit bindings.
+
+```hlsl
+AppendStructuredBuffer<float4> append_buf;
+ConsumeStructuredBuffer<float4> consume_buf;
+
+[numthreads(1, 1, 1)]
+void main()
+{
+    float4 val = consume_buf.Consume();
+    append_buf.Append(val);
+}
+```
+
+The binding assignments are as follows:
+
+*   `append_buf` is the first resource declared, so it is assigned binding 0.
+    Its associated counter is assigned binding 1.
+*   `consume_buf` is the next resource, so it is assigned binding 2. Its
+    counter is assigned binding 3.
+
+This behavior is consistent with DXC. It is important to note that DXC's
+handling of counter buffers for `AppendStructuredBuffer` and
+`ConsumeStructuredBuffer` is different from its handling of `RWStructuredBuffer`
+counters. For `RWStructuredBuffer`, DXC assigns counter bindings after all main
+resources have been assigned bindings. This proposal adopts the
+`AppendStructuredBuffer` behavior for all counter resources to ensure
+consistency.
 
 ### Unbounded arrays
 
