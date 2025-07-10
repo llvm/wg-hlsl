@@ -222,7 +222,8 @@ RWBuffer<float> D[3];    // gets u2 because it fits between A and C but not befo
 void main() {
   A[0] = D[2][0] + C[0] + B[10][0];
 }
-```
+``an 
+
 https://godbolt.org/z/vbvfqjo8h
 
 If there are resources declared after the unbound array that do not fit into the
