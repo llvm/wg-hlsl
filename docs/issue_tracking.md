@@ -116,7 +116,7 @@ We move a deliverable to **Active** once we start working on one of the tasks.
 At this point we can set the deliverable's iteration based on the estimates of
 those tasks.
 
-Once all the tasks are closed, the deliveable can be closed.
+Once all the tasks are closed, the deliverable can be closed.
 
 ### Task
 
