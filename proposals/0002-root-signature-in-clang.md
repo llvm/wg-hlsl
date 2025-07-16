@@ -1079,7 +1079,9 @@ Behaviour:
 exception that it will run all validations with the resource bindings in the
 shader code
 
-Design Notes: Not planned in Clang, as it seems shadowed.
+Design Notes: Not planned in Clang. This is on the assumption that running the
+additional validations doesn't provide additional utility over the root
+signature target option and compiling the shader regularly.
 
 #### Option `-verifyrootsignature`
 
