@@ -946,7 +946,8 @@ carried forward to Clang and their expected behaviour.
 
 #### Option `-force-rootsig-ver`
 
-Compiles the root signatures with a specific root signature version.
+When compiling a shader with a root signature, this option overrides the root
+signature version used, where the default is `rootsig_1_1`.
 
 Usage:
 
