@@ -1089,6 +1089,26 @@ signature target option and compiling the shader regularly.
 
 Design Notes: Not planned in Clang. Appears to be broken in DXC, so no users.
 
+#### Option `/Frs`
+
+Specifies to compile the shader as normal but will also output the RTS0 part
+into a separate DXIL Container.
+
+Usage:
+
+```
+  /Frs <DXIL Container>
+```
+
+Behaviour:
+
+ - Behaviour is the same as `-extractrootsignature`. Except that it will still
+output the complete DXIL Container as normal, and, produce an additional DXIL
+container with just the RTS0 part.
+
+Design Notes: Not planned in Clang. For similar motivations as
+`extractrootsignature`.
+
 ## Alternatives considered (Optional)
 
 ### Store Root Signatures as Strings
