@@ -1057,6 +1057,8 @@ Behaviour:
 contents of the input container
  - Does not perform any validation with the input root signature
  - Requires input to be a valid DXIL container with or without an RST0 part
+ - Note: Even when provided, this will parse/validate a root signature
+specified as an attribute (or another above) before dropping it.
 
 Design Notes: Planned in Clang. If compiling a stand-alone DXIL Container with
 just the RTS0 is useful then this is presumably also required in that workflow.
