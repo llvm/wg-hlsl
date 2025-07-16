@@ -1042,8 +1042,8 @@ the parsing and basic validations of the root signataure.
 
 #### Option `-setrootsignature`
 
-Overwrite the root signature part (RTS0) with the serialized root signature
-given in the file.
+Overwrite the root signature part (RTS0) with the RTS0 of provided DXIL
+Container.
 
 Usage:
 
@@ -1055,7 +1055,7 @@ Behaviour:
 
  - Insert/overwrite the RTS0 part of the compiled DXIL Container with the RST0
 contents of the input container
- - Does not perform any validation with the input root signature
+ - Does not perform any validation with RTS0 of the provided DXIL Container
  - Requires input to be a valid DXIL container with or without an RST0 part
  - Note: Even when provided, this will parse/validate a root signature
 specified as an attribute (or another above) before dropping it.
