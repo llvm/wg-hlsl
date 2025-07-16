@@ -971,7 +971,9 @@ signature defined by the given macro expansion.
 
 Usage:
 
-Given a defined macro in the source file (`#define RS "CBV(b0)"`)
+Given a defined macro either provided in the source file
+(`#define RS "CBV(b0)"`), or, as a command line define
+(`-D RS="CBV(b0)"`)
 
 ```
   -rootsig-define RS
