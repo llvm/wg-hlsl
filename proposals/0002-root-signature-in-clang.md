@@ -1087,7 +1087,26 @@ signature target option and compiling the shader regularly.
 
 #### Option `-verifyrootsignature`
 
-Design Notes: Not planned in Clang. Appears to be broken in DXC, so no users.
+Given a shader defined from a DXIL Container, perform validations with the
+root signature part (RTS0) of the other DXIL Container
+
+Usage:
+
+```
+  -dumpbin <Shader DXIL Container> -verifyrootsignatures <Root Signature DXIL Container>
+```
+
+Note: `dumpbin` is required to load a binary instead of performing compilation
+
+Behaviour:
+
+ - Performs validation that require resource binding information from the
+input DXIL Container with the provided RTS0.
+
+Design Notes: Not planned in Clang. We don't want to provide non-compilation
+options.
+
+Design Notes: Maybe these validations will be part of `setrootsignature`.
 
 #### Option `/Frs`
 
