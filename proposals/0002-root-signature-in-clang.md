@@ -1019,7 +1019,7 @@ Design Notes: Commonly used. Planned in Clang.
 
 #### Option `-Qstrip-rootsignature`
 
-Strips the root signature attribute from the entry function.
+Omits the root signature part (RTS0) from the produced DXIL Container.
 
 Usage:
 
@@ -1032,7 +1032,7 @@ Behaviour:
  - Parse and perform syntactic validations of "entry" root signature
  - Perform the 'basic' sub-set of validations that are available without access
 to resource bindings
- - Produces the DXIL container with the root signature part (RTS0) omitted
+ - Produces the DXIL container with the RTS0 omitted
 
 Design Notes: Usable within .hlsl source files. Planned in Clang unless there is
 a signal of it being unused.
