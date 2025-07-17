@@ -1095,7 +1095,7 @@ root signature part (RTS0) of the other DXIL Container
 Usage:
 
 ```
-  -dumpbin <Shader DXIL Container> -verifyrootsignatures <Root Signature DXIL Container>
+  -dumpbin <Shader DXIL Container> -verifyrootsignature <Root Signature DXIL Container>
 ```
 
 Note: `dumpbin` is required to load a binary instead of performing compilation
