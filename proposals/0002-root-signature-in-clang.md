@@ -1074,7 +1074,8 @@ Behaviour:
 contents of the input container
  - This will only perform the resource binding validations with the compiled
 shader and RTS0 of the provided DXIL Container
- - Requires input to be a valid DXIL container with or without an RST0 part
+ - Requires the option argument to be a valid DXIL container with or without an
+RST0 part
  - Note: Even when provided, this will parse and do non-resource binding
 validations of the root signature specified as an attribute (or another way
 above) before dropping it
