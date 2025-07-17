@@ -944,6 +944,17 @@ carried forward to Clang and their expected behaviour.
 
 (Design notes and unplanned options will be removed after being resolved)
 
+Design Notes: In the context of using root signature with DXC, there is the
+`-dumpbin` option which allows the user to specify a DXIL Container object as
+the input file and use this for an operation, rather than invoke the compiler.
+Many of the below options also have a `dumpbin` variant of the options that
+provide similar functionality. So note that below, we will only consider the
+context of compiling a shader.
+
+In this sense, we are proposing to not bring the `dumpbin` variants of these
+options forward to clang. And an open question is: where do we plan to provide
+these options, or, if we plan to provide them. (Possibly in `dxv` or `dxa`?)
+
 #### Option `-force-rootsig-ver`
 
 When compiling a shader with a root signature, this option overrides the root
