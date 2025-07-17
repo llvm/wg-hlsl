@@ -1014,7 +1014,8 @@ to resource bindings
 as the only part
 
  - Note: It is not possible to use `-rootsig-define` to overwrite which root
-signature will be used as the "entry" root signature.
+signature will be used as the "entry" root signature, because this is specified
+using the `-E` option when compiling directly to a root signature target.
 
 Design Notes: Commonly used. Planned in Clang.
 
