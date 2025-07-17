@@ -1148,6 +1148,8 @@ Behaviour:
 output the complete DXIL Container as normal, and, produce an additional DXIL
 container with just the RTS0 part.
 
+ - Note: this does not have any `dumpbin` functionality
+
 Design Notes: Not planned in Clang. For similar motivations as
 `extractrootsignature`.
 
