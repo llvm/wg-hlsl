@@ -1023,8 +1023,7 @@ Given a defined macro in the source file (`#define RS "CBV(b0)"`)
 Behaviour:
 
  - Parse and perform syntactic validations of "entry" root signature
- - Perform the 'basic' sub-set of validations that are available without access
-to resource bindings
+ - Perform the non-resource binding sub-set of validations
  - Produces a DXIL container with only the serialized "entry" root signature
 as the only part
 
@@ -1047,15 +1046,14 @@ Usage:
 Behaviour:
 
  - Parse and perform syntactic validations of "entry" root signature
- - Perform the 'basic' sub-set of validations that are available without access
-to resource bindings
+ - Perform the non-resource binding sub-set of validations
  - Produces the DXIL container with the RTS0 omitted
 
 Design Notes: Usable within .hlsl source files. Planned in Clang unless there is
 a signal of it being unused.
 
-Design Notes: Plan to match DXC behaviour directly such that we still do
-the parsing and basic validations of the root signataure.
+Design Notes: Should we diverge from DXC behaviour to just ignore the original
+root signature specified?
 
 #### Option `-setrootsignature`
 
@@ -1065,12 +1063,12 @@ Container.
 Usage:
 
 ```
-  -setrootsignature <DXIL Container>
+  -setrootsignature <DXIL Container with RTS0>
 ```
 
 Behaviour:
 
- - Insert/overwrite the RTS0 part of the compiled DXIL Container with the RST0
+ - Insert/overwrite the RTS0 part of the compiled DXIL Container with the RTS0
 contents of the input container
  - This will only perform the resource binding validations with the compiled
 shader and RTS0 of the provided DXIL Container
