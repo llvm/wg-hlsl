@@ -984,11 +984,15 @@ Behaviour:
 
  - If the entry function does not have a root signature attribute, it will use
 the one defined by the macro expansion
-
  - If the entry function has a root signature attribute, it will overwrite to
 use the one defined by the macro expansion
+ - Note: Even when provided, this will parse and do non-resource binding
+validations of the root signature specified as an attribute before dropping it
 
 Design Notes: Commonly used. Planned in Clang.
+
+Design Notes: Should we diverge from DXC behaviour to just ignore the original
+root signature specified?
 
 #### Target Root Signature Version
 
@@ -1057,13 +1061,18 @@ Behaviour:
 
  - Insert/overwrite the RTS0 part of the compiled DXIL Container with the RST0
 contents of the input container
- - Does not perform any validation with RTS0 of the provided DXIL Container
+ - This will only perform the resource binding validations with the compiled
+shader and RTS0 of the provided DXIL Container
  - Requires input to be a valid DXIL container with or without an RST0 part
- - Note: Even when provided, this will parse/validate a root signature
-specified as an attribute (or another above) before dropping it.
+ - Note: Even when provided, this will parse and do non-resource binding
+validations of the root signature specified as an attribute (or another way
+above) before dropping it
 
 Design Notes: Planned in Clang. If compiling a stand-alone DXIL Container with
 just the RTS0 is useful then this is presumably also required in that workflow.
+
+Design Notes: Should we diverge from DXC behaviour to just ignore the original
+root signature specified?
 
 #### Option `-extractrootsignature`
 
