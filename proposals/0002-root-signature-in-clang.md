@@ -938,22 +938,23 @@ Operands:
 
 ### Root Signature Driver Options
 
-A user can compile and use a root signature for a shader using the different
-command line options. Below lists the options available in DXC that will be
-carried forward to Clang and their expected behaviour.
+A user can compile and use a root signature for a shader using a variety of
+different command line options. This section lists the options available in DXC
+that will be carried forward to Clang and their expected behaviour.
 
-(Design notes and unplanned options will be removed after being resolved)
+Options implemented in Clang follow the guiding principle to validate as much
+as possible on the smallest set of root signatures. Practically, this means
+that if a root signature will not be used, then it will not be parsed or
+validated.
 
-Design Notes: In the context of using root signature with DXC, there is the
-`-dumpbin` option which allows the user to specify a DXIL Container object as
-the input file and use this for an operation, rather than invoke the compiler.
-Many of the below options also have a `dumpbin` variant of the options that
-provide similar functionality. So note that below, we will only consider the
-context of compiling a shader.
+DXC also provided numerous options that (alongside `-dumpbin`) were intended to
+to modify the compiled DXIL Container with respect to the root signature (RTS0)
+part. It has been decided that these options will not be implemented in Clang
+as a driver option. Instead they will have their functionality implemented
+separately within an object manipulation tool.
 
-In this sense, we are proposing to not bring the `dumpbin` variants of these
-options forward to clang. And an open question is: where do we plan to provide
-these options, or, if we plan to provide them. (Possibly in `dxv` or `dxa`?)
+Concretely, these DXC options are: `setrootsignature`, `extractrootsignature`,
+and, `verifyrootsignature`.
 
 #### Option `-force-rootsig-ver`
 
@@ -970,15 +971,12 @@ Usage:
 Behaviour:
 
  - Validation logic that is specific to the version will be followed, as
-described above
- - Serialized root signature in DXIL container will be compliant with specified
-version
-
-Design Notes: Required for backwards compatibility. Implemented in Clang.
+described in the [validations section](#validations-in-sema)
+ - The serialized RTS0 format will be compliant with specified version
 
 #### Option `-rootsig-define`:
 
-Sets the root signature attribute for the entry function to be the root
+Overrides the root signature attribute for the entry function to be the root
 signature defined by the given macro expansion.
 
 Usage:
@@ -997,13 +995,9 @@ Behaviour:
 the one defined by the macro expansion
  - If the entry function has a root signature attribute, it will overwrite to
 use the one defined by the macro expansion
- - Note: Even when provided, this will parse and do non-resource binding
-validations of the root signature specified as an attribute before dropping it
 
-Design Notes: Commonly used. Planned in Clang.
-
-Design Notes: Should we diverge from DXC behaviour to just ignore the original
-root signature specified?
+_Note_: Behaviour differs from DXC as it will not parse the function's root
+signature attribute, if it exists
 
 #### Target Root Signature Version
 
@@ -1015,7 +1009,8 @@ Usage:
 Given a defined macro in the source file (`#define RS "CBV(b0)"`)
 
 ```
-  -T <root signature version> -E <entry root signature>`
+  -T <root signature version> -E <entry root signature>
+  -T <root signature version> -E <entry root signature> -D <entry root signature>="..."
   -T rootsig_1_0 -E RS /Fo RS.bin
   -T rootsig_1_1 -E RS /Fo RS.bin
 ```
@@ -1024,110 +1019,34 @@ Behaviour:
 
  - Parse and perform syntactic validations of "entry" root signature
  - Perform the non-resource binding sub-set of validations
- - Produces a DXIL container with only the serialized "entry" root signature
-as the only part
+ - Produces a DXIL container with just the RTS0 part
 
- - Note: It is not possible to use `-rootsig-define` to overwrite which root
+_Note_: It is not possible to use `-rootsig-define` to overwrite which root
 signature will be used as the "entry" root signature, because this is specified
 using the `-E` option when compiling directly to a root signature target.
 
-Design Notes: Commonly used. Planned in Clang.
+_Note_: It is possible to specify the root signature using the `-D` option.
+This then should not require providing a source file. DXC still requires an
+input file, so it will be left as an implementation detail of whether or not it
+is feasible to have an optional source file.
 
-#### Option `-Qstrip-rootsignature`
+#### Option `-Qstrip_rootsignature`
 
 Omits the root signature part (RTS0) from the produced DXIL Container.
 
 Usage:
 
 ```
-  -Qstrip-rootsignature
+  -Qstrip_rootsignature
 ```
 
 Behaviour:
 
- - Parse and perform syntactic validations of "entry" root signature
- - Perform the non-resource binding sub-set of validations
+ - Parse and perform validations of used root signature
  - Produces the DXIL container with the RTS0 omitted
 
-Design Notes: Usable within .hlsl source files. Planned in Clang unless there is
-a signal of it being unused.
-
-Design Notes: Should we diverge from DXC behaviour to just ignore the original
-root signature specified?
-
-#### Option `-setrootsignature`
-
-Overwrite the root signature part (RTS0) with the RTS0 of provided DXIL
-Container.
-
-Usage:
-
-```
-  -setrootsignature <DXIL Container with RTS0>
-```
-
-Behaviour:
-
- - Insert/overwrite the RTS0 part of the compiled DXIL Container with the RTS0
-contents of the input container
- - This will only perform the resource binding validations with the compiled
-shader and RTS0 of the provided DXIL Container
- - Requires the option argument to be a valid DXIL container with or without an
-RST0 part
- - Note: Even when provided, this will parse and do non-resource binding
-validations of the root signature specified as an attribute (or another way
-above) before dropping it
-
-Design Notes: Planned in Clang. If compiling a stand-alone DXIL Container with
-just the RTS0 is useful then this is presumably also required in that workflow.
-
-Design Notes: Should we diverge from DXC behaviour to just ignore the original
-root signature specified?
-
-#### Option `-extractrootsignature`
-
-Specifies to compile the shader as normal but will only output the RTS0 part
-into the produced DXIL Container.
-
-Usage:
-
-```
-  -extractrootsignature /Fo <DXIL Container>
-```
-
-Behaviour:
-
- - Behaviour is the same as the
-[root signature target option](#target-root-signature-version), with the
-exception that it will run all validations with the resource bindings in the
-shader code
-
-Design Notes: Not planned in Clang. This is on the assumption that running the
-additional validations doesn't provide additional utility over the root
-signature target option and compiling the shader regularly.
-
-#### Option `-verifyrootsignature`
-
-Given a shader defined from a DXIL Container, perform validations with the
-root signature part (RTS0) of the other DXIL Container
-
-Usage:
-
-```
-  -dumpbin <Shader DXIL Container> -verifyrootsignature <Root Signature DXIL Container>
-```
-
-Note: `dumpbin` is required to load a binary instead of performing compilation
-
-Behaviour:
-
- - Performs validation that require resource binding information from the
-input DXIL Container with the provided RTS0.
-
-Design Notes: Not planned in Clang. We don't want to provide non-compilation
-options.
-
-Design Notes: Maybe these validations will be part of `setrootsignature`.
+_Note_: Behaviour differs from DXC as it will perform resource binding
+validations since this information is available.
 
 #### Option `/Frs`
 
@@ -1142,14 +1061,9 @@ Usage:
 
 Behaviour:
 
- - Behaviour is the same as `-extractrootsignature`. Except that it will still
-output the complete DXIL Container as normal, and, produce an additional DXIL
-container with just the RTS0 part.
-
- - Note: this does not have any `dumpbin` functionality
-
-Design Notes: Not planned in Clang. For similar motivations as
-`extractrootsignature`.
+ - Creates a separate compiler action to output a DXIL Container with just RTS0
+part into the file specified.
+ - Parses and validates the entry function's root signature.
 
 ## Alternatives considered (Optional)
 
