@@ -24,8 +24,7 @@ part. It has been decided that these options will not be implemented in Clang
 as a driver option. Instead they will have their functionality implemented
 separately within an object manipulation tool.
 
-Concretely, these DXC options are: `setrootsignature`, `extractrootsignature`,
-and, `verifyrootsignature`.
+## Compilation Options
 
 ### Option `-force-rootsig-ver`
 
@@ -134,6 +133,66 @@ Behaviour:
  - Creates a separate compiler action to output a DXIL Container with just RTS0
 part into the file specified.
  - Parses and validates the entry function's root signature.
+
+## Object Maniupulation Options
+
+For all of the following options it is defined that the produced container
+will have its contents re-hashed for validility. When describing the option
+usage, it is assumed that the DXIL Container to be modified is the input file.
+This will be referred to as the input DXIL Container. The argument to the
+option is referred to as the provided DXIL Container.
+
+#### Option `-setrootsignature`
+
+Produce a copy of input DXIL Container with the RTS0 part of provided DXIL
+Container. Perform resource binding validations on produced DXIL Container.
+
+Usage:
+
+```
+  -setrootsignature <DXIL Container with RTS0>
+```
+
+Behaviour:
+
+ - Performs resource binding validations with input shader bytecode and RTS0
+of provided DXIL Container
+ - Produces a copy of input DXIL Container with the RTS0 part of provided DXIL
+Container
+ - Requires the provided DXIL Container to be a valid DXIL container with an
+RST0 part
+
+#### Option `-extractrootsignature`
+
+Produce a DXIL Container containing only the input DXIL Container RTS0 part.
+
+Usage:
+
+```
+  -extractrootsignature /Fo <DXIL Container>
+```
+
+Behaviour:
+
+ - As described above.
+
+#### Option `-verifyrootsignature`
+
+Perform resource binding validations of input DXIL Container with the RTS0 part
+of provided DXIL Container.
+
+Usage:
+
+```
+  -verifyrootsignature <DXIL Container with RTS0>
+```
+
+Behaviour:
+
+ - Performs resource binding validations with input shader bytecode and RTS0
+of provided DXIL Container
+ - Requires the provided DXIL Container to be a valid DXIL container with an
+RST0 part
 
 ## Acknowledgments (Optional)
 
