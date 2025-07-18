@@ -50,7 +50,7 @@ on the outputs.
 
 Semantic attributes only carry meaning when used on:
   - an entry point parameter
-  - entrypoint return value
+  - an entry point function or the return value
   - fields of a struct used by an entry point parameter or return value.
 All other uses are simply ignored.
 
