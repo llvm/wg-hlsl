@@ -134,3 +134,7 @@ Behaviour:
  - Creates a separate compiler action to output a DXIL Container with just RTS0
 part into the file specified.
  - Parses and validates the entry function's root signature.
+
+## Acknowledgments (Optional)
+
+<!-- {% endraw %} -->
