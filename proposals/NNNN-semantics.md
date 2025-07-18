@@ -23,58 +23,85 @@ System semantics are linked to specific parts of the pipeline, while
 user semantics are just a way for the user to link the output of a stage
 to the input of another stage.
 
-
 Shader semantic attributes can be applied to:
   - a function parameter
   - function return value
   - a struct field's declaration
 
-They only carry meaning when used on:
-  - an entry point parameter
-  - entrypoint return value
-  - a struct type used by an entry point parameter or return value.
-All other uses are simply ignored.
-
-When a semantic is applied to both a parameter/return value, and its type,
-the parameter/return value semantic applies, and the type's semantics are
-ignored.
-
-Each scalar in the entrypoint must have a semantic attribute attached, either
-directly or inherited from the parent struct type.
-
-When a semantic applies to an array type, each element of the array
-is considered to take one index space in the semantic.
-When a semantic applies to a struct, each scalar field (recursively) takes
-one index in the semantic.
-
-Shader semantics on function return value are output semantics.
-When applying to an entrypoint parameter, the `in`/`out`/`inout` qualifiers
-will determine if this is an input or output semantic.
-
-Each semantic is *usually* composed of two elements:
- - a case insensitive name
- - an index
-
+The full semantic as used by the pipeline is composed of a case insensitive
+name and an index.
+When assigning a semantic attribute, a number may be appended to the name to
+indicate the starting index for the semantic assignment.  If no number is
+specified, the starting index is assumed to be `0`.
 Any semantic starting with the `SV_` prefix is considered to be a system
-semantic. Some system semantics do not have indices, while other have. All
-user semantics have an index (implicit or explicit).
+semantic.
 
-The index can be either implicit (equal to 0), or explicit:
-
- - `Semantic`, Name = SEMANTIC, Index = 0
- - `SEMANTIC0`, Name = SEMANTIC, Index = 0
- - `semANtIC12`, Name = SEMANTIC, Index = 12
-
+Examples:
+ - `SEMANTIC0`, Name = SEMANTIC, Index = 0, user semantic
+ - `Semantic`, Name = SEMANTIC, Index = 0, user semantic
+ - `semANtIC12`, Name = SEMANTIC, Index = 12, user semantic
+ - `SV_Position`, Name = SV_POSITION, Index = 0, system semantic
+ - `SV_POSITION2`, Name = SV_POSITION, Index = 2, system semantic
 
 The HLSL language does not impose restriction on the indices except it has to
 be a positive integer or zero. Target APIs can apply additional restrictions.
 The same semantic (name+index) must only appear once on the inputs, and once
 on the outputs.
 
+Semantic attributes only carry meaning when used on:
+  - an entry point parameter
+  - entrypoint return value
+  - fields of a struct used by an entry point parameter or return value.
+All other uses are simply ignored.
+
+A semantic attribute applied to a field, parameter, or function declaration
+will override all inner semantics on any fields contained in that
+declaration's type.
+
+For entry functions, every parameter and non-void return value must have an
+assigned semantic. This semantic must come from either:
+ - a semantic attribute on the parameter
+ - a semantic attribute on all structure fields in the type's declaration.
+ - for return values, a semantic attribute on the function
+
+Shader semantics on function return value are output semantics.
+When applying to an entrypoint parameter, the `in`/`out`/`inout` qualifiers
+will determine if this is an input or output semantic.
+
 Each stage has a fixed list of allowed system semantics for its
 inputs or outputs. If user semantics are allowed as input or output semantics
-depends on the shader stage being
-targeted.
+depends on the shader stage being targeted.
+
+The semantic index correspond to a storage "row" in the pipeline.
+Each "row" can store at most a 4-component 32bit numeric value.
+This implies a struct with multiple `float4` fields will be stored over
+multiple "rows", hence will span over multiple semantic indices.
+
+Example:
+ - `float   s : MY_SEMANTIC` takes one row, implicitly set to `0`.
+ - `float   s : MY_SEMANTIC0` takes one row, explicitly set to `0`.
+ - `float4  s : MY_SEMANTIC0` takes one row, explicitly set to `0`.
+ - `double4 s : MY_SEMANTIC0` takes two rows, `0` and `1`.
+
+- Struct fields, arrays and matrices may require more than one "row" depending
+  on their dimensions.
+- Each array element, struct field, or matrix row starts on a new "row",
+  there is no packing.
+- Indices are assigned from the first element/field to the last, recursively
+  in a depth-first order.
+- An array of size N with elements taking M rows will take a total of
+  N x M rows.
+- Each semantic+index pair can appear once on the inputs, and once on the
+  outputs.
+
+Example:
+ - `float arr[2] : MY_SEM` takes 2 rows, `0` and `1`.
+   Even if a row could store multiple floats, each array element starts on a
+   new row.
+
+ - `double3 arr[2] : MY_SEM1` takes 4 rows, `1`, `2`, `3` and `4`.
+   Each double3 require 2 rows, and thus the array requires 4 rows.
+   `arr[0]` will take `1` and `2`, and `arr[1]` `3`, `4`.
 
 Examples:
 
