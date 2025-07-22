@@ -68,9 +68,9 @@ The Clang code generation algorithm is as follows:
 5.  If a resource has an associated counter buffer, Clang creates a second
     resource handle for it. The binding for the counter buffer is determined as
     follows:
-    *   If the resource has the `vk::counter_binding(b)` attribute, Clang assigns
-        the counter buffer an explicit binding `b`. The counter buffer resides
-        in the same descriptor set as the main resource.
+    *   If the resource has the `vk::counter_binding(b)` attribute, Clang
+        assigns the counter buffer an explicit binding `b`. The counter buffer
+        resides in the same descriptor set as the main resource.
     *   Otherwise, Clang assigns the counter buffer an implicit binding in the
         same descriptor set as the main resource. The `OrderId` for the counter
         buffer is assigned as if it were declared immediately after the
@@ -113,20 +113,22 @@ resources based on their declaration order in the source code. All four
 resources will be placed in the default descriptor set (set 0).
 
 *   `A` is the first resource declared, so it will be assigned binding 0.
-*   `B` is declared next, so it will be assigned binding 1.
-    It is an array of four buffers, but it will be represented by a single
-    descriptor binding.
+*   `B` is declared next, so it will be assigned binding 1. It is an array of
+    four buffers, but it will be represented by a single descriptor binding.
 *   `C` is the third resource, so it will be assigned the next available
     binding, which is 2.
 *   `D` is the last resource, so it will be assigned binding 3.
 
 This behavior is consistent with DXC default behavior when targeting SPIR-V.
-However, this differs from the DXIL behavior described in [0024-implicit-resource-binding.md](0024-implicit-resource-binding.md). In DXIL, the resource array `B` will take 4 register slots. In SPIR-V, resource arrays (like `B[4]`) use a single binding.
+However, this differs from the DXIL behavior described in
+[0024-implicit-resource-binding.md](0024-implicit-resource-binding.md). In DXIL,
+the resource array `B` will take 4 register slots. In SPIR-V, resource arrays
+(like `B[4]`) use a single binding.
 
 ### Explicit register assignment
 
-Consider the following HLSL compute shader where four resources are declared with
-explicit resources:
+Consider the following HLSL compute shader where four resources are declared
+with explicit resources:
 
 ```hlsl
 RWBuffer<float4> A : register(u0);
@@ -144,14 +146,12 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 }
 ```
 
-With the proposed changes, Clang will assign bindings to these
-resources based on the register assignment in the source code.
+With the proposed changes, Clang will assign bindings to these resources based
+on the register assignment in the source code.
 
-*   `A` is assigned binding 0 in the default descriptor set (set
-    0).
-*   `B` is assigned binding 1 in descriptor set 1. It is an
-    array of four buffers, but it will be represented by a single descriptor
-    binding.
+*   `A` is assigned binding 0 in the default descriptor set (set 0).
+*   `B` is assigned binding 1 in descriptor set 1. It is an array of four
+    buffers, but it will be represented by a single descriptor binding.
 *   `C` is assigned binding 1 in the default descriptor set (set 0).
 *   `D` is assigned binding 0 in descriptor set 1.
 
@@ -174,12 +174,11 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 }
 ```
 
-With the proposed changes, Clang will assign bindings to these
-resources based on the `vk::binding` attribute.
+With the proposed changes, Clang will assign bindings to these resources based
+on the `vk::binding` attribute.
 
 *   `A` is assigned binding 2 in descriptor set 1.
-*   `B` is assigned binding 0 in the default descriptor set (set
-    0).
+*   `B` is assigned binding 0 in the default descriptor set (set 0).
 *   `C` is assigned binding 1 in descriptor set 1.
 
 ### Mixed explicit bindings
@@ -202,8 +201,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 The `vk::binding` attribute takes precedence over the `register` attribute.
 
 *   `A` is assigned binding 2 in descriptor set 1.
-*   `B` is assigned binding 0 in the default descriptor set (set
-    0).
+*   `B` is assigned binding 0 in the default descriptor set (set 0).
 *   `C` is assigned binding 1 in descriptor set 1.
 
 ### Space-only register annotations
@@ -224,36 +222,41 @@ void main() {
 
 Under the proposed SPIR-V binding rules, the assignments would be:
 
-*   `A` has an explicit binding: binding 1 in the default descriptor set (set 0).
-*   `B` has an implicit binding. It is the first declared resource with an implicit binding in set 0, so it is assigned the first available slot: binding 0 in set 0.
-*   `C` has an implicit binding in `space1`. It is the first declared resource for set 1, so it is assigned binding 0 in set 1.
-*   `D` has an implicit binding in `space1`. It is the second declared resource for set 1, so it is assigned the next available slot: binding 1 in set 1.
+*   `A` has an explicit binding: binding 1 in the default descriptor set (set
+    0).
+*   `B` has an implicit binding. It is the first declared resource with an
+    implicit binding in set 0, so it is assigned the first available slot:
+    binding 0 in set 0.
+*   `C` has an implicit binding in `space1`. It is the first declared resource
+    for set 1, so it is assigned binding 0 in set 1.
+*   `D` has an implicit binding in `space1`. It is the second declared resource
+    for set 1, so it is assigned the next available slot: binding 1 in set 1.
 
-This differs from the DXIL behavior described in [0024-implicit-resource-binding.md](0024-implicit-resource-binding.md), particularly for the unbounded array `B` and for `D` which follows a resource array. In SPIR-V, resource arrays (like `C[3]`) are treated as a single binding, which simplifies the layout.
+This differs from the DXIL behavior described in
+[0024-implicit-resource-binding.md](0024-implicit-resource-binding.md),
+particularly for the unbounded array `B` and for `D` which follows a resource
+array. In SPIR-V, resource arrays (like `C[3]`) are treated as a single binding,
+which simplifies the layout.
 
 ### Conflict with explicit register assignment
 
-Consider the following HLSL compute shader where three resources are declared with
-conflicting explicit resources:
+Consider the following HLSL compute shader where three resources are declared
+with conflicting explicit resources:
 
-RWBuffer<float4> A : register(t0);
-RWBuffer<float4> B : register(s0);
-RWBuffer<float4> C : register(u0);
-RWBuffer<float4> C          : register(u0);
+RWBuffer<float4> A : register(t0); RWBuffer<float4> B : register(s0);
+RWBuffer<float4> C : register(u0); RWBuffer<float4> C : register(u0);
 
-[numthreads(1, 1, 1)]
-void main(uint3 dispatchThreadId : SV_DispatchThreadID)
-{
-    C[0] = A[0] + B[0];
-}
-```
+[numthreads(1, 1, 1)] void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
+C[0] = A[0] + B[0]; } ```
 
 With the proposed changes, Clang will assign the same set and binding to all
 three resources. All will be in descriptor set 0 at binding 0. This will be an
 error because all three resources are used by the shader.
 
-This behavior is consistent with DXC's default behavior.
-However, if the `-vk-s-shift=50` option was provided to DXC, the binding for the resource in register `s0` would be 50, removing the conflict. This option will not be implemented in Clang. See the open questions.
+This behavior is consistent with DXC's default behavior. However, if the
+`-vk-s-shift=50` option was provided to DXC, the binding for the resource in
+register `s0` would be 50, removing the conflict. This option will not be
+implemented in Clang. See the open questions.
 
 ### Unused resource array
 
@@ -273,8 +276,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 }
 ```
 
-Because `B` is not used, it will be removed by the optimizer.
-This means that the implicit binding assignments will be affected.
+Because `B` is not used, it will be removed by the optimizer. This means that
+the implicit binding assignments will be affected.
 
 *   `A` is the first resource declared, so it will be assigned binding 0.
 *   `B` is unused and removed.
@@ -316,10 +319,14 @@ stable binding assignments.
 *   `s.D` is the second implicitly bound resource. It is assigned the next
     available binding, which is binding 3.
 
-This behavior is different from DXC when targeting SPIR-V, which assigns bindings for resources in a
-struct in a contiguous set of binding. Since `s.D and s.C` cannot both fit between `A` and `B`, then both come after. `s.C` gets binding 3, and `s.D` gets binding 4. Unlike DXIL, they are assigned binding based on the order that they are declared in the struct.
+This behavior is different from DXC when targeting SPIR-V, which assigns
+bindings for resources in a struct in a contiguous set of binding. Since `s.D
+and s.C` cannot both fit between `A` and `B`, then both come after. `s.C` gets
+binding 3, and `s.D` gets binding 4. Unlike DXIL, they are assigned binding
+based on the order that they are declared in the struct.
 
-The proposed behavior is consistent with the behavior in Clang when targeting DXIL.
+The proposed behavior is consistent with the behavior in Clang when targeting
+DXIL.
 
 ### Resource arrays in a struct
 
@@ -350,20 +357,23 @@ declaration order.
 *   `s.A` is the first implicitly bound resource. It is an array of 4, but it
     will be assigned a single binding, binding 0.
 *   `s.B` is the second. It will be assigned binding 1.
-*   `s.C` is the third. It will be assigned the next available binding, which
-    is binding 3.
+*   `s.C` is the third. It will be assigned the next available binding, which is
+    binding 3.
 
-This behavior is different from DXC. When targeting SPIR-V, DXC tries to assign all of the resources in the struct with continuous bindings where each resource gets one binding for each element. In this example, the binding assignments in DXC are as follows:
+This behavior is different from DXC. When targeting SPIR-V, DXC tries to assign
+all of the resources in the struct with continuous bindings where each resource
+gets one binding for each element. In this example, the binding assignments in
+DXC are as follows:
 
-- `D` is assigned binding 2.
-- `A` is assigned binding 3.
-- `B` is assigned binding 7.
-- `C` is assigned binding 9.
+-   `D` is assigned binding 2.
+-   `A` is assigned binding 3.
+-   `B` is assigned binding 7.
+-   `C` is assigned binding 9.
 
 ### Dynamic indexing of resource arrays in a struct
 
-Consider the following HLSL compute shader where a resource array inside a struct
-is dynamically indexed:
+Consider the following HLSL compute shader where a resource array inside a
+struct is dynamically indexed:
 
 ```hlsl
 RWBuffer<float> A[10];
@@ -381,7 +391,10 @@ void main() {
 }
 ```
 
-When targeting DXIL, DXC reports an error for this code: `error: Index for resource array inside cbuffer must be a literal expression`. This is a fundamental limitation of the DXIL representation for resources in structs. This limitation does not exist when targeting SPIR-V. 
+When targeting DXIL, DXC reports an error for this code: `error: Index for
+resource array inside cbuffer must be a literal expression`. This is a
+fundamental limitation of the DXIL representation for resources in structs. This
+limitation does not exist when targeting SPIR-V.
 
 This case will still work in Clang.
 
@@ -393,72 +406,66 @@ Note that in DXC `s.B` is assigned binding 10.
 ### Dynamic resource indexing
 
 Consider the following HLSL compute shader where a resource array is dynamically
-indexed:
-```hlsl
-RWBuffer<float4> A[8];
-RWBuffer<float4> B;
+indexed: ```hlsl RWBuffer<float4> A[8]; RWBuffer<float4> B;
 
-RWBuffer<float4> GetBuffer(uint index)
+RWBuffer<float4> GetBuffer(uint index) { return A[index]; }
+
+[numthreads(8, 3, 4)] void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
+RWBuffer<float4> input = GetBuffer(dispatchThreadId.x);
+
+```
+float4 value = float4(0, 0, 0, 0);
+
+switch (dispatchThreadId.y)
 {
-    return A[index];
+    case 0:
+        switch (dispatchThreadId.z)
+        {
+            case 0: value = input[0]; break;
+            case 1: value = input[1]; break;
+            case 2: value = input[2]; break;
+            case 3: value = input[3]; break;
+        }
+        break;
+    case 1:
+        switch (dispatchThreadId.z)
+        {
+            case 0: value = input[4]; break;
+            case 1: value = input[5]; break;
+            case 2: value = input[6]; break;
+            case 3: value = input[7]; break;
+        }
+        break;
+    case 2:
+        switch (dispatchThreadId.z)
+        {
+            case 0: value = input[8]; break;
+            case 1: value = input[9]; break;
+            case 2: value = input[10]; break;
+            case 3: value = input[11]; break;
+        }
+        break;
 }
 
-[numthreads(8, 3, 4)]
-void main(uint3 dispatchThreadId : SV_DispatchThreadID)
-{
-    RWBuffer<float4> input = GetBuffer(dispatchThreadId.x);
-
-    float4 value = float4(0, 0, 0, 0);
-
-    switch (dispatchThreadId.y)
-    {
-        case 0:
-            switch (dispatchThreadId.z)
-            {
-                case 0: value = input[0]; break;
-                case 1: value = input[1]; break;
-                case 2: value = input[2]; break;
-                case 3: value = input[3]; break;
-            }
-            break;
-        case 1:
-            switch (dispatchThreadId.z)
-            {
-                case 0: value = input[4]; break;
-                case 1: value = input[5]; break;
-                case 2: value = input[6]; break;
-                case 3: value = input[7]; break;
-            }
-            break;
-        case 2:
-            switch (dispatchThreadId.z)
-            {
-                case 0: value = input[8]; break;
-                case 1: value = input[9]; break;
-                case 2: value = input[10]; break;
-                case 3: value = input[11]; break;
-            }
-            break;
-    }
-
-    B[dispatchThreadId.x] = value;
-}
+B[dispatchThreadId.x] = value;
 ```
 
-In this example, the `A` array is indexed using `dispatchThreadId.x`,
-which is not a compile-time constant. This is an example of dynamic resource
-indexing. The selected buffer is then read from based on `dispatchThreadId.y`
-and `dispatchThreadId.z`.
+} ```
+
+In this example, the `A` array is indexed using `dispatchThreadId.x`, which is
+not a compile-time constant. This is an example of dynamic resource indexing.
+The selected buffer is then read from based on `dispatchThreadId.y` and
+`dispatchThreadId.z`.
 
 This pattern is supported when generating SPIR-V. However, it illustrates the
 difficulty of implementing an option like `-fspv-flatten-resource-arrays`. To
 flatten the resource array, a pass would be required to replace the array with
-individual resources (e.g., `A_0`, `A_1`, etc.). To handle the
-dynamic index, the compiler would have to generate code for each possible index,
-leading to significant code duplication. The nested `switch` statements further
-complicate this, as the entire switch structure would need to be duplicated for
-each resource in the array. This is why supporting such an option adds
-significant complexity and maintenance overhead.
+individual resources (e.g., `A_0`, `A_1`, etc.). To handle the dynamic index,
+the compiler would have to generate code for each possible index, leading to
+significant code duplication. The nested `switch` statements further complicate
+this, as the entire switch structure would need to be duplicated for each
+resource in the array. This is why supporting such an option adds significant
+complexity and maintenance overhead.
 
 ### Resource in constant buffer
 
@@ -480,13 +487,14 @@ void main()
 }
 ```
 
-In this example, `A` is declared in the
-`MyResources` constant buffer. When using implicit bindings, DXC has a specific
-behavior where the bindings for the resources inside the cbuffer are assigned
-before the cbuffer itself. In this case, `A` will be assigned binding 0, and `MyResources` will be assigned binding 1.
+In this example, `A` is declared in the `MyResources` constant buffer. When
+using implicit bindings, DXC has a specific behavior where the bindings for the
+resources inside the cbuffer are assigned before the cbuffer itself. In this
+case, `A` will be assigned binding 0, and `MyResources` will be assigned binding
+1.
 
-TODO: The exact binding assignment behavior in Clang for
-this scenario is one of the open questions to be resolved by this proposal.
+TODO: The exact binding assignment behavior in Clang for this scenario is one of
+the open questions to be resolved by this proposal.
 
 ### Unused RWStructuredBuffer with Counter
 
@@ -540,8 +548,8 @@ The binding assignments are as follows:
     in the default descriptor set (set 0). Its counter buffer is explicitly
     assigned binding 3 via the `vk::counter_binding(3)` attribute.
 *   The counter for `rw_buf1` has an implicit binding. It is assigned the first
-    available binding in the default descriptor set, which is 2 (since 0, 1,
-    and 3 are already used).
+    available binding in the default descriptor set, which is 2 (since 0, 1, and
+    3 are already used).
 
 ### Implicitly Bound RWStructuredBuffer with Counter
 
@@ -598,8 +606,8 @@ The binding assignments are as follows:
 
 ### Append/Consume Buffers with Counters
 
-This example demonstrates `AppendStructuredBuffer` and `ConsumeStructuredBuffer`,
-which have implicit counters and implicit bindings.
+This example demonstrates `AppendStructuredBuffer` and
+`ConsumeStructuredBuffer`, which have implicit counters and implicit bindings.
 
 ```hlsl
 AppendStructuredBuffer<float4> append_buf;
@@ -617,8 +625,8 @@ The binding assignments are as follows:
 
 *   `append_buf` is the first resource declared, so it is assigned binding 0.
     Its associated counter is assigned binding 1.
-*   `consume_buf` is the next resource, so it is assigned binding 2. Its
-    counter is assigned binding 3.
+*   `consume_buf` is the next resource, so it is assigned binding 2. Its counter
+    is assigned binding 3.
 
 This behavior is consistent with DXC. It is important to note that DXC's
 handling of counter buffers for `AppendStructuredBuffer` and
@@ -641,24 +649,40 @@ void main()
 }
 ```
 
-In HLSL, `A[]` and `B[]` are declared as unbounded (or runtime-sized) arrays of resources. In Vulkan, this concept maps to a descriptor binding that is an array of descriptors. Each declaration (`A` and `B`) will be assigned a single, separate descriptor binding. For example, with implicit bindings:
+In HLSL, `A[]` and `B[]` are declared as unbounded (or runtime-sized) arrays of
+resources. In Vulkan, this concept maps to a descriptor binding that is an array
+of descriptors. Each declaration (`A` and `B`) will be assigned a single,
+separate descriptor binding. For example, with implicit bindings:
 
 *   `A` will be assigned to binding 0 in the default descriptor set.
 *   `B` will be assigned to binding 1 in the default descriptor set.
 
-This behavior differs significantly from the model for DXIL, as detailed in [0024-implicit-resource-binding.md](0024-implicit-resource-binding.md). In DXIL, an unbounded array consumes all remaining binding slots in its register space. Consequently, DXIL is limited to a single unbounded resource array per register space. The SPIR-V approach is more flexible, allowing multiple unbounded arrays to be used by assigning each to its own descriptor binding.
+This behavior differs significantly from the model for DXIL, as detailed in
+[0024-implicit-resource-binding.md](0024-implicit-resource-binding.md). In DXIL,
+an unbounded array consumes all remaining binding slots in its register space.
+Consequently, DXIL is limited to a single unbounded resource array per register
+space. The SPIR-V approach is more flexible, allowing multiple unbounded arrays
+to be used by assigning each to its own descriptor binding.
 
 ## Open questions
 
 ### Should unused resources be assigned a binding?
 
-When targeting SPIR-V in DXC, resources are assigned bindings before optimization passes run. This
-leads to unused resources receiving a binding. If we assign implicit bindings in
-the backend, this will occur after optimizations, which can affect the final
-binding assignments for other resources. If we want to maintain compatibility with
-DXC's behavior, we must decide how to handle these unused resources.
+**DECISION: Assigning implicit bindings will be done after optimizations. No one
+expressed that they rely on unused resources reserving a binding. This behavior
+matches DXIL in DXC, so we don't expect many users to rely on the SPIR-V
+behavior in DXC.**
 
-Assigning binding after optimization is consistent with the behavior when targeting DXIL in both DXC and Clang. This will help us align better with their implementation.
+When targeting SPIR-V in DXC, resources are assigned bindings before
+optimization passes run. This leads to unused resources receiving a binding. If
+we assign implicit bindings in the backend, this will occur after optimizations,
+which can affect the final binding assignments for other resources. If we want
+to maintain compatibility with DXC's behavior, we must decide how to handle
+these unused resources.
+
+Assigning binding after optimization is consistent with the behavior when
+targeting DXIL in both DXC and Clang. This will help us align better with their
+implementation.
 
 Possible solutions:
 
@@ -667,15 +691,22 @@ Possible solutions:
 2.  Add an attribute to both binding intrinsics to prevent optimizers from
     removing them. Unused resources could then be removed in a later pass after
     implicit bindings have been assigned.
-3.  Add a target intrinsic to be a fake use of the resource handle to keep it alive until it is no longer needed.
+3.  Add a target intrinsic to be a fake use of the resource handle to keep it
+    alive until it is no longer needed.
 
 ### Do we still need `-fvk-auto-shift-bindings`?
+
+**DECISION: This option does not seem to be used. It also has complications in
+implementing it, so we will not implement it in Clang.**
 
 This option changes a resource's binding based on the `-fvk-*-shift` options.
 Supporting this would require the backend pass to access the values of the shift
 options and know the register type (`b`, `s`, `t`, `u`) for each resource.
 
 ### Do we still need `-fspv-flatten-resource-arrays`?
+
+**DECISION: This option does not seem to be used. It also has complications in
+implementing it, so we will not implement it in Clang.**
 
 Supporting this option would require assigning multiple bindings to a single
 resource array. This would likely necessitate an extra pass to replace the
@@ -700,6 +731,19 @@ offset based on the register type:
     `-fvk-u-shift`.
 
 While not difficult to implement, this adds to long-term maintenance costs.
+
+### Do we still need the `-fspv-preserve-bindings` option?
+
+This option tells the compiler to not remove unused bindings. The option
+is useful if the developer wants to have the same resource assignement to all
+shaders regardless of which resources are used, and know the binding and set of
+every resource by doing reflection on just a single shader.
+
+As with assigning bindings to unused resources, this could be implemented by
+adding a fake use of the resource handle that survives until instruction
+selection. The variable is created during instruction selection. However, we
+will have to make sure that we do not remove the unused variables after
+instruction selection.
 
 ### What is the order ID of resources declared in cbuffers?
 
