@@ -47,8 +47,8 @@ backend:
 Clang uses two intrinsics to represent resource accesses:
 
 ```llvm
-@llvm.spv.resource.handlefrombinding(i32 DescSet, i32 Binding, i32 ArraySize, i32 Index, bool IsUAV, ptr Name)
-@llvm.spv.resource.handlefromimplicitbinding(i32 OrderId, i32 DescSet, i32 ArraySize, i32 Index, bool IsUAV, ptr Name)
+@llvm.spv.resource.handlefrombinding(i32 DescSet, i32 Binding, i32 ArraySize, i32 Index, bool isUniformIndex, ptr Name)
+@llvm.spv.resource.handlefromimplicitbinding(i32 OrderId, i32 DescSet, i32 ArraySize, i32 Index, bool isUniformIndex, ptr Name)
 ```
 
 The Clang code generation algorithm is as follows:
@@ -120,7 +120,8 @@ resources will be placed in the default descriptor set (set 0).
     binding, which is 2.
 *   `D` is the last resource, so it will be assigned binding 3.
 
-This behavior is consistent with DXC default behaviour.
+This behavior is consistent with DXC default behavior when targeting SPIR-V.
+However, this differs from the DXIL behavior described in [0024-implicit-resource-binding.md](0024-implicit-resource-binding.md). In DXIL, the resource array `B` will take 4 register slots. In SPIR-V, resource arrays (like `B[4]`) use a single binding.
 
 ### Explicit register assignment
 
@@ -129,9 +130,9 @@ explicit resources:
 
 ```hlsl
 RWBuffer<float4> A : register(u0);
-RWBuffer<float4> B[4]: register(u1, space1);
-RWBuffer<float4> C  : register(u1);
-RWBuffer<float4> D          : register(u0, space1);
+RWBuffer<float4> B[4] : register(u1, space1);
+RWBuffer<float4> C : register(u1);
+RWBuffer<float4> D : register(u0, space1);
 
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
@@ -154,7 +155,7 @@ resources based on the register assignment in the source code.
 *   `C` is assigned binding 1 in the default descriptor set (set 0).
 *   `D` is assigned binding 0 in descriptor set 1.
 
-This behavior is consistent with DXC's default behaviour.
+This behavior is consistent with DXC's default behavior.
 
 ### Explicit Vulkan binding
 
@@ -163,7 +164,7 @@ with explicit Vulkan bindings:
 
 ```hlsl
 [[vk::binding(2, 1)]] RWBuffer<float4> A;
-[[vk::binding(0)]] RWBuffer<float4>      B;
+[[vk::binding(0)]] RWBuffer<float4> B;
 [[vk::binding(1, 1)]] RWBuffer<float4> C;
 
 [numthreads(1, 1, 1)]
@@ -188,7 +189,7 @@ both a `vk::binding` and a `register` attribute:
 
 ```hlsl
 [[vk::binding(2, 1)]] RWBuffer<float4> A : register(u0);
-[[vk::binding(0)]] RWBuffer<float4>      B : register(u1);
+[[vk::binding(0)]] RWBuffer<float4> B : register(u1);
 [[vk::binding(1, 1)]] RWBuffer<float4> C : register(u2);
 
 [numthreads(1, 1, 1)]
@@ -235,9 +236,9 @@ This differs from the DXIL behavior described in [0024-implicit-resource-binding
 Consider the following HLSL compute shader where three resources are declared with
 conflicting explicit resources:
 
-```hlsl
-RWBuffer<float4> A         : register(t0);
-RWBuffer<float4> B         : register(s0);
+RWBuffer<float4> A : register(t0);
+RWBuffer<float4> B : register(s0);
+RWBuffer<float4> C : register(u0);
 RWBuffer<float4> C          : register(u0);
 
 [numthreads(1, 1, 1)]
@@ -251,7 +252,7 @@ With the proposed changes, Clang will assign the same set and binding to all
 three resources. All will be in descriptor set 0 at binding 0. This will be an
 error because all three resources are used by the shader.
 
-This behavior is consistent with DXC's default behaviour.
+This behavior is consistent with DXC's default behavior.
 However, if the `-vk-s-shift=50` option was provided to DXC, the binding for the resource in register `s0` would be 50, removing the conflict. This option will not be implemented in Clang. See the open questions.
 
 ### Unused resource array
@@ -281,7 +282,7 @@ This means that the implicit binding assignments will be affected.
     binding, which is 1.
 *   `D` is the last resource, so it will be assigned binding 2.
 
-This behavior is different from DXC's default behaviour, which assigns bindings
+This behavior is different from DXC's default behavior, which assigns bindings
 before optimizations. See the open questions.
 
 ### Resources in a struct
@@ -300,7 +301,7 @@ struct S {
 
 [numthreads(4,1,1)]
 void main() {
-  A[0] = s.D[0] + s.C[0];
+  A[0] = s.D[0] + s.C[0] + B[0];
 }
 ```
 
@@ -309,14 +310,16 @@ resources, including those within a `struct`. This provides predictable and
 stable binding assignments.
 
 *   `A` is explicitly bound to `register(u0)`, so it is assigned binding 0.
-*   `B` is unused and will not recieve a binding. 
+*   `B` is explicitly bound to `register(u1)`, so it is assigned binding 2.
 *   `s.C` is the first implicitly bound resource declared. It is assigned the
     first available binding, which is binding 1.
 *   `s.D` is the second implicitly bound resource. It is assigned the next
-    available binding, which is binding 2.
+    available binding, which is binding 3.
 
-This behavior is different from DXC, which assigns bindings for resources in a
-struct in a contingous set of binding. Since `s.D and s.C` cannot both fit between `A` and `B`, then both come after. `s.C` gets binding 3, and `s.D` gets binding 4. Unlike DXIL, they are assigned binding based on the order that they are declared in the struct.
+This behavior is different from DXC when targeting SPIR-V, which assigns bindings for resources in a
+struct in a contiguous set of binding. Since `s.D and s.C` cannot both fit between `A` and `B`, then both come after. `s.C` gets binding 3, and `s.D` gets binding 4. Unlike DXIL, they are assigned binding based on the order that they are declared in the struct.
+
+The proposed behavior is consistent with the behavior in Clang when targeting DXIL.
 
 ### Resource arrays in a struct
 
@@ -350,7 +353,7 @@ declaration order.
 *   `s.C` is the third. It will be assigned the next available binding, which
     is binding 3.
 
-This behavior is different from DXC. When targeting SPIR-V, DXC tries to assign all of the resources in the struct with continious binding where each resource gets one binding for each element. In this example, the binding assignments in DXC are as follows:
+This behavior is different from DXC. When targeting SPIR-V, DXC tries to assign all of the resources in the struct with continuous bindings where each resource gets one binding for each element. In this example, the binding assignments in DXC are as follows:
 
 - `D` is assigned binding 2.
 - `A` is assigned binding 3.
@@ -380,7 +383,12 @@ void main() {
 
 When targeting DXIL, DXC reports an error for this code: `error: Index for resource array inside cbuffer must be a literal expression`. This is a fundamental limitation of the DXIL representation for resources in structs. This limitation does not exist when targeting SPIR-V. 
 
-With the proposed changes for SPIR-V, this limitation is removed. The code above is valid and will compile successfully. The resource array `s.B` will be treated as a single resource with one binding, and the dynamic indexing will be correctly translated to SPIR-V.
+This case will still work in Clang.
+
+*   `A` will be assigned binding 0.
+*   `s.B` will be assigned binding 1.
+
+Note that in DXC `s.B` is assigned binding 10.
 
 ### Dynamic resource indexing
 
@@ -644,11 +652,13 @@ This behavior differs significantly from the model for DXIL, as detailed in [002
 
 ### Should unused resources be assigned a binding?
 
-In DXC, resources are assigned bindings before optimization passes run. This
+When targeting SPIR-V in DXC, resources are assigned bindings before optimization passes run. This
 leads to unused resources receiving a binding. If we assign implicit bindings in
 the backend, this will occur after optimizations, which can affect the final
-binding assignments for other resources. If we want maintain compatibility with
+binding assignments for other resources. If we want to maintain compatibility with
 DXC's behavior, we must decide how to handle these unused resources.
+
+Assigning binding after optimization is consistent with the behavior when targeting DXIL in both DXC and Clang. This will help us align better with their implementation.
 
 Possible solutions:
 
@@ -657,6 +667,7 @@ Possible solutions:
 2.  Add an attribute to both binding intrinsics to prevent optimizers from
     removing them. Unused resources could then be removed in a later pass after
     implicit bindings have been assigned.
+3.  Add a target intrinsic to be a fake use of the resource handle to keep it alive until it is no longer needed.
 
 ### Do we still need `-fvk-auto-shift-bindings`?
 
