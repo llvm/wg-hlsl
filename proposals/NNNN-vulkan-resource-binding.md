@@ -664,9 +664,35 @@ Consequently, DXIL is limited to a single unbounded resource array per register
 space. The SPIR-V approach is more flexible, allowing multiple unbounded arrays
 to be used by assigning each to its own descriptor binding.
 
+### Constexpr expressions in attributes
+
+This example shows how `constexpr` expressions can be used as arguments to the
+`vk::binding` attribute.
+
+```hlsl
+constexpr int get_binding(int i) {
+    return i + 1;
+}
+
+static const int kMySet = 1;
+
+[[vk::binding(get_binding(1) + 1, kMySet)]] RWBuffer<float4> A;
+
+[numthreads(1, 1, 1)]
+void main(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+    A[0] = 1.0f;
+}
+```
+
+The compiler will evaluate the `constexpr` expressions at compile time and use
+the resulting values for the binding and set assignments.
+
+*   `A` is assigned binding 3 in descriptor set 1.
+
 ## Open questions
 
-### Should unused resources be assigned a binding?
+### Should unused resources beassigned a binding?
 
 **DECISION: Assigning implicit bindings will be done after optimizations. No one
 expressed that they rely on unused resources reserving a binding. This behavior
@@ -734,8 +760,8 @@ While not difficult to implement, this adds to long-term maintenance costs.
 
 ### Do we still need the `-fspv-preserve-bindings` option?
 
-This option tells the compiler to not remove unused bindings. The option
-is useful if the developer wants to have the same resource assignement to all
+This option tells the compiler to not remove unused bindings. The option is
+useful if the developer wants to have the same resource assignement to all
 shaders regardless of which resources are used, and know the binding and set of
 every resource by doing reflection on just a single shader.
 
