@@ -2,7 +2,7 @@
 
 # Resource arrays
 
-* Proposal: [NNNN](NNNN-resource-arrays.md)
+* Proposal: [0028](0028-resource-arrays.md)
 * Author(s): [Helena Kotas](https://github.com/hekota)
 * Status: **Design In Progress**
 
