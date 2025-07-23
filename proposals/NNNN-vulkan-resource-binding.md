@@ -692,7 +692,7 @@ the resulting values for the binding and set assignments.
 
 ## Open questions
 
-### Should unused resources beassigned a binding?
+### Should unused resources be assigned a binding?
 
 **DECISION: Assigning implicit bindings will be done after optimizations. No one
 expressed that they rely on unused resources reserving a binding. This behavior
