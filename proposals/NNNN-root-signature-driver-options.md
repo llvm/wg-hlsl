@@ -115,7 +115,7 @@ Behaviour:
  - Produces the DXIL container with the RTS0 omitted
 
 _Note_: Behaviour differs from DXC as it will perform resource binding
-validations since this information is available.
+validations when this information is available.
 
 ### Option `/Frs`
 
@@ -193,7 +193,5 @@ Behaviour:
 of provided DXIL Container
  - Requires the provided DXIL Container to be a valid DXIL container with an
 RST0 part
-
-## Acknowledgments (Optional)
 
 <!-- {% endraw %} -->
