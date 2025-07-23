@@ -243,8 +243,10 @@ which simplifies the layout.
 Consider the following HLSL compute shader where three resources are declared
 with conflicting explicit resources:
 
-RWBuffer<float4> A : register(t0); RWBuffer<float4> B : register(s0);
-RWBuffer<float4> C : register(u0); RWBuffer<float4> C : register(u0);
+```hlsl
+RWBuffer<float4> A : register(t0);
+RWBuffer<float4> B : register(s0);
+RWBuffer<float4> C : register(u0);
 
 [numthreads(1, 1, 1)] void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
 C[0] = A[0] + B[0]; } ```
