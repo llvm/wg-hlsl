@@ -2,7 +2,7 @@
 
 # Root Signature Driver Options
 
-* Proposal: [NNNN](NNNN-root-signture-driver-options.md)
+* Proposal: [0029](0029-root-signture-driver-options.md)
 * Author(s): [Finn Plummer](https//github.com/inbelic)
 * Status: **Accepted**
 * Impacted Project(s): Clang
