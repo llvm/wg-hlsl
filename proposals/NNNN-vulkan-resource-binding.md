@@ -297,7 +297,7 @@ struct:
 
 ```hlsl
 RWBuffer<float> A : register(u0);
-RWBuffer<float> B : register(u2); // Unused but explicitly bound.
+RWBuffer<float> B : register(u2);
 
 struct S {
   RWBuffer<float> C;
