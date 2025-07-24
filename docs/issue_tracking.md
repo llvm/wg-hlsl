@@ -29,7 +29,9 @@ The main fields HLSL Support adds are:
 ### Epic
 
 An "Epic" is our name for some large piece of functionality we're working
-towards.  All work items associated with an Epic have this field set.
+towards.  All work items associated with an Epic have this field set. We're
+still figuring out what is an appropriate scope for an epic. Adding a new epic
+is something that should be discussed in the working group meeting.
 
 ### Kind
 
@@ -39,7 +41,7 @@ Issues can be:
 * Task
 * Bug
 
-Note that we don't use githubs new "Type" field because that isn't necessarily
+Note that we don't use github's new "Type" field because that isn't necessarily
 consistent across repos.
 
 More details on what the different kinds of issues are can be found below.
@@ -114,7 +116,7 @@ We move a deliverable to **Active** once we start working on one of the tasks.
 At this point we can set the deliverable's iteration based on the estimates of
 those tasks.
 
-Once all the tasks are closed, the deliveable can be closed.
+Once all the tasks are closed, the deliverable can be closed.
 
 ### Task
 
@@ -131,7 +133,7 @@ expect to complete it.
 
 ### Bug
 
-Bugs are things we don't plan to do, so we don't spend a lot of time estimating
+Bugs are things we didn't plan to do, so we don't spend a lot of time estimating
 them. If significant work is involved in fixing it then we'll need to create
 other issues to track that as appropriate.
 
