@@ -57,6 +57,8 @@ All other uses are simply ignored.
 A semantic attribute applied to a field, parameter, or function declaration
 will override all inner semantics on any fields contained in that
 declaration's type.
+When a semantic is overriden, the compiler shall emit a warning stating
+which semantic was overriden by the enclosing type or the function.
 
 For entry functions, every parameter and non-void return value must have an
 assigned semantic. This semantic must come from either:
