@@ -351,27 +351,29 @@ call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind 
 To avoid issues described
 [above](#example-where-dxc-does-not-handle-local-arrays-correctly), we should
 aim to resolve initialization of resource array handles early in Clang. That
-involves intercepting the codegen for array access to emit the a resource class
+involves intercepting the codegen on array access to emit a resource class
 constructor call, which will eventually be transformed to
 `@dx.op.createHandleFromBinding` DXIL intrinsic. Creating local copies of
-resource arrays is mostly handled by the existing array parameter passing code,
-but additional work will likely be needed to support indexing subsets of
-multi-dimensional arrays.
+resource arrays should be mostly handled by the existing array parameter passing
+code, though additional work will likely be needed to support indexing of
+subsets of multi-dimensional arrays.
 
 ### Changes from DXC
 
-One notable difference from DXC behavior that we propose for Clang concerns the
+One notable difference from DXC behavior proposed for Clang is related to
 handling of unbounded resource arrays:
 
 *Local declarations of unbounded resource arrays will not be allowed.*
 
-Locally-scoped unbounded resource arrays are incorrect from a language
-perspective, as are unbounded arrays used as function arguments. Local arguments
-are initialized by creating a local copy of the array, which does not make sense
-for arrays of unknown size.
+https://github.com/microsoft/hlsl-specs/issues/141
+
+Locally-scoped unbounded resource arrays (also called _unsized arrays_) are
+incorrect from a language perspective, as are unbounded arrays used as function
+arguments. Local array arguments are initialized by creating a local copy of the
+array, which does not make sense for arrays of unknown size.
 
 Unbounded resource array declarations will only be allowed at global scope and
-can only be referenced through the global variable with which they are declared.
+can only be referenced through a global variable.
 
 ## Detailed design
 
@@ -379,7 +381,7 @@ can only be referenced through the global variable with which they are declared.
 
 We need to intercept codegen for `ArraySubscriptExpr` in Clang codegen. If the
 indexed array is a resource array declared at global scope and the expected
-result is a single resource, the array element access should be generated as a
+result is a single resource, the array element access should be translated to a
 resource class constructor call with the appropriate indexing and binding
 values.
 
@@ -399,19 +401,19 @@ The code generated for the `A[2][1]` expression should be equivalent
 `RWBuffer<float>(10, 0, 4, 2, "A")[1]` - that is, a constructor call followed by a
 subscript operator invoked on the resource class. Note that the constructor
 arguments represent the resource binding register `10`, space `0`, size of the
-array `4`, and index in the resource array `2`.
+array `4`, index in the resource array `2`, and the resource name.
 
-Unlike individual resource declarations, resource arrays will not be initialized
-by Sema. However, Sema must ensure that the constructor for the specific
-resource template class is instantiated and its definition is emitted, so that
-Clang codegen can call it.
+Unlike individual resource declarations, resource arrays at a global scope will
+not be initialized by Sema. However, Sema must ensure that the constructor for
+the specific resource template class is instantiated and its definition is
+emitted, so that Clang codegen can call it.
 
 ### Codegen Changes to Handle Local Resource Arrays
 
 Local copies of resource arrays should be mostly handled by the existing code
-that creates array copies for function arguments and by the presence of copy
-constructors on resource classes. Some additional work will likely be required
-to support indexing sub-arrays of multi-dimensional resource arrays.
+that creates copies of arrays for function arguments, and by the presence of
+copy constructors on resource classes. Some additional work will likely be
+required to support indexing of sub-arrays of multi-dimensional resource arrays.
 
 Consider this example:
 
@@ -429,24 +431,24 @@ void main() {
 }
 ```
 
-The `N[7]` expression should create a local copy of the sub-array of size `5`. The
-changes needed to support this will most likely be required in the same part of
-Clang code generation that handles `ArraySubscriptExpr`.
+The `N[7]` expression should create a local copy of the sub-array of size `5`.
+The changes needed to support this will most likely be required in the same part
+of Clang code generation that handles `ArraySubscriptExpr`.
 
 ### Changed Needed in LLVM Passes
 
-After Clang code generation and LLVM optimizations, the code related to resource
-arrays will most likely require some changes in LLVM backend passes.
+After Clang code generation and LLVM optimizations, the generated code related
+to resource arrays will likely require additional work in LLVM backend passes.
 
-The existing `DXILForwardHandleAccesses` pass aims to eliminate redundant stores
-and loads from resource handle globals. However, it currently expects resource
-handles to be loaded from a global variable, which is not the case for resource
-array element handles.
+For example, the existing `DXILForwardHandleAccesses` pass aims to eliminate
+redundant stores and loads from resource handle globals. However, it currently
+expects resource handles to be loaded from a global variable, which is not the
+case for resource array element handles.
 
 Additionally, local resource arrays and their copies tend to generate IR code
 that includes resource handles stored in local variables (using `alloca` and
 lifetime markers), with `load` and `store` operations on those handles through
- an `i32` type.These will need to be either cleaned up in the
+ an `i32` type. These will need to be either cleaned up in the
  `DXILForwardHandleAccesses` pass, or changes may need to be made to Clang
  codegen for array copying or to subsequent LLVM array optimizations to
  eliminate these unwanted constructs. The scope of this work is currently TBD.
@@ -463,12 +465,12 @@ this is notoriously buggy (see example
 
 ### Use Builtin Template Class to Represent Resource Arrays
 
-Another approach considered is to encapsulate resource arrays in a built-in
+Another approach considered was to encapsulate resource arrays in a built-in
 template class defined in `HLSLExternalSemaSource`. The class could be named
 `BoundResourceRange` to emphasize that it represents a set of resources
 mapped/bound to a descriptor range, rather than a traditional array. The
 template arguments would specify the array size and the resource type it
-contains.Any resource array variable declaration at global scope would have its
+contains. Any resource array variable declaration at global scope would have its
 type replaced with the corresponding `BoundResourceRange` specialization.
 
 The class would provide a subscript operator (`[]`) that initializes individual
