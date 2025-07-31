@@ -1,6 +1,6 @@
 # HLSL shader semantics
 
-* Proposal: [NNNN](http://NNNN-input-semantics.md)
+* Proposal: [0028](http://0028-input-semantics.md)
 * Author(s): [Nathan Gauër](https://github.com/Keenuts)
 * Status: **Design In Progress**
 
