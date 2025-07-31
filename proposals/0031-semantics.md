@@ -1,6 +1,6 @@
 # HLSL shader semantics
 
-* Proposal: [0031](http://0031-semantics.md)
+* Proposal: [0031](0031-semantics.md)
 * Author(s): [Nathan Gauër](https://github.com/Keenuts)
 * Status: **Design In Progress**
 
