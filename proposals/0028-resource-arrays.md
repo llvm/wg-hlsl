@@ -352,7 +352,7 @@ To avoid issues described
 [above](#example-where-dxc-does-not-handle-local-arrays-correctly), we should
 aim to resolve initialization of resource array handles early in Clang. That
 involves intercepting the codegen on array access to emit a resource class
-constructor call, which will eventually be transformed to
+constructor call, which will eventually be transformed to a
 `@dx.op.createHandleFromBinding` DXIL intrinsic. Creating local copies of
 resource arrays should be mostly handled by the existing array parameter passing
 code, though additional work will likely be needed to support indexing of
@@ -397,7 +397,7 @@ void main() {
 }
 ```
 
-The code generated for the `A[2][1]` expression should be equivalent
+The code generated for the `A[2][1]` expression should be equivalent to
 `RWBuffer<float>(10, 0, 4, 2, "A")[1]` - that is, a constructor call followed by a
 subscript operator invoked on the resource class. Note that the constructor
 arguments represent the resource binding register `10`, space `0`, size of the
@@ -435,7 +435,7 @@ The `N[7]` expression should create a local copy of the sub-array of size `5`.
 The changes needed to support this will most likely be required in the same part
 of Clang code generation that handles `ArraySubscriptExpr`.
 
-### Changed Needed in LLVM Passes
+### Changes Needed in LLVM Passes
 
 After Clang code generation and LLVM optimizations, the generated code related
 to resource arrays will likely require additional work in LLVM backend passes.
@@ -485,7 +485,7 @@ Introducing such a class raises several new questions:
   is it acceptable to replace resource arrays with `BoundResourceRange`?
 - Handling of resources arrays in Sema would need to support both
   `BoundResourceRange` and resource arrays types.
-- reating a local copy of a multi-dimensional array cannot be implemented by the
+- Creating a local copy of a multi-dimensional array cannot be implemented by the
   class alone and would require changes in Clang code generation anyway.
 
 ## Acknowledgments
