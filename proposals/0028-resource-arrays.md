@@ -51,9 +51,9 @@ descriptor range from the range `<lower bound, upper bound>` (inclusive).
 
 For example for the resource `A` declared above that is bound to register `u10`,
 the DXIL call to initialize resource handle for `A[2]` will have lower bound
-value `10`, upper bound `13`, space `0` and array index of `2`:
+value `10`, upper bound `13`, space `0` and array index of `12`:
 ```
-call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 10, i32 13, i32 0, i8 1 }, i32 2, i1 false),
+call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 10, i32 13, i32 0, i8 1 }, i32 12, i1 false),
 ```
 
 Initialization of other resources in the same array would differ only by the
