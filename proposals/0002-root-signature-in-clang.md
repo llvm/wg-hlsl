@@ -918,18 +918,13 @@ RWTexture2D<float4> outputTexture;
 [numthreads(4, 1, 1)]
 void CS_Main(uint3 id : SV_DispatchThreadID)
 {
-    // Get the dimensions of the output texture.
     uint width, height;
     outputTexture.GetDimensions(width, height);
 
-    // Convert the thread ID to normalized texture coordinates (0.0 to 1.0).
     float2 uv = float2(id.x / (float)width, id.y / (float)height);
 
-    // Sample the texture using the sampler and UV coordinates.
-    // The Sample method returns a float4, from which you can get a single float.
     float4 sampledColor = myTexture.Sample(mySampler, uv);
 
-    // Write the result to the output texture.
     outputTexture[id.xy] = sampledColor;
 }
 ```
@@ -987,7 +982,6 @@ cbuffer MyConstants : register(b0) // Binds to register 0, which the root signat
     float4 MyColor;
 };
 
-// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
 [RootSignature("DescriptorTable(CBV(b0)), RootFlags(DENY_PIXEL_SHADER_ROOT_ACCESS)")]
 float4 PS_Main() : SV_TARGET
 {
@@ -1003,7 +997,6 @@ cbuffer MyConstants : register(b0) // Binds to register 0, which the root signat
     float4 MyColor;
 };
 
-// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
 [RootSignature("DescriptorTable(Sampler(s0, flags=DATA_VOLATILE))")]
 float4 PS_Main() : SV_TARGET
 {
@@ -1019,7 +1012,6 @@ cbuffer MyConstants : register(b0) // Binds to register 0, which the root signat
     float4 MyColor;
 };
 
-// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
 [RootSignature("DescriptorTable(CBV(b0, flags=DATA_VOLATILE | DATA_STATIC_WHILE_SET_AT_EXECUTE))")]
 float4 PS_Main() : SV_TARGET
 {
@@ -1035,7 +1027,6 @@ cbuffer MyConstants : register(b0) // Binds to register 0, which the root signat
     float4 MyColor;
 };
 
-// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
 [RootSignature("DescriptorTable(CBV(b0, flags=DESCRIPTORS_VOLATILE  | DATA_STATIC ))")]
 float4 PS_Main() : SV_TARGET
 {
@@ -1051,7 +1042,6 @@ cbuffer MyConstants : register(b0) // Binds to register 0, which the root signat
     float4 MyColor;
 };
 
-// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
 [RootSignature("CBV(b0, flags=DATA_VOLATILE | DATA_STATIC)")]
 float4 PS_Main() : SV_TARGET
 {
@@ -1067,7 +1057,6 @@ cbuffer MyConstants : register(b0) // Binds to register 0, which the root signat
     float4 MyColor;
 };
 
-// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
 [RootSignature("CBV(b1)")]
 float4 PS_Main() : SV_TARGET
 {
@@ -1089,7 +1078,6 @@ struct PSInput {
 [RootSignature("DescriptorTable(Sampler(s0)), SRV(t0)")]
 float4 PS_Main(PSInput IN) : SV_TARGET
 {
-    // simple sample — this makes the shader declare a texture object at t0
     return gTex.Sample(gSamp, IN.uv);
 }
 ```
@@ -1111,7 +1099,6 @@ struct PSInput {
 )]
 float4 PSMain(PSInput IN) : SV_TARGET
 {
-    // Pixel shader acess t0 — but root signature deny acess to PS
     return gTex.Sample(gSamp, IN.uv);
 }
 ```
