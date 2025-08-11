@@ -907,37 +907,213 @@ Operands:
     When the Filter of a StaticSampler is `FILTER_COMPARISON*`,
     the ComparisonFunc cannot be 0.
 
-#### Resource used in DXIL must be fully bound in root signature.
+#### Samplers cannot be mixed with other resource types in a descriptor table.
 
 ```
-  // B is bound to t1, but no root parameters cover t1.
-  Buffer<float> B : register(t1);
-  [RootSignature("")]
-  void main() : SV_Target {
-    return B[0];
-  }
+Texture2D<float4> myTexture;
+SamplerState mySampler;
+RWTexture2D<float4> outputTexture;
+
+[RootSignature("DescriptorTable(SRV(t0), UAV(u0), Sampler(s0))")]
+[numthreads(4, 1, 1)]
+void CS_Main(uint3 id : SV_DispatchThreadID)
+{
+    // Get the dimensions of the output texture.
+    uint width, height;
+    outputTexture.GetDimensions(width, height);
+
+    // Convert the thread ID to normalized texture coordinates (0.0 to 1.0).
+    float2 uv = float2(id.x / (float)width, id.y / (float)height);
+
+    // Sample the texture using the sampler and UV coordinates.
+    // The Sample method returns a float4, from which you can get a single float.
+    float4 sampledColor = myTexture.Sample(mySampler, uv);
+
+    // Write the result to the output texture.
+    outputTexture[id.xy] = sampledColor;
+}
 ```
 
-#### Root Signature Flag must match DXIL.
+#### NumDescriptors cannot be 0.
 
 ```
-  // Used dynamic resource but missing CBVSRVUAVHeapDirectlyIndexed flag.
-  [RootSignature("")]
-  void main() : SV_Target {
-    Buffer<float> B = ResourceDescriptorHeap[0];
-    return B[0];
-  }
+[RootSignature("DescriptorTable(UAV(u0, NumDescriptors=0))")]
+[numthreads(4, 1, 1)]
+void CS_Main(uint3 id : SV_DispatchThreadID)
+{}
 ```
 
-#### Textures/TypedBuffers cannot be bound to root descriptors.
+#### Cannot append range with implicit lower bound after an unbounded range.
 
 ```
-  // B is TypedBuffer, but bound as a root descriptor.
-  Buffer<float> B : register(t0);
-  [RootSignature("SRV(t0)")]
-  void main() : SV_Target {
-    return B[0];
-  }
+[RootSignature("DescriptorTable(UAV(u0, NumDescriptors=unbounded), UAV(u1000, NumDescriptors=10))")]
+[numthreads(4, 1, 1)]
+void CS_Main(uint3 id : SV_DispatchThreadID)
+{}
+```
+
+#### Overflow of shader register range.
+
+```
+[RootSignature("DescriptorTable(UAV(u4294967295, NumDescriptors=100))")]
+[numthreads(4, 1, 1)]
+void CS_Main(uint3 id : SV_DispatchThreadID)
+{}
+```
+
+#### `RegisterSpace` cannot use system reserved ranges.
+
+```
+[RootSignature("DescriptorTable(UAV(u1, NumDescriptors=100,space=4294967280))")]
+[numthreads(4, 1, 1)]
+void CS_Main(uint3 id : SV_DispatchThreadID)
+{}
+```
+
+#### Overlapping register ranges are not allowed.
+
+```
+[RootSignature("DescriptorTable(UAV(u1, NumDescriptors=100), UAV(u5, NumDescriptors=5))")]
+[numthreads(4, 1, 1)]
+void CS_Main(uint3 id : SV_DispatchThreadID)
+{}
+```
+
+#### Shader has root bindings but root signature uses a DENY flag to disallow root binding access to the shader stage.
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
+[RootSignature("DescriptorTable(CBV(b0)), RootFlags(DENY_PIXEL_SHADER_ROOT_ACCESS)")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+```
+
+#### Sampler descriptor ranges can't specify DATA_* flags.
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
+[RootSignature("DescriptorTable(Sampler(s0, flags=DATA_VOLATILE))")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+```
+
+#### Descriptor range flags cannot specify more than one DATA_* flag.
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
+[RootSignature("DescriptorTable(CBV(b0, flags=DATA_VOLATILE | DATA_STATIC_WHILE_SET_AT_EXECUTE))")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+```
+
+#### Descriptor range flags cannot specify DESCRIPTORS_VOLATILE with the DATA_STATIC flag at the same time.
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
+[RootSignature("DescriptorTable(CBV(b0, flags=DESCRIPTORS_VOLATILE  | DATA_STATIC ))")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+```
+
+#### Root descriptor flags cannot specify more than one DATA_* flag at a time.
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
+[RootSignature("CBV(b0, flags=DATA_VOLATILE | DATA_STATIC)")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+```
+
+#### Descriptor range is not fully bound in root signature.
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+// The pixel shader will try to access the cbuffer, which is forbidden by the root signature.
+[RootSignature("CBV(b1)")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+```
+
+#### SRV or UAV root descriptors can only be Raw or Structured buffers.
+
+```
+Texture2D<float4> gTex : register(t0);   // texture object bound to t0
+SamplerState gSamp    : register(s0);
+
+struct PSInput {
+    float4 pos : SV_POSITION;
+    float2 uv  : TEXCOORD0;
+};
+
+[RootSignature("DescriptorTable(Sampler(s0)), SRV(t0)")]
+float4 PS_Main(PSInput IN) : SV_TARGET
+{
+    // simple sample — this makes the shader declare a texture object at t0
+    return gTex.Sample(gSamp, IN.uv);
+}
+```
+
+#### Accessing denied root binding.
+
+```
+Texture2D<float4> gTex : register(t0);
+SamplerState gSamp     : register(s0);
+
+struct PSInput {
+    float4 pos : SV_POSITION;
+    float2 uv  : TEXCOORD0;
+};
+[RootSignature(
+    "RootFlags(DENY_PIXEL_SHADER_ROOT_ACCESS), " \
+    "DescriptorTable(SRV(t0)), " \
+    "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR)"
+)]
+float4 PSMain(PSInput IN) : SV_TARGET
+{
+    // Pixel shader acess t0 — but root signature deny acess to PS
+    return gTex.Sample(gSamp, IN.uv);
+}
 ```
 
 <!--
