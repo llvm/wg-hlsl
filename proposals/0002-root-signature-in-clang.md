@@ -975,7 +975,7 @@ void CS_Main(uint3 id : SV_DispatchThreadID)
 ```
 
 #### Shader has root bindings but root signature uses a DENY flag to disallow root binding access to the shader stage.
-
+This shader code is correct, it is supposed to fail only if compiled to a pxil shader, due to the usage of a `DENY_*` flag.
 ```
 cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
 {
@@ -1077,27 +1077,6 @@ struct PSInput {
 
 [RootSignature("DescriptorTable(Sampler(s0)), SRV(t0)")]
 float4 PS_Main(PSInput IN) : SV_TARGET
-{
-    return gTex.Sample(gSamp, IN.uv);
-}
-```
-
-#### Accessing denied root binding.
-
-```
-Texture2D<float4> gTex : register(t0);
-SamplerState gSamp     : register(s0);
-
-struct PSInput {
-    float4 pos : SV_POSITION;
-    float2 uv  : TEXCOORD0;
-};
-[RootSignature(
-    "RootFlags(DENY_PIXEL_SHADER_ROOT_ACCESS), " \
-    "DescriptorTable(SRV(t0)), " \
-    "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR)"
-)]
-float4 PSMain(PSInput IN) : SV_TARGET
 {
     return gTex.Sample(gSamp, IN.uv);
 }
