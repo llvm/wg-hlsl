@@ -1052,7 +1052,7 @@ float4 PS_Main() : SV_TARGET
 #### Descriptor range is not fully bound in root signature.
 
 ```
-cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature does not define
 {
     float4 MyColor;
 };
