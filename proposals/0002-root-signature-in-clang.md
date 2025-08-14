@@ -918,14 +918,7 @@ RWTexture2D<float4> outputTexture;
 [numthreads(4, 1, 1)]
 void CS_Main(uint3 id : SV_DispatchThreadID)
 {
-    uint width, height;
-    outputTexture.GetDimensions(width, height);
-
-    float2 uv = float2(id.x / (float)width, id.y / (float)height);
-
-    float4 sampledColor = myTexture.Sample(mySampler, uv);
-
-    outputTexture[id.xy] = sampledColor;
+    outputTexture[id.xy] = myTexture.Sample(mySampler, 0);
 }
 ```
 
