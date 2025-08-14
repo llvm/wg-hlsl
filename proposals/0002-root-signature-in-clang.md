@@ -1064,6 +1064,23 @@ float4 PS_Main() : SV_TARGET
 }
 ```
 
+This error might also happen, if the shader visilibily removes registers that were binding 
+other resources. For example: 
+
+```
+cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
+{
+    float4 MyColor;
+};
+
+[RootSignature("DescriptorTable(CBV(b0), visibility=SHADER_VISIBILITY_VERTEX)")]
+float4 PS_Main() : SV_TARGET
+{
+    return MyColor;
+}
+
+```
+
 #### SRV or UAV root descriptors can only be Raw or Structured buffers.
 
 ```
