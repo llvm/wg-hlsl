@@ -975,7 +975,7 @@ void CS_Main(uint3 id : SV_DispatchThreadID)
 ```
 
 #### Shader has root bindings but root signature uses a DENY flag to disallow root binding access to the shader stage.
-This shader code is correct, it is supposed to fail only if compiled to a pxil shader, due to the usage of a `DENY_*` flag.
+This shader code is correct, it is supposed to fail only if compiled to a pixel shader, due to the usage of a `DENY_*` flag.
 ```
 cbuffer MyConstants : register(b0) // Binds to register 0, which the root signature defines
 {
