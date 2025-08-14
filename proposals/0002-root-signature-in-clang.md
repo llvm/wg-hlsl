@@ -1064,7 +1064,7 @@ float4 PS_Main() : SV_TARGET
 }
 ```
 
-This error might also happen, if the shader visilibily removes registers that were binding 
+This error might also happen, if the shader visibility removes registers that were binding 
 other resources. For example: 
 
 ```
