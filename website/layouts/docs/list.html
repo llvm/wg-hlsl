@@ -1,0 +1,23 @@
+{{- define "main" -}}
+<h1>{{ .Title }}</h1>
+
+{{- .Content -}}
+
+<ul>
+{{- range .Site.RegularPages -}}
+  {{- if eq .Section "docs" -}}
+    {{- if ne .File.LogicalName "_index.md" -}}
+      {{- if ne .File.LogicalName "index.md" -}}
+<li>
+  <a href="{{ .RelPermalink }}">{{ .Title | default (.File.BaseFileName | humanize) }}</a>
+  {{- if .Summary }} - {{ .Summary | plainify | truncate 100 }}{{ end }}
+</li>
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+</ul>
+
+{{- partial "edit-meta.html" . -}}
+{{- partial "pagination.html" . -}}
+{{- end -}}

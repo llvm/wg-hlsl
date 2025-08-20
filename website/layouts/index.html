@@ -1,0 +1,8 @@
+{{ define "main" }}
+	{{ $readme := resources.Get "readme.md" }}
+	{{ if $readme }}
+		{{ $readme.Content | markdownify }}
+	{{ else }}
+		<p>README not found.</p>
+	{{ end }}
+{{ end }}

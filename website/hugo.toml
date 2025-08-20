@@ -1,0 +1,51 @@
+baseURL = 'https://llvm.github.io/wg-hlsl'
+languageCode = 'en-us'
+title = 'wg-hlsl'
+theme = 'hugo-theme-techdoc'
+
+[params]
+  menu_style = "open-menu"
+  
+
+[module]
+  [[module.mounts]]
+    source = './content'
+    target= 'content'
+
+  [[module.mounts]]
+    source = '../docs'
+    target = 'content/docs'
+    
+  [[module.mounts]]
+    source = '../proposals'
+    target = 'content/proposals'
+
+  [[module.mounts]]
+    source = '../meetings'
+    target = 'content/meetings'
+  
+  # Mount top-level README so the home page layout can read it
+  [[module.mounts]]
+    source = '../README.md'
+    target = 'assets/readme.md'
+    
+
+[menu]
+  [[menu.main]]
+  name = "Home"
+  url = "/"
+  weight = 1
+
+  [[menu.main]]
+  name = "Docs"
+  url = "/docs"
+
+  [[menu.main]]
+  name = "Proposals"
+  url = "/proposals"
+
+  [[menu.main]]
+  name = "Meetings"
+  url = "/meetings"
+
+  

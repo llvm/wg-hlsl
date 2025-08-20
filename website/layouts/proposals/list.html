@@ -1,0 +1,21 @@
+{{ define "main" }}
+
+<ul>
+  {{ $opts := dict "path" "" }} {{ range .Pages }}
+  <li>
+    <a href="{{ .RelPermalink }}">{{ .File }}</a>
+
+    {{ $content := .RawContent }}
+    {{ $status := "no status" }}
+
+    {{ $statusMatch := findRE `(?m)^\* Status: \*\*(.+?)\*\*` $content 1 }}
+    {{ if $statusMatch }}
+      {{ $status = index $statusMatch 0 | replaceRE `^\* Status: \*\*(.+?)\*\*` "$1" }}
+    {{ end }}
+    
+    {{ if $status }} {{ $status }} {{ end }}
+  </li>
+  {{ end }}
+</ul>
+
+{{ end }}

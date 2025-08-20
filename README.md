@@ -6,11 +6,11 @@ support in Clang and the associated LLVM code generation paths.
 
 ## Repository Organization
 
-* `docs` - General documentation for the working group including process
+* [docs](docs) - General documentation for the working group including process
   documentation, project roadmaps and anything else that doesn't have a clear place.
-* `meetings` - Meeting agenda and minutes for HLSL Working Group meetings (see
+* [meetings](meetings) - Meeting agenda and minutes for HLSL Working Group meetings (see
   [LLVM Community Calendar](https://calendar.google.com/calendar/u/0/embed?src=calendar@llvm.org)).
-* `proposals` - Technical proposal documentation for implementation tasks in
+* [proposals](proposals) - Technical proposal documentation for implementation tasks in
   LLVM & Clang.
 
 ## Issue Tracking
