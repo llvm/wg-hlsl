@@ -1,21 +1,60 @@
 {{ define "main" }}
 
-<ul>
-  {{ $opts := dict "path" "" }} {{ range .Pages }}
-  <li>
-    <a href="{{ .RelPermalink }}">{{ .File }}</a>
-
+  {{/* Build groups of pages keyed by Status */}}
+  {{ $groups := dict }}
+  {{ range .Pages }}
     {{ $content := .RawContent }}
-    {{ $status := "no status" }}
-
-    {{ $statusMatch := findRE `(?m)^\* Status: \*\*(.+?)\*\*` $content 1 }}
-    {{ if $statusMatch }}
-      {{ $status = index $statusMatch 0 | replaceRE `^\* Status: \*\*(.+?)\*\*` "$1" }}
+    {{ $status := "No Status" }}
+    {{ with (findRE `(?m)^\* Status: \*\*(.+?)\*\*` $content 1) }}
+      {{ $status = (index . 0) | replaceRE `^\* Status: \*\*(.+?)\*\*` "$1" }}
     {{ end }}
-    
-    {{ if $status }} {{ $status }} {{ end }}
-  </li>
+    {{ $existing := index $groups $status }}
+    {{ if $existing }}
+      {{ $groups = merge $groups (dict $status ( $existing | append . )) }}
+    {{ else }}
+      {{ $groups = merge $groups (dict $status (slice .)) }}
+    {{ end }}
   {{ end }}
-</ul>
+
+
+  {{/* Sort */}}
+  {{ $rawStatuses := slice }}
+  {{ range $k, $_ := $groups }}
+    {{ $rawStatuses = $rawStatuses | append $k }}
+  {{ end }}
+  {{ $customFirst := slice "No Status" "Under Consideration" "Design In Progress" "Accepted" }}
+  {{ $statuses := slice }}
+  {{ range $i, $s := $customFirst }}
+    {{ if in $rawStatuses $s }}
+      {{ $statuses = $statuses | append $s }}
+    {{ end }}
+  {{ end }}
+  {{/* Add remaining statuses excluding those already appended */}}
+  {{ $remaining := slice }}
+  {{ range $rawStatuses }}
+    {{ if not (in $statuses .) }}
+      {{ $remaining = $remaining | append . }}
+    {{ end }}
+  {{ end }}
+  {{ $remaining = sort $remaining }}
+  {{ range $remaining }}
+    {{ $statuses = $statuses | append . }}
+  {{ end }}
+
+
+  {{/* Render them */}}
+  {{ range $statuses }}
+    {{ $status := . }}
+    <h2 id="status-{{ anchorize $status }}">{{ $status }}</h2>
+    <ul>    
+        {{ $pages := index $groups $status }}
+        {{ if gt (len $pages) 1 }}
+          {{ $pages = sort $pages "Title" }}
+        {{ end }}
+        {{ range $pages }}
+        <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+        {{ end }}
+  </ul>
+  {{ end }}
 
 {{ end }}

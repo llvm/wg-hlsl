@@ -1,0 +1,59 @@
+{{/*
+	Content adapter to add proposal markdown files from the root ../proposals directory.
+	The proposals directory is mounted as assets/proposals in hugo.toml so we can read
+	them via resources functions and control page creation here.
+*/}}
+
+{{ $proposals := resources.Match "proposals/*.md" }}
+{{ range $res := $proposals }}
+	{{/* Read file content as string */}}
+	{{ $raw := $res.Content | string }}
+
+	{{/* Infer proposal number from filename: 0001-foo-bar.md -> 0001 */}}
+			{{/* Normalize filename (strip any path components) */}}
+			{{ $rawName := $res.Name }}
+			{{ $filename := replaceRE `^.*/` "" $rawName }}
+			{{ $baseNoExt := replaceRE `(?i)\.md$` "" $filename }}
+			{{ $numMatches := findRE `^[0-9]{4}` $baseNoExt 1 }}
+			{{ $num := cond (gt (len $numMatches) 0) (index $numMatches 0) $baseNoExt }}
+
+		{{/* Extract first markdown ATX H1 (lines starting with # ) as title; fallback to filename */}}
+		{{ $title := "" }}
+	{{ with findRE `(?m)^# +(.+)$` $raw 1 }}
+		{{ $match := index . 0 }}
+		{{ $title = replaceRE `^# +` "" $match | strings.TrimSpace }}
+	{{ else }}
+		{{ $title = printf "Proposal %s" $num }}
+	{{ end }}
+
+	{{/* Basic params: proposal number; we could parse status etc. with regexes */}}
+	{{ $status := "" }}
+	{{ with findRE `(?m)^\* +Status: +\*\*([^*]+)\*\*` $raw 1 }}
+		{{ $status = replaceRE `(?m)^\* +Status: +\*\*([^*]+)\*\*` `$1` (index . 0) | strings.TrimSpace }}
+	{{ end }}
+
+		{{ $params := dict "proposal" $num "status" $status }}
+
+		{{/* Normalize core title (remove any leading number/brackets if present) */}}
+		{{ $coreTitle := $title | replaceRE `^\[?[0-9]{4}\]?[:\s-]+` "" | strings.TrimSpace }}
+		{{ if eq $coreTitle "" }}
+			{{ $coreTitle = $title }}
+		{{ end }}
+			{{ $displayTitle := printf "[%s] %s" $num $coreTitle }}
+
+	{{/* We keep the content as-is. */}}
+	{{ $content := dict "mediaType" "text/markdown" "value" $raw }}
+
+	{{/* Path: use number plus slug of title (without leading Proposal XXX) */}}
+		{{/* Use the original filename (without .md) as path to stay stable and concise. */}}
+		{{ $path := $baseNoExt }}
+
+		{{ $page := dict
+			"content" $content
+			"kind" "page"
+			"path" $path
+			"title" $displayTitle
+			"params" $params
+		}}
+		{{ $.AddPage $page }}
+{{ end }}

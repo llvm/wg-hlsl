@@ -1,6 +1,6 @@
-<!-- {% raw %} -->
-
-# Issue Tracking
+---
+title: "Issue Tracking"
+---
 
 We use github issues to track the scenarios, deliverables, tasks and bugs for
 the HLSL working group.

@@ -4,7 +4,14 @@ title = 'wg-hlsl'
 theme = 'hugo-theme-techdoc'
 
 [params]
-  menu_style = "open-menu"
+  menu_style = "slide-menu"
+  
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
+ignoreLogs = ['warning-goldmark-raw-html']
   
 
 [module]
@@ -17,10 +24,6 @@ theme = 'hugo-theme-techdoc'
     target = 'content/docs'
     
   [[module.mounts]]
-    source = '../proposals'
-    target = 'content/proposals'
-
-  [[module.mounts]]
     source = '../meetings'
     target = 'content/meetings'
   
@@ -28,6 +31,13 @@ theme = 'hugo-theme-techdoc'
   [[module.mounts]]
     source = '../README.md'
     target = 'assets/readme.md'
+  
+  # Mount proposals as assets so the content adapter can ingest them without
+  # Hugo treating them as regular content files directly (avoids collisions
+  # and lets us enrich metadata programmatically).
+  [[module.mounts]]
+    source = '../proposals'
+    target = 'assets/proposals'
     
 
 [menu]
@@ -35,17 +45,3 @@ theme = 'hugo-theme-techdoc'
   name = "Home"
   url = "/"
   weight = 1
-
-  [[menu.main]]
-  name = "Docs"
-  url = "/docs"
-
-  [[menu.main]]
-  name = "Proposals"
-  url = "/proposals"
-
-  [[menu.main]]
-  name = "Meetings"
-  url = "/meetings"
-
-  
