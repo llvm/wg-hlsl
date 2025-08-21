@@ -1,12 +1,15 @@
-<!-- {% raw %} -->
-
-# Strict Availability Diagnostics
-
-* Proposal: [0001](0001-availability-diagnostics.md)
-* Author(s): [Chris Bieneman](https://github.com/llvm-beanz), [Helena Kotas](https://github.com/hekota)
-* Sponsor: [Chris Bieneman](https://github.com/llvm-beanz)
-* Status: **Accepted**
-* Planned Version: 20YY (Clang-only)
+---
+title: Strict Availability Diagnostics
+params:
+  number: 0001
+  status: Accepted
+  authors:
+    - llvm-beanz: Chris Bieneman
+    - hekota: Helena Kotas
+  sponsors:
+    llvm-beanz: Chris Bieneman
+  planned_version: 20YY (Clang-only)
+---
 
 ## Introduction
 
@@ -315,5 +318,3 @@ target shader model the diagnostic message should be:
 ```
 'a' is only available in S shader environment on Shader Model x.y or newer
 ```
-
-<!-- {% endraw %} -->

@@ -1,12 +1,13 @@
-<!-- {% raw %} -->
-
-# Implementation of Root Signatures in Clang
-
-* Proposal: [0002](0002-root-signture-in-clang.md)
-* Author(s): [Xiang Li](https//github.com/python3kgae), [Damyan
-  Pepper](https://github.com/damyanp), [Joao Saffran](https://github.com/joaosaffran)
-* Status: **Accepted**
-* Impacted Project(s): Clang
+---
+title: Root Signatures in Clang
+params:
+  number: 2
+  authors:
+    - python3kgae: Xiang Li
+    - damyanp: Damyan Pepper
+    - joaosaffran: Joao Saffran
+  status: Accepted
+---
 
 <!--
 *During the review process, add the following fields as needed:*
@@ -1002,5 +1003,3 @@ be reworked so much for portability and comformance with LLVM coding conventions
 that the effort would not be worthwhile.
 
 ## Acknowledgments (Optional)
-
-<!-- {% endraw %} -->

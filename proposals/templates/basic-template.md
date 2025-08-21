@@ -1,4 +1,13 @@
-<!-- {% raw %} -->
+---
+title: Proposal Template
+params:
+  number: 0
+  authors:
+    - github_username: Human Readable Name
+  status: Under Consideration
+  sponsors:
+    github_username: Human Readable Name
+---
 
 # Feature name
 
@@ -26,10 +35,6 @@
 >    project planning.
 
 ---
-
-* Proposal: [NNNN](NNNN-filename.md)
-* Author(s): [Author 1](https://github.com/author_username)
-* Status: **Design In Progress**
 
 *During the review process, add the following fields as needed:*
 

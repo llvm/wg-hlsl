@@ -31,14 +31,10 @@ ignoreLogs = ['warning-goldmark-raw-html']
   [[module.mounts]]
     source = '../README.md'
     target = 'assets/readme.md'
-  
-  # Mount proposals as assets so the content adapter can ingest them without
-  # Hugo treating them as regular content files directly (avoids collisions
-  # and lets us enrich metadata programmatically).
+
   [[module.mounts]]
     source = '../proposals'
-    target = 'assets/proposals'
-    
+    target = 'content/proposals'
 
 [menu]
   [[menu.main]]

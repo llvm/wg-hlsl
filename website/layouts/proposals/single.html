@@ -1,5 +1,54 @@
 {{- define "main" -}}
 
+<h1>{{ printf "[%04d] - %s" .Params.number .Title }}</h1>
+
+<table style="width: auto">
+    <tbody>
+        <tr>
+            <th>
+                Author(s)
+            </th>
+            <td>
+                {{ range .Params.authors }}
+                    {{ range $username, $name := . }}
+                        <a href="https://github.com/{{ $username }}">{{ $name }}</a><br>
+                    {{ end }}
+                {{ end }}
+            </td>
+        </tr>
+        <tr>
+            <th>
+                Status
+            </th>        
+            <td>
+                {{ .Params.status }}
+            </td>
+        </tr>
+        {{ with .Params.sponsors }}
+        <tr>
+            <th>
+                Sponsor(s)
+            </th>
+            <td>
+                {{ range $username, $name := . }}
+                <a href="https://github.com/{{ $username }}">{{ $name }}</a><br>
+                {{ end }}
+            </td>
+        </tr>
+        {{ end }}
+        {{ with .Params.planned_version }}
+        <tr>
+            <th>
+                Planned Version
+            </th>
+            <td>
+                {{ . }}
+            </td>
+        </tr>
+        {{ end }}
+    </tbody>
+</table>
+
 {{- .Content -}}
 
 {{- partial "edit-meta.html" . -}}

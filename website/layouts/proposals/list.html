@@ -1,60 +1,35 @@
 {{ define "main" }}
 
-  {{/* Build groups of pages keyed by Status */}}
-  {{ $groups := dict }}
-  {{ range .Pages }}
-    {{ $content := .RawContent }}
-    {{ $status := "No Status" }}
-    {{ with (findRE `(?m)^\* Status: \*\*(.+?)\*\*` $content 1) }}
-      {{ $status = (index . 0) | replaceRE `^\* Status: \*\*(.+?)\*\*` "$1" }}
-    {{ end }}
-    {{ $existing := index $groups $status }}
-    {{ if $existing }}
-      {{ $groups = merge $groups (dict $status ( $existing | append . )) }}
-    {{ else }}
-      {{ $groups = merge $groups (dict $status (slice .)) }}
-    {{ end }}
-  {{ end }}
-
-
-  {{/* Sort */}}
-  {{ $rawStatuses := slice }}
-  {{ range $k, $_ := $groups }}
-    {{ $rawStatuses = $rawStatuses | append $k }}
-  {{ end }}
-  {{ $customFirst := slice "No Status" "Under Consideration" "Design In Progress" "Accepted" }}
-  {{ $statuses := slice }}
-  {{ range $i, $s := $customFirst }}
-    {{ if in $rawStatuses $s }}
-      {{ $statuses = $statuses | append $s }}
-    {{ end }}
-  {{ end }}
-  {{/* Add remaining statuses excluding those already appended */}}
-  {{ $remaining := slice }}
-  {{ range $rawStatuses }}
-    {{ if not (in $statuses .) }}
-      {{ $remaining = $remaining | append . }}
-    {{ end }}
-  {{ end }}
-  {{ $remaining = sort $remaining }}
-  {{ range $remaining }}
-    {{ $statuses = $statuses | append . }}
-  {{ end }}
-
-
-  {{/* Render them */}}
-  {{ range $statuses }}
+  {{ $remaining_pages := (.Pages.ByParam "number") }}
+  
+  {{ range slice "Under Consideration" "Design In Progress" "Accepted" "Completed" "Rejected" }}
     {{ $status := . }}
-    <h2 id="status-{{ anchorize $status }}">{{ $status }}</h2>
-    <ul>    
-        {{ $pages := index $groups $status }}
-        {{ if gt (len $pages) 1 }}
-          {{ $pages = sort $pages "Title" }}
+    
+    {{ $pages := $remaining_pages }}
+    {{ $remaining_pages = slice }}
+
+    <h2>{{ $status }} </h2>
+    <ul>
+      {{ range $pages }}
+        {{ if eq .Params.status $status }}
+          <li><a href="{{ .RelPermalink }}">{{ printf "[%04d] - %s" .Params.number .Title }}</a></li>
+        {{ else }}
+          {{ $remaining_pages = $remaining_pages | append . }}
         {{ end }}
-        {{ range $pages }}
-        <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
-        {{ end }}
-  </ul>
-  {{ end }}
+      {{ end }}
+    </ul>
+ {{ end }}
+
+ 
+ {{ if gt ($remaining_pages | len) 0 }}
+ <h2>Invalid Metadata</h2>
+ <ul>
+  {{range $remaining_pages }}
+  <li>
+    {{ .File.LogicalName }}
+  </li>
+  {{end}}
+ </ul>
+ {{ end }}
 
 {{ end }}

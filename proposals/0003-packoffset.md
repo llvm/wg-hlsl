@@ -1,12 +1,11 @@
-<!-- {% raw %} -->
-
-# packoffset attribute
-
-* Proposal: [0003](0003-packoffset.md)
-* Author(s): [Xiang Li](https://github.com/python3kgae)
-* Sponsor: 
-* Status: **Under Consideration**
-* Planned Version: 
+---
+title: packoffset attribute
+params:
+  number: 3
+  status: Under Consideration
+  authors: 
+    - python3kgae: Xiang Li
+---
 
 ## Introduction
 
@@ -169,5 +168,3 @@ metadata for cbuffer.
 
 How to support 16bit types.
 The offset like c0.y is 32bit.
-
-<!-- {% endraw %} -->
