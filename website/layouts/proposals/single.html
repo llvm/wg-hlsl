@@ -1,6 +1,12 @@
 {{- define "main" -}}
 
-<h1>{{ printf "[%04d] - %s" .Params.number .Title }}</h1>
+<h1>{{ .Title }}</h1>
+
+<style>
+    ul.wg-hlsl-names { list-style: none; margin: 0; padding: 0;  }
+    ul.wg-hlsl-names li { display: inline; }
+    ul.wg-hlsl-names li + li::before { content: ", ";  }
+</style>
 
 <table style="width: auto">
     <tbody>
@@ -9,11 +15,13 @@
                 Author(s)
             </th>
             <td>
-                {{ range .Params.authors }}
-                    {{ range $username, $name := . }}
-                        <a href="https://github.com/{{ $username }}">{{ $name }}</a><br>
-                    {{ end }}
-                {{ end }}
+                <ul class="wg-hlsl-names">
+                {{- range .Params.authors -}}
+                    {{- range $username, $name := . -}}
+                       <li><a href="https://github.com/{{ $username }}">{{- $name -}}</a></li>
+                    {{- end -}}
+                {{- end -}}
+                </ul>
             </td>
         </tr>
         <tr>
@@ -30,9 +38,13 @@
                 Sponsor(s)
             </th>
             <td>
-                {{ range $username, $name := . }}
-                <a href="https://github.com/{{ $username }}">{{ $name }}</a><br>
-                {{ end }}
+                <ul class="wg-hlsl-names">
+                {{- range . -}}
+                    {{- range $username, $name := . -}}
+                        <li><a href="https://github.com/{{ $username }}">{{- $name -}}</a></li>
+                    {{- end -}}
+                {{- end -}}
+                </ul>
             </td>
         </tr>
         {{ end }}

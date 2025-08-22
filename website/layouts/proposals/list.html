@@ -12,7 +12,7 @@
     <ul>
       {{ range $pages }}
         {{ if eq .Params.status $status }}
-          <li><a href="{{ .RelPermalink }}">{{ printf "[%04d] - %s" .Params.number .Title }}</a></li>
+          <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
         {{ else }}
           {{ $remaining_pages = $remaining_pages | append . }}
         {{ end }}

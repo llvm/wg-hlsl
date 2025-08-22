@@ -1,13 +1,12 @@
 ---
-title: Strict Availability Diagnostics
+title: "[0001] - Strict Availability Diagnostics"
 params:
-  number: 0001
   status: Accepted
   authors:
     - llvm-beanz: Chris Bieneman
     - hekota: Helena Kotas
   sponsors:
-    llvm-beanz: Chris Bieneman
+    - llvm-beanz: Chris Bieneman
   planned_version: 20YY (Clang-only)
 ---
 

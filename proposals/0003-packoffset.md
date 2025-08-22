@@ -1,7 +1,6 @@
 ---
-title: packoffset attribute
+title: '[0003] - packoffset attribute'
 params:
-  number: 3
   status: Under Consideration
   authors: 
     - python3kgae: Xiang Li

@@ -1,12 +1,11 @@
 ---
-title: Proposal Template
+title: "[0000] - Proposal Template"
 params:
-  number: 0
   authors:
     - github_username: Human Readable Name
   status: Under Consideration
   sponsors:
-    github_username: Human Readable Name
+    - github_username: Human Readable Name
 ---
 
 # Feature name

@@ -1,7 +1,6 @@
 ---
-title: Root Signatures in Clang
+title: "[0002] - Root Signatures in Clang"
 params:
-  number: 2
   authors:
     - python3kgae: Xiang Li
     - damyanp: Damyan Pepper
