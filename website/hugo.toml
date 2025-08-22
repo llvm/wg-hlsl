@@ -45,3 +45,19 @@ ignoreLogs = ['warning-goldmark-raw-html']
   name = "Home"
   url = "/"
   weight = 1
+
+  [[menu.main]]
+  name = "Documentation"
+  url = "/documentation"
+  weight = 2
+
+  [[menu.main]]
+  name = "Meetings"
+  url = "/meetings"
+  weight = 3
+
+  [[menu.main]]
+  name = "Proposals"
+  url = "/proposals"
+  weight = 4
+

@@ -20,6 +20,8 @@ Project](https://github.com/orgs/llvm/projects/4) to track issues and tasks.
 Work items that will result in PR contributions to LLVM are tracked under the
 LLVM-project issue tracker, other work items are tracked on this repository.
 
+See [issue_tracking](docs/issue_tracking) for more info.
+
 ## Meetings
 
 Public meetings are the first Thursday of every month at 5:00-5:30 pm UTC (1
