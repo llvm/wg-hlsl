@@ -51,6 +51,10 @@
     </tbody>
 </table>
 
+{{/* Force-enable ToC for proposals */}}
+{{- $tocParams := merge .Params (dict "TableOfContents" true) -}}
+{{- partial "table-of-contents.html" (dict "Params" $tocParams "TableOfContents" .TableOfContents) -}}
+
 {{- .Content -}}
 
 {{- partial "edit-meta.html" . -}}

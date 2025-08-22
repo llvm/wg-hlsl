@@ -10,6 +10,10 @@ theme = 'hugo-theme-techdoc'
   [markup.goldmark]
     [markup.goldmark.renderer]
       unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+    ordered = false
 
 ignoreLogs = ['warning-goldmark-raw-html']
   
