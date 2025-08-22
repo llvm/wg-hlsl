@@ -48,7 +48,7 @@ ignoreLogs = ['warning-goldmark-raw-html']
 
   [[menu.main]]
   name = "Documentation"
-  url = "/documentation"
+  url = "/docs"
   weight = 2
 
   [[menu.main]]
