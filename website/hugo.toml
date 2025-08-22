@@ -1,6 +1,6 @@
 baseURL = 'https://llvm.github.io/wg-hlsl'
 languageCode = 'en-us'
-title = 'wg-hlsl'
+title = 'HLSL Working Group'
 theme = 'hugo-theme-techdoc'
 
 [params]
