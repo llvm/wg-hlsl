@@ -1,12 +1,13 @@
-<!-- {% raw %} -->
+---
+title: "[0008] - C interface for HLSL compiler as a library"
+params:
+  status: Under Consideration
+  authors:
+    - coopp: Cooper Partin
+  sponsors:
+    - coopp: Cooper Partin
+---
 
-# C interface for HLSL compiler as a library
-
-* Proposal: [0008](0008-c-interface-compiler-library.md)
-* Author(s): [Cooper Partin](https://github.com/coopp)
-* Sponsor: [Cooper Partin](https://github.com/coopp)
-* Status: **Under Consideration**
-* Impacted Project(s): (Clang)
 
 * Issues:
   [#63631](https://github.com/llvm/llvm-project/issues/63631)
@@ -1536,5 +1537,3 @@ int main()
 ## Acknowledgments
 
 [Chris Bieneman](https://github.com/llvm-beanz)
-
-<!-- {% endraw %} -->

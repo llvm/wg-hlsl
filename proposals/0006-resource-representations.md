@@ -1,12 +1,13 @@
-<!-- {% raw %} -->
+---
+title: "[0006] - Resource Representations in Clang and LLVM"
+params:
+   status: Accepted
+   authors:
+      - bogner: Justin Bogner
+   sponsors:
+      - bogner: Justin Bogner
+---
 
-# Resource Representations in Clang and LLVM
-
-* Proposal: [0006](0006-resource-representations.md)
-* Author(s): [Justin Bogner](https://github.com/bogner)
-* Sponsor: [Justin Bogner](https://github.com/bogner)
-* Status: **Accepted**
-* Impacted Project(s): Clang
 * Related Docs: [DXILResources.html]
 
 ## Introduction
@@ -115,5 +116,3 @@ DXC and by leveraging the DXIL validator.
 
 [DXILResources.html]: https://llvm.org/docs/DirectX/DXILResources.html
 [DXIL.rst]: https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#shader-resources
-
-<!-- {% endraw %} -->

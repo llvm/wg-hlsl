@@ -1,11 +1,10 @@
-<!-- {% raw %} -->
-
-# Initializer Lists
-
-* Proposal: [0013](0013-initializer-lists.md)
-* Author(s): [Chris Bieneman](https://github.com/llvm-beanz)
-* Status: **Accepted**
-
+---
+title: "[0013] - Initializer Lists"
+params:
+  status: Accepted
+  authors:
+    - llvm-beanz: Chris Bieneman
+---
 
 ## Introduction
 
@@ -168,4 +167,3 @@ easily by just running the statement printer.
 
 [Proposal_0005]: https://github.com/microsoft/hlsl-specs/blob/main/proposals/0005-strict-initializer-lists.md
 
-<!-- {% endraw %} -->

@@ -1,9 +1,10 @@
-
-# Constant buffers
-
-* Proposal: [16](0015-constant-buffers.md)
-* Author(s): [Helena Kotas](https://github.com/hekota)
-* Status: **Design In Progress**
+---
+title: "[0016] - Constant buffers"
+params:
+  status: Design In Progress
+  authors:
+    - hekota: Helena Kotas
+---
 
 ## Introduction
 

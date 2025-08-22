@@ -8,14 +8,6 @@ params:
   status: Accepted
 ---
 
-<!--
-*During the review process, add the following fields as needed:*
-
-* PRs: [#NNNN](https://github.com/microsoft/DirectXShaderCompiler/pull/NNNN)
-* Issues:
-  [#NNNN](https://github.com/microsoft/DirectXShaderCompiler/issues/NNNN)
-  -->
-
 ## Introduction
 
 [Root

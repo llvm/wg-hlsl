@@ -1,18 +1,10 @@
-<!-- {% raw %} -->
-
-# HLSL resources in SPIR-V
-
-*   Proposal: [0018](0018-spirv-resource-representation.md)
-*   Author(s): [Steven Perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
-
-*During the review process, add the following fields as needed:*
-
-*   PRs: [#114273](https://github.com/llvm/llvm-project/pull/114273),
-    [#111052](https://github.com/llvm/llvm-project/pull/111052),
-    [#111564](https://github.com/llvm/llvm-project/pull/111564),
-    [#115178](https://github.com/llvm/llvm-project/pull/115178),
-    [#144774](https://github.com/llvm/llvm-project/pull/144774)
+---
+title: "[0018] - HLSL resources in SPIR-V"
+params:
+    status: Design In Progress
+    authors:
+        - s-perron: Steven Perron
+---
 
 ## Introduction
 
@@ -291,5 +283,3 @@ If a matrix is part of a storage buffer, it must have an explicit layout with
 MatrixStride and either RowMajor or ColMajor decorations. Because matrices are
 not yet implemented, we cannot yet determine how these decorations will be
 added.
-
-<!-- {% endraw %} -->

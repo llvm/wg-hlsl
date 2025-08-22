@@ -1,14 +1,12 @@
-<!-- {% raw %} -->
-
-# Support for in-process, Out-of-process, or both for the c style compiler api
-
-* Proposal: [0005](0005-inproc-outofproc-compiler-api-support.md)
-* Author(s): [Cooper Partin](https://github.com/coopp)
-* Sponsor: [Cooper Partin](https://github.com/coopp)
-* Status: **Accepted**
-* Impacted Project(s): (Clang)
-
-* Issues:
+---
+title: "[0005] - Support for in-process, Out-of-process, or both for the C style compiler API"
+params:
+  status: Accepted
+  authors:
+    - coopp: Cooper Partin
+  sponsors:
+    - coopp: Cooper Partin
+---
 
 ## Introduction
 
@@ -122,5 +120,3 @@ during the out of process development effort.
 ## Acknowledgments
 
 [Chris Bieneman](https://github.com/llvm-beanz)
-
-<!-- {% endraw %} -->

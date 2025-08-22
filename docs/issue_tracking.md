@@ -154,4 +154,3 @@ These labels track issues related to HLSL support in Clang:
 [2]: https://github.com/llvm/llvm-project/issues?q=is%3Aopen+is%3Aissue+label%3Abackend%3ADirectX
 [3]: https://github.com/llvm/llvm-project/issues?q=is%3Aopen+is%3Aissue+label%3Abackend%3ASPIR-V
 
-<!-- {% endraw %} -->

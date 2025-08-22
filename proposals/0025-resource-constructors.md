@@ -1,8 +1,10 @@
-# Resource Constructors
-
-* Proposal: [0025 - Resource Constructors](0025-resource-constructors.md)
-* Author(s): [Helena Kotas](https://github.com/hekota)
-* Status: **Design In Progress**
+---
+title: "[0025] - Resource Constructors"
+params:
+  status: Design In Progress
+  authors:
+    - hekota: Helena Kotas
+---
 
 ## Introduction
 
@@ -234,4 +236,3 @@ public:
 
 Chris Bieneman
 
-<!-- {% endraw %} -->

@@ -1,11 +1,10 @@
-<!-- {% raw %} -->
-
-# Target Extension Types for Inline SPIR-V and Decorated Types
-
-* Proposal: [0017](0017-inline-spirv-and-decorated-types.md)
-* Author(s): [Cassandra Beckley](https://github.com/cassiebeckley)
-* Status: **Design In Progress**
-* PRs: [#125316](https://github.com/llvm/llvm-project/pull/125316)
+---
+title: "[0017] - Target Extension Types for Inline SPIR-V and Decorated Types"
+params:
+  status: Design In Progress
+  authors:
+    - cassiebeckley: Cassandra Beckley
+---
 
 ## Introduction
 
@@ -132,4 +131,3 @@ Take a moment to acknowledge the contributions of people other than the author
 and sponsor.
 -->
 
-<!-- {% endraw %} -->

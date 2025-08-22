@@ -1,18 +1,11 @@
-<!-- {% raw %} -->
-
-# Allowing multiple address spaces for the `this` pointer
-
-*   Proposal: [0021](http://0021-this-address-space.md)
-*   Author(s): [Nathan Gauer](https://github.com/keenuts),
-    [Steven Perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
-
-*During the review process, add the following fields as needed:*
-
-*   PRs: [\#111](https://github.com/llvm/wg-hlsl/pull/111),
-    [llvm-project:\#127675](https://github.com/llvm/llvm-project/pull/127675)
-*   Issues:
-*   Posts:
+---
+title: "[0021] - Allowing multiple address spaces for the `this` pointer"
+params:
+  status: Design In Progress
+  authors:
+    - keenuts: Nathan Gauer
+    - s-perron: Steven Perron
+---
 
 ## Introduction
 
@@ -154,5 +147,3 @@ Both of these options would have to be implemented during sema. The issue is
 that both of these solutions appear to be significantly different than anything
 currently done in sema. Although I believe it is possible, I am uncertain if we
 should invent a novel process.
-
-<!-- {% endraw %} -->

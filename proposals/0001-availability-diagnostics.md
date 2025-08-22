@@ -7,7 +7,6 @@ params:
     - hekota: Helena Kotas
   sponsors:
     - llvm-beanz: Chris Bieneman
-  planned_version: 20YY (Clang-only)
 ---
 
 ## Introduction

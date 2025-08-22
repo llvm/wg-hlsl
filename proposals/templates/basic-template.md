@@ -8,8 +8,6 @@ params:
     - github_username: Human Readable Name
 ---
 
-# Feature name
-
 ## Instructions
 
 > This template wraps at 80-columns. You don't need to match that wrapping, but
@@ -87,5 +85,3 @@ reviewing.
 
 Take a moment to acknowledge the contributions of people other than the author
 and sponsor.
-
-<!-- {% endraw %} -->

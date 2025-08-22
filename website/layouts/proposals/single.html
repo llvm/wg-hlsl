@@ -12,7 +12,15 @@
     <tbody>
         <tr>
             <th>
-                Author(s)
+                Status
+            </th>        
+            <td>
+                {{ .Params.status }}
+            </td>
+        </tr>
+        <tr>
+            <th>
+                Author{{- if gt (.Params.authors | len) 1 -}}s{{- end -}}
             </th>
             <td>
                 <ul class="wg-hlsl-names">
@@ -24,18 +32,10 @@
                 </ul>
             </td>
         </tr>
-        <tr>
-            <th>
-                Status
-            </th>        
-            <td>
-                {{ .Params.status }}
-            </td>
-        </tr>
         {{ with .Params.sponsors }}
         <tr>
             <th>
-                Sponsor(s)
+                Sponsor{{- if gt (. | len) 1 -}}s{{- end -}}
             </th>
             <td>
                 <ul class="wg-hlsl-names">
@@ -45,16 +45,6 @@
                     {{- end -}}
                 {{- end -}}
                 </ul>
-            </td>
-        </tr>
-        {{ end }}
-        {{ with .Params.planned_version }}
-        <tr>
-            <th>
-                Planned Version
-            </th>
-            <td>
-                {{ . }}
             </td>
         </tr>
         {{ end }}

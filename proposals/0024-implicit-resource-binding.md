@@ -1,8 +1,10 @@
-# Implicit Resource Binding
-
-* Proposal: [0024](0024-implicit-resource-binding.md)
-* Author(s): [Helena Kotas](https://github.com/hekota)
-* Status: **Design In Progress**
+---
+title: "[0024] - Implicit Resource Binding"
+params:
+  status: Design In Progress
+  authors:
+    - hekota: Helena Kotas
+---
 
 ## Introduction
 
@@ -557,5 +559,3 @@ bound resources used by the shader.
 
 ## Acknowledgments (Optional)
 
-
-<!-- {% endraw %} -->
