@@ -1,11 +1,10 @@
-<!-- {% raw %} -->
-
-# Root Signature Driver Options
-
-* Proposal: [0029](0029-root-signture-driver-options.md)
-* Author(s): [Finn Plummer](https//github.com/inbelic)
-* Status: **Accepted**
-* Impacted Project(s): Clang
+---
+title: "[0029] - Root Signature Driver Options"
+params:
+  status: Accepted
+  authors:
+    - inbelic: Finn Plummer
+---
 
 ## Introduction
 
@@ -193,5 +192,3 @@ Behaviour:
 of provided DXIL Container
  - Requires the provided DXIL Container to be a valid DXIL container with an
 RST0 part
-
-<!-- {% endraw %} -->

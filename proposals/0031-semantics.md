@@ -1,8 +1,10 @@
-# HLSL shader semantics
-
-* Proposal: [0031](0031-semantics.md)
-* Author(s): [Nathan Gauër](https://github.com/Keenuts)
-* Status: **Design In Progress**
+---
+title: "[0031] - HLSL shader semantics"
+params:
+  status: Design In Progress
+  authors:
+    - Keenuts: Nathan Gauër
+--- 
 
 ## Introduction
 

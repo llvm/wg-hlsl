@@ -1,10 +1,12 @@
-# Vulkan Resource Binding
+---
+title: "[0030] - Vulkan Resource Binding"
+params:
+    status: Design In Progress
+    authors:
+        - s-perron: Steven Perron
+---
 
-*   Proposal: [0030](0030-vulkan-resource-binding.md)
-*   Author(s): [s-perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
-*   PRs: [#146756](https://github.com/llvm/llvm-project/pull/146756)
-*   Issues: [#124561](https://github.com/llvm/llvm-project/issues/124561)
+* Issues: [#124561](https://github.com/llvm/llvm-project/issues/124561)
 
 ## Introduction
 
