@@ -1,10 +1,13 @@
-# Resource Element Type Validation
+---
+title: "[0011] - Resource Element Type Validation"
+params:
+  status: Under Consideration
+  authors:
+    - bob80905: Joshua Batista
+  sponsors:
+    - bob80905: Joshua Batista
+---
 
-* Proposal: [0011](0011-resource-element-type-validation.md)
-* Author(s): [Joshua Batista](https://github.com/bob80905)
-* Sponsor: Joshua Batista
-* Status: **Under Consideration**
-* Impacted Project(s): (LLVM)
 * Issues: [#75676](https://github.com/llvm/llvm-project/issues/75676)
 
 ## Introduction
@@ -158,4 +161,3 @@ This is unneeded because all primitive non-intangible types are valid element ty
 * Sarah Spall
 * Tex Riddell
 * Justin Bogner
-<!-- {% endraw %} -->

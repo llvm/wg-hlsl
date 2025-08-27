@@ -1,10 +1,10 @@
-<!-- {% raw %} -->
-
-# Consistent Naming for DX Intrinsics
-
-* Proposal: [0014](0014-consistent-naming-for-dx-intrinsics.md)
-* Author(s): [Justin Bogner](https://github.com/bogner)
-* Status: **Design In Progress**
+---
+title: "[0014] - Consistent Naming for DX Intrinsics"
+params:
+  status: Design In Progress
+  authors:
+    - bogner: Justin Bogner
+---
 
 ## Introduction
 
@@ -220,5 +220,3 @@ llvm.dx.quad.vote ; (QuadVote) (could map from llvm.dx.quad.reduce.[and|or].i1)
 
 - Thanks to Tex Riddell for surveying the DXIL op names and coming up with the
   scheme used in most of the examples.
-
-<!-- {% endraw %} -->

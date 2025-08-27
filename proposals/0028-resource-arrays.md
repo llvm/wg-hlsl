@@ -1,10 +1,10 @@
-<!-- {% raw %} -->
-
-# Resource arrays
-
-* Proposal: [0028](0028-resource-arrays.md)
-* Author(s): [Helena Kotas](https://github.com/hekota)
-* Status: **Design In Progress**
+---
+title: "[0028] - Resource arrays"
+params:
+   status: Design In Progress
+   authors:
+      - hekota: Helena Kotas
+---
 
 ## Introduction
 
@@ -493,5 +493,3 @@ Introducing such a class raises several new questions:
 Chris Bieneman
 Justin Bogner
 Tex Riddell
-
-<!-- {% endraw %} -->

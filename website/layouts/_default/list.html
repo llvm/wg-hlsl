@@ -1,0 +1,14 @@
+{{ define "main" }}
+
+{{ .Content }}
+
+<ul>
+{{ range .Pages.ByTitle }}
+    <li>
+         <a href="{{ .RelPermalink }}">{{ .Title | default (.File.BaseFileName | humanize) }}</a>
+         {{- if .Summary }} - {{ .Summary | plainify | truncate 100 }}{{ end }}
+    </li>
+{{ end }}
+</ul>
+
+{{ end }}

@@ -1,10 +1,12 @@
-# DXIL Function Scalarization
-
-* Proposal: [0009](0009-DXIL-Function-Scalarization.md)
-* Author(s): [Farzon Lotfi](https://github.com/farzonl)
-* Sponsor: [Farzon Lotfi](https://github.com/farzonl)
-* Status: **Accepted**
-* Impacted Projects: Clang
+---
+title: "[0009] - DXIL Function Scalarization"
+params:
+   status: Accepted
+   authors:
+      - farzonl: Farzon Lotfi
+   sponsors:
+      - farzonl: Farzon Lotfi
+---
 
 ## Introduction
 

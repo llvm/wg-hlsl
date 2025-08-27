@@ -1,8 +1,10 @@
-# SPIR-V Input/Output built-ins
-
- * Proposal: [NNNN](NNNN-spirv-input-builtin.md)
- * Author(s): [Nathan Gauër](https://github.com/Keenuts)
- * Status: **Design In Progress**
+---
+title: "[0019] - SPIR-V Input/Output built-ins"
+params:
+  status: Design In Progress
+  authors:
+    - Keenuts: Nathan Gauër
+---
 
 ## Introduction
 

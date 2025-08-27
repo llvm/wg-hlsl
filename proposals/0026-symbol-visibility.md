@@ -1,8 +1,10 @@
-# Global symbol visibility
-
-* Proposal: [0026](http://0026-filename.md)
-* Author(s): [Steven Perron](https://github.com/s-perron)
-* Status: **Design In Progress**
+---
+title: "[0026] - Global symbol visibility"
+params:
+  status: Design In Progress
+  authors:
+    - s-perron: Steven Perron
+---
 
 ## Introduction
 

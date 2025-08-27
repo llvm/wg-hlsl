@@ -1,11 +1,10 @@
-<!-- {% raw %} -->
-
-# Return Values of Loads, Samples, and Gathers
-
-* Proposal: [0007](0007-the-resret-type.md)
-* Author(s): [Justin Bogner](https://github.com/bogner)
-* Status: **Accepted**
-* PRs: llvm/llvm-project#104252
+---
+title: "[0007] - Return Values of Loads, Samples, and Gathers"
+params:
+    status: Accepted
+    authors:
+        - bogner: Justin Bogner
+---
 
 ## Introduction
 
@@ -126,5 +125,3 @@ DXIL operations they'll lower to.
   %hi4 = extractvalue %dx.types.ResRet.f32 %res4, 1
   %val4 = call %dx.op.MakdeDouble.f64(i32 101, i32 %lo4, i32 %hi4)
 ```
-
-<!-- {% endraw %} -->

@@ -1,15 +1,10 @@
-<!-- {% raw %} -->
-
-# SPIR-V Specialization Constants
-
-*   Proposal: [0027](0027-vk-const-id.md)
-*   Author(s): [Steven Perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
-
-*   PRs:
-
-    [#143179](https://github.com/llvm/llvm-project/pull/143179)
-    [#143180](https://github.com/llvm/llvm-project/pull/143180)
+---
+title: "[0027] - SPIR-V Specialization Constants"
+params:
+  status: Design In Progress
+  authors:
+    - s-perron: Steven Perron
+---
 
 ## Introduction
 
@@ -104,4 +99,3 @@ directly during SEMA. This was considered less desirable incase there is a
 future backend that want to implement the feature, but not have to use the same
 builtin. The design we used places the specific code went in CodeGen.
 
-<!-- {% endraw %} -->

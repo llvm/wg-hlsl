@@ -1,8 +1,10 @@
-# SPIRV - Variable address space
-
- * Proposal: [NNNN](NNNN-SPIRV-variable-address-space.md)
- * Author(s): [Nathan Gauër](https://github.com/Keenuts)
- * Status: **Design In Progress**
+---
+title: "[0020] - SPIR-V Variable address space"
+params:
+  status: Design In Progress
+  authors:
+    - Keenuts: Nathan Gauër
+---
 
 ## Introduction
 

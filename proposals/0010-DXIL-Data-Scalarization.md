@@ -1,9 +1,12 @@
-# DXIL Data Scalarization
-
-* Proposal: [0010](0010-DXIL-Data-Scalarization.md)
-* Author(s): [Farzon Lotfi](https://github.com/farzonl)
-* Sponsor: [Farzon Lotfi](https://github.com/farzonl)
-* Status: **Under Consideration**
+---
+title: "[0010] - DXIL Data Scalarization"
+params:
+  status: Under Consideration
+  authors:
+    - farzonl: Farzon Lotfi
+  sponsors:
+    - farzonl: Farzon Lotfi
+---
 
 ## Introduction
 

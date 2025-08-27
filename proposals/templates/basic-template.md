@@ -1,6 +1,12 @@
-<!-- {% raw %} -->
-
-# Feature name
+---
+title: "[0000] - Proposal Template"
+params:
+  authors:
+    - github_username: Human Readable Name
+  status: Under Consideration
+  sponsors:
+    - github_username: Human Readable Name
+---
 
 ## Instructions
 
@@ -26,10 +32,6 @@
 >    project planning.
 
 ---
-
-* Proposal: [NNNN](NNNN-filename.md)
-* Author(s): [Author 1](https://github.com/author_username)
-* Status: **Design In Progress**
 
 *During the review process, add the following fields as needed:*
 
@@ -83,5 +85,3 @@ reviewing.
 
 Take a moment to acknowledge the contributions of people other than the author
 and sponsor.
-
-<!-- {% endraw %} -->

@@ -1,11 +1,11 @@
-# Register Types and Diagnostics
+---
+title: "[0004] - Register Types and Diagnostics"
+params:
+  status: Under Consideration
+  authors:
+    - bob80905: Joshua Batista
+---
 
-<!-- {% raw %} -->
-* Proposal: [0004](0004-register-types-and-diagnostics.md)
-* Author(s): [Joshua Batista](https://github.com/bob80905)
-* Sponsor: TBD
-* Status: **Under Consideration**
-* Impacted Project(s): (LLVM)
 * PRs: [#87578](https://github.com/llvm/llvm-project/pull/97103)
 * Issues: [#57886](https://github.com/llvm/llvm-project/issues/57886)
 
@@ -260,4 +260,3 @@ at the Sema stage.
 * Justin Bogner
 * Damyan Pepper
 * Farzon Lotfi
-<!-- {% endraw %} -->

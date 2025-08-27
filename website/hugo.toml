@@ -1,0 +1,63 @@
+baseURL = 'https://llvm.github.io/wg-hlsl'
+languageCode = 'en-us'
+title = 'HLSL Working Group'
+theme = 'hugo-theme-techdoc'
+
+[params]
+  menu_style = "slide-menu"
+  
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+    ordered = false
+
+ignoreLogs = ['warning-goldmark-raw-html']
+  
+
+[module]
+  [[module.mounts]]
+    source = './content'
+    target= 'content'
+
+  [[module.mounts]]
+    source = '../docs'
+    target = 'content/docs'
+    
+  [[module.mounts]]
+    source = '../meetings'
+    target = 'content/meetings'
+  
+  # Mount top-level README so the home page layout can read it
+  [[module.mounts]]
+    source = '../README.md'
+    target = 'assets/readme.md'
+
+  [[module.mounts]]
+    source = '../proposals'
+    target = 'content/proposals'
+
+[menu]
+  [[menu.main]]
+  name = "Home"
+  url = "/"
+  weight = 1
+
+  [[menu.main]]
+  name = "Documentation"
+  url = "/docs"
+  weight = 2
+
+  [[menu.main]]
+  name = "Meetings"
+  url = "/meetings"
+  weight = 3
+
+  [[menu.main]]
+  name = "Proposals"
+  url = "/proposals"
+  weight = 4
+

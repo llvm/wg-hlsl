@@ -1,10 +1,10 @@
-<!-- {% raw %} -->
-
-# Mapping Resource Attributes to DXIL and SPIR-V
-
-* Proposal: [0015](0015-resource-attributes-in-dxil-and-spirv.md)
-* Author: [Justin Bogner](https://github.com/bogner)
-* Status: **Accepted**
+---
+title: "[0015] - Mapping Resource Attributes to DXIL and SPIR-V"
+params:
+  status: Accepted
+  authors:
+    - bogner: Justin Bogner
+---
 
 ## Introduction
 
@@ -441,4 +441,3 @@ has two main downsides:
 For these reasons, I think the broader set of specific attributes is a better
 approach.
 
-<!-- {% endraw %} -->

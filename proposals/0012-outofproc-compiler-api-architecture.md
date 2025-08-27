@@ -1,14 +1,12 @@
-<!-- {% raw %} -->
-
-# Out-of-process compiler api architecture
-
-* Proposal: [0012](0012-outofproc-compiler-api-architecture.md)
-* Author(s): [Cooper Partin](https://github.com/coopp)
-* Sponsor: [Cooper Partin](https://github.com/coopp)
-* Status: **Under Consideration**
-* Impacted Project(s): (Clang)
-
-* Issues:
+---
+title: "[0012] - Out-of-process compiler API architecture"
+params:
+    status: Under Consideration
+    authors:
+        - coopp: Cooper Partin
+    sponsors:
+        - coopp: Cooper Partin
+---
 
 ## Introduction
 
@@ -266,6 +264,4 @@ Using this same module keeps a single shipping binary for all compilation.
 ## Acknowledgments
 
 [Chris Bieneman](https://github.com/llvm-beanz)
-
-<!-- {% endraw %} -->
 

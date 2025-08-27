@@ -1,8 +1,10 @@
-# Representing counter variables for typed buffers
-
-*   Proposal: [0023](http://0023-typed-buffer-counters.md)
-*   Author(s): [Steven Perron](https://github.com/s-perron)
-*   Status: **Design In Progress**
+---
+title: "[0023] - Representing counter variables for typed buffers"
+params:
+  status: Design In Progress
+  authors:
+    - s-perron: Steven Perron
+---
 
 ## Introduction
 
