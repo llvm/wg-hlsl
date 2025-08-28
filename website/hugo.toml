@@ -5,6 +5,9 @@ theme = 'hugo-theme-techdoc'
 
 [params]
   menu_style = "slide-menu"
+  github_doc_repository = "https://github.com/llvm/wg-hlsl"
+  github_doc_repository_branch = "main"
+  github_doc_repository_path = ""
   
 [markup]
   [markup.goldmark]
