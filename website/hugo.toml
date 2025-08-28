@@ -3,8 +3,13 @@ languageCode = 'en-us'
 title = 'HLSL Working Group'
 theme = 'hugo-theme-techdoc'
 
+ignoreLogs = ['warning-goldmark-raw-html']
+
 [params]
   menu_style = "slide-menu"
+  github_doc_repository = "https://github.com/llvm/wg-hlsl"
+  github_doc_repository_branch = "main"
+  github_doc_repository_path = ""
   
 [markup]
   [markup.goldmark]
@@ -13,10 +18,7 @@ theme = 'hugo-theme-techdoc'
   [markup.tableOfContents]
     startLevel = 2
     endLevel = 3
-    ordered = false
-
-ignoreLogs = ['warning-goldmark-raw-html']
-  
+    ordered = false  
 
 [module]
   [[module.mounts]]
@@ -31,10 +33,10 @@ ignoreLogs = ['warning-goldmark-raw-html']
     source = '../meetings'
     target = 'content/meetings'
   
-  # Mount top-level README so the home page layout can read it
+  # Use README.md as the home page
   [[module.mounts]]
     source = '../README.md'
-    target = 'assets/readme.md'
+    target = 'content/_index.md'
 
   [[module.mounts]]
     source = '../proposals'
