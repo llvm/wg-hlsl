@@ -3,6 +3,8 @@ languageCode = 'en-us'
 title = 'HLSL Working Group'
 theme = 'hugo-theme-techdoc'
 
+ignoreLogs = ['warning-goldmark-raw-html']
+
 [params]
   menu_style = "slide-menu"
   github_doc_repository = "https://github.com/llvm/wg-hlsl"
@@ -16,10 +18,7 @@ theme = 'hugo-theme-techdoc'
   [markup.tableOfContents]
     startLevel = 2
     endLevel = 3
-    ordered = false
-
-ignoreLogs = ['warning-goldmark-raw-html']
-  
+    ordered = false  
 
 [module]
   [[module.mounts]]
