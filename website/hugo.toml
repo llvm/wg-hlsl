@@ -33,10 +33,10 @@ ignoreLogs = ['warning-goldmark-raw-html']
     source = '../meetings'
     target = 'content/meetings'
   
-  # Mount top-level README so the home page layout can read it
+  # Use README.md as the home page
   [[module.mounts]]
     source = '../README.md'
-    target = 'assets/readme.md'
+    target = 'content/_index.md'
 
   [[module.mounts]]
     source = '../proposals'
