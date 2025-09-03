@@ -351,12 +351,15 @@ call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind 
 To avoid issues described
 [above](#example-where-dxc-does-not-handle-local-arrays-correctly), we should
 aim to resolve initialization of resource array handles early in Clang. That
-involves intercepting the codegen on array access to emit a resource class
-constructor call, which will eventually be transformed to a
+involves intercepting the codegen on array access to emit a call to a static
+resource class initialization method, which will eventually be transformed to a
 `@dx.op.createHandleFromBinding` DXIL intrinsic. Creating local copies of
 resource arrays should be mostly handled by the existing array parameter passing
 code, though additional work will likely be needed to support indexing of
 subsets of multi-dimensional arrays.
+
+Resource constructors and initialization methods are described
+[here](0025-resource-initialization-and-constructors.md).
 
 ### Changes from DXC
 
@@ -382,8 +385,8 @@ can only be referenced through a global variable.
 We need to intercept codegen for `ArraySubscriptExpr` in Clang codegen. If the
 indexed array is a resource array declared at global scope and the expected
 result is a single resource, the array element access should be translated to a
-resource class constructor call with the appropriate indexing and binding
-values.
+static resource initialization method call with the appropriate indexing and
+binding values.
 
 For example in this simple shader:
 
@@ -398,13 +401,14 @@ void main() {
 ```
 
 The code generated for the `A[2][1]` expression should be equivalent to
-`RWBuffer<float>(10, 0, 4, 2, "A")[1]` - that is, a constructor call followed by a
-subscript operator invoked on the resource class. Note that the constructor
+`RWBuffer<float>::__createFromBinding(10, 0, 4, 2, "A")[1]` - that is, a static
+resource initialization method call followed by a
+subscript operator invoked on the resource class. Note that the method
 arguments represent the resource binding register `10`, space `0`, size of the
 array `4`, index in the resource array `2`, and the resource name.
 
 Unlike individual resource declarations, resource arrays at a global scope will
-not be initialized by Sema. However, Sema must ensure that the constructor for
+not be initialized by Sema. However, Sema must ensure that the initialization method for
 the specific resource template class is instantiated and its definition is
 emitted, so that Clang codegen can call it.
 
