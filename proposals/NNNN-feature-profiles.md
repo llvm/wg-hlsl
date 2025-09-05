@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Feature Profiles"
+title: "[NNNN] - Feature-based Target Profiles"
 params:
   authors:
     - llvm-beanz: Chris Bieneman
@@ -10,7 +10,7 @@ params:
 
 ## Introduction
 
-This proposal seeks to introduce a new more formalized way of specifying feature
+This proposal seeks to introduce a new more formalized way of specifying target
 profiles as a set of features to allow the compiler to utilize when generating
 outputs. This proposal pairs stricter availability checks with explicit opt-in
 mechanisms for optional features to help avoid the compiler introducing
@@ -23,7 +23,7 @@ which may not be supported by all devices. This places a burden on users to
 ensure that they are aware of the potential impacts on deployment for shaders
 utilizing features which they may or may not have intended.
 
-This feature addresses this problem by defining clear feature profiles derived
+This feature addresses this problem by defining clear target profiles derived
 from DirectX Shader Models for DirectX targets and [Vulkan
 Profiles](https://github.com/KhronosGroup/Vulkan-Profiles) for Vulkan, and
 compiler features to enable opting in to optional features that layer on top of
@@ -32,12 +32,14 @@ the specified target profile.
 ## Proposed solution
 
 The core of this proposal revolves around a new definition for "target profiles"
-that the shader compiler will translate to available feature sets.
+that the shader compiler will translate to available feature sets. Target
+profiles is a term of art in the FXC and DXC compilers surfaced to users via the
+`-T` flag.
 
-The target profile flag supported by DXC-compatible drivers as `-T` will be
-extended to support a new wider set of profile values. The current profiles will
-remain unchanged, which will imply a shader-model feature set and _all_ optional
-features.
+This proposal does not change the behavior for any of the values supported by
+the `-T` flag in existing compilers. The current profiles map to shader stage
+and shader model version and will enable a shader-model feature set and _all_
+optional features.
 
 Target profiles should be flexible and easy to define. A target profile may
 either be supported on a single target (e.g. a Vulkan profile may only be
@@ -106,12 +108,30 @@ without triggering diagnostics when the target profile is specified. Features
 not explicitly required are treated as unavailable unless they have been
 explicitly enabled by the user.
 
+A target profile does not force required features into the final compiled
+program; only _used_ features will be captured in shader annotations (e.g.
+feature flags, annotating instructions, or metadata).
+
 ### Overriding Profile Settings
 
 A target profile should initialize a set of base configurations. Those
 configurations can be overridden with additional flags. Notably Clang's existing
 `-triple` and `-target-feature` can be used to override the base triple or
 enable and disable specific target features.
+
+### Policy Around Included Profiles
+
+Allowing unrestricted contributions of profiles into the compiler could negate
+the benefits of this proposal by making it difficult for users to identify the
+correct profile to use. To mitigate this problem we should integrate profiles to
+the compiler that:
+
+* Describe official API versioning schemes (DirectX feature levels and Shader
+  Models, Metal versions, Vulkan versions).
+* Align with an official notion of target profiles such as [Vulkan
+  profiles](https://github.com/KhronosGroup/Vulkan-Profiles/tree/main), or any
+  similar concept that may arise from recognized industry consortiums or
+  standards bodies.
 
 ### Example Usage
 
@@ -156,6 +176,16 @@ Builds a compute shader for the DirectX 12_1 feature tier, targeting DXIL 1.4
 and a defined set of optional features aligning with 12_1's required features
 documented on
 [learn.microsoft](https://learn.microsoft.com/en-us/windows/win32/direct3d12/hardware-feature-levels).
+
+```
+clang-dxc -T cs_DirectX_12_1 -target-feature -Doubles ...
+```
+
+Builds a compute shader for the DirectX 12_1 feature tier, targeting DXIL 1.0
+and a defined set of optional features aligning with 12_1's required features
+documented on
+[learn.microsoft](https://learn.microsoft.com/en-us/windows/win32/direct3d12/hardware-feature-levels),
+but disallowing the use of double-precision floating point values.
 
 ## Outstanding Questions
 
