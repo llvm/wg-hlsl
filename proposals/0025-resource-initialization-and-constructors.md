@@ -33,8 +33,8 @@ or manipulating the resource, such as subscript operators, `Load` and `Store`
 methods, etc.
 
 Note that while the HLSL resources are defined as structs, they are often
-referred to as _resource classes_ or _resource records_. These terms can be used
-interchangeably.
+referred to as _resource classes_, _resource records_, or _resource structs_.
+These terms can be used interchangeably.
 
 The record classes can be declared at the global scope, used as function in/out
 parameters, or as local variables. They need to be properly initialized
@@ -75,7 +75,8 @@ The `tmp.__handle` argument passed into the
 `__builtin_hlsl_resource_handlefrombinding` Clang builtin function will be used
 to infer the return type of that function. This is the same way we infer return
 types for HLSL intrinsic builtins based on their arguments, except in the case
-only the type of the argument is used and not its (uninitialized) value.
+only the type of the argument is used and not its value (which is
+uninitialized, or set to `poison` value).
 
 The `name` argument will be used to generate the DXIL resource metadata and also
 for resource diagnostics that need to happen after optimizations later in the
