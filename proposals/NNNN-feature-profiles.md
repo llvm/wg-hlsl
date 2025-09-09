@@ -146,7 +146,7 @@ SM 6.0 and earlier.
 clang-dxc -T cs_Android15 ...
 ```
 
-Builds a compute shader for Android 15, targeting SPIRV 1.2 and allowing the
+Builds a compute shader for Android 15, targeting SPIRV 1.3 and allowing the
 required features supported by the Android 15 profile.
 
 ```
