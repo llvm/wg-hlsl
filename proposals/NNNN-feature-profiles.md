@@ -81,7 +81,7 @@ profile for Android 15 based on the Khronos-vended Vulkan profile:
 ```
 ProfileName: Android15
 TargetDefinitions:
-  - BaseTriple: spirv-vulkan1.2
+  - BaseTriple: spirv-vulkan1.3
     Stages: [pixel, vertex, compute] # Not really sure what all Android supports...
     RequiredFeatures:
       - VK_KHR_maintenance5
