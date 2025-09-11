@@ -1,9 +1,13 @@
-# HLSL Matrices
-* Proposal: [NNNN](NNNN-hlsl-matrix.md)
-* Author(s): [Farzon Lotfi](https://github.com/farzonl) and 
-             [Greg Roth](https://github.com/pow2clk)
+---
+title: NNNN - HLSL Matrices
+params:
+  authors:
+  - farzonl: Farzon Lotfi
+  - pow2clk: Greg Roth
+  status: Design In Progress
+---
 
-* Status: **Design In Progress**
+# HLSL Matrices
 
 * Issues:
   [#88060](https://github.com/llvm/llvm-project/issues/88060)
@@ -14,7 +18,7 @@ Adding native matrix types is critical for modernizing HLSL. Matrices are core
 to graphics workloads, powering transformations, lighting, and animation. For
 the frontend mapping HLSL matrices to Clang's Matrix Type Extension allows us
 to build on an existing type with clean IR that maps to vectors and will
-unlock effective optimizations, while simplify backend lowering. This change
+unlock effective optimizations, while simplifying backend lowering. This change
 makes HLSL a first-class citizen in LLVM, improving performance, portability, 
 and long-term maintainability.
 
@@ -33,7 +37,7 @@ HLSL matrices must:
   element types.
 * When both destination dimensions are less than or equal to the source, 
   matrices can be implicitly truncated to smaller sizes with a warning.
-* Usable as resource types
+* Usable as resource element types
 * Usable as entry point semantics
 * Matrix multiplication with compatible vectors
 * Resolve overloaded functions taking matrix parameters.
