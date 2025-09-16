@@ -309,7 +309,9 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
     STATIC_BORDER_COLOR = 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
                           'STATIC_BORDER_COLOR_OPAQUE_BLACK' |
-                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' ;
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' |
+                          'STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT' |
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT' ;
 
     STATIC_SAMPLER_FLAGS = 'SAMPLER_FLAG_UINT_BORDER_COLOR' |
                            'SAMPLER_FLAG_NON_NORMALIZED_COORDINATES';
@@ -626,6 +628,12 @@ The additional semantic rules not already covered by the grammar are listed here
     - `FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT`
   - `MinLOD` and `MaxLOD` must be 0
   - `AddressU` and `AddressV` must be `TEXTURE_ADDRESS_MODE_CLAMP` or `TEXTURE_ADDRESS_MODE_BORDER`
+
+- When flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
+  - `BorderColor` must be one of
+    - STATIC_BORDER_COLOR_TRANSPARENT_BLACK
+    - STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT
+    - STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT
 
 ### Metadata Schema
 
