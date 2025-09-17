@@ -250,7 +250,7 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
       ( 'minLOD' '=' NUMBER ) |
       ( 'maxLOD' '=' NUMBER ) |
       ( 'space' '=' POS_INT ) |
-      ( 'visibility' '=' SHADER_VISIBILITY ) 
+      ( 'visibility' '=' SHADER_VISIBILITY ) |
       ( 'flags' '=' STATIC_SAMPLER_FLAGS ) ;
 
     BReg = 'b' DIGITS ;
