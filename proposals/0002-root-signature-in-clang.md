@@ -319,7 +319,7 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
 ### Root Signature Versioning 
 
-Currently, DirectX supports three "versions" of root signatures: 1.0, 1.1 and 1.2. 
+Currently, DirectX supports three versions of root signatures: 1.0, 1.1 and 1.2. 
 Version 1.1 includes additional flags for descriptor ranges and root descriptors.
 See the [DirectX Documentation][root_signature_versions_doc] for full details.
 Version 1.2 includes additions flags for static samplers. These changes are documented
