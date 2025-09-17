@@ -610,6 +610,11 @@ The additional semantic rules not already covered by the grammar are listed here
       - `FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT`
     - `MinLOD` and `MaxLOD` must be 0
     - `AddressU` and `AddressV` must be `TEXTURE_ADDRESS_MODE_CLAMP` or `TEXTURE_ADDRESS_MODE_BORDER`
+  - When the flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
+    - `BorderColor` must be one of
+      - `STATIC_BORDER_COLOR_TRANSPARENT_BLACK`
+      - `STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT`
+      - `STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT`
 
 - Register Value
   The value `0xFFFFFFFF` is invalid.
@@ -627,12 +632,6 @@ The additional semantic rules not already covered by the grammar are listed here
 
   Note that a valid value for `numDescriptors` is `unbounded` and requires
   overlap analysis.
-
-- When the flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
-  - `BorderColor` must be one of
-    - STATIC_BORDER_COLOR_TRANSPARENT_BLACK
-    - STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT
-    - STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT
 
 ### Metadata Schema
 
