@@ -1,14 +1,13 @@
 ---
-title: NNNN - HLSL Matrices
+title: 0032 - HLSL Matrices
 params:
   authors:
-  - farzonl: Farzon Lotfi
-  - pow2clk: Greg Roth
+  + farzonl: Farzon Lotfi
+  + pow2clk: Greg Roth
   status: Design In Progress
 ---
 
 # HLSL Matrices
-
 * Issues:
   [#88060](https://github.com/llvm/llvm-project/issues/88060)
 
@@ -19,8 +18,8 @@ to graphics workloads, powering transformations, lighting, and animation. For
 the frontend mapping HLSL matrices to Clang's Matrix Type Extension allows us
 to build on an existing type with clean IR that maps to vectors and will
 unlock effective optimizations, while simplifying backend lowering. This change
-makes HLSL a first-class citizen in LLVM, improving performance, portability, 
-and long-term maintainability.
+makes HLSL matrices a first-class citizen in LLVM, improving portability and
+long-term maintainability.
 
 ## Requirements
 
@@ -45,8 +44,9 @@ HLSL matrices must:
 ## Solution
 
 The Clang matrix extension gives us the frontend support we need to build HLSL
-matrices. We will essentially map the matrix keyword to the matrix_type 
-attribute via using semantics.
+matrices. We will essentially map the matrix keyword to the `matrix_type`
+
+attribute using semantics.
 
 ```hlsl
 template<typename Ty, int R, int C> using matrix = Ty
@@ -76,7 +76,18 @@ Other advantages include:
 * Perform most piecewise operations with splatted scalars (missing divide)
 * Explicit casts between matrices with all compatible element types
 
-Some complications we will need to account for are the legalization of matrix
+Another advantage is the elements of a value of a `matrix_type` are laid out in
+[column-major order](https://clang.llvm.org/docs/MatrixTypes.html#decisions-for-the-implementation-in-clang) without padding. 
+That exactly matches the memory layout we need for the DirectX backend without
+ having to add any special passes to manipulate data layout.
+
+That said the current `matrix_type` has a complication. The current design is 
+incomplete with an intent to be row\col major agnostic. The plan is to support
+both data layouts in a way where accessing columns or rows can be done 
+efficiently, but not both. That could present problems with supporting
+(row|column)_major qualifiers in the same shader.
+
+Other complications we will need to account for are the legalization of matrix
 intrinsics types like:
 * int_matrix_transpose
 * int_matrix_multiply
@@ -148,3 +159,12 @@ void TypePrinter::printConstantMatrixAfter(const ConstantMatrixType *T, raw_ostr
   printAfter(T->getElementType(), OS);
 }
 ```
+
+## Testing
+
+To land just the clang extention the testing will be simplified to what was 
+done for [vectors](https://github.com/llvm/llvm-project/commit/b8dbc6ffea93976dc0d8569c9d23e9c21e33e317).
+
+Testing for operators should not be necessary those tests already exist for 
+clang matrix extentions. All the HLSL matrix must cases should be captured in
+the offload test suite.
