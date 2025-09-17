@@ -60,9 +60,10 @@ inclusive matrix dimensions
 typedef matrix<float, 4, 4> float4x4;
 ```
 
-We will need to do this in sema source to make this type available before we
-start parsing headers. This will be done similarly to `defineHLSLVectorAlias()` in
-`HLSLExternalSemaSource.cpp`.
+The typedefs will happen as a default header in `hlsl_basic_types.h`. The 
+matrix template will need to be done in sema source to make the type available
+before westart parsing headers. This will be done similarly to
+`defineHLSLVectorAlias()` in `HLSLExternalSemaSource.cpp`.
 
 Advantages to using Clang matrix extension is that it lowers to Clang Vector
 types meaning we won't have to change much of our backend like the intrinsic
