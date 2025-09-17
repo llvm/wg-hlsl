@@ -322,8 +322,8 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 Currently, DirectX supports three "versions" of root signatures: 1.0, 1.1 and 1.2. 
 Version 1.1 includes additional flags for descriptor ranges and root descriptors.
 See the [DirectX Documentation][root_signature_versions_doc] for full details.
-Version 1.2 includes additions flags for static samplers. This changes were documented
-in the [Vulkan Specification][root_signature_version12_doc] for root signatures.
+Version 1.2 includes additions flags for static samplers. These changes are documented
+in the [VulkanOn12 Spec][root_signature_version12_doc] for root signatures.
 
 The metadata format specification will be the same, regardless of the version. 
 Each version has different defaults and different valid flag combinations.
@@ -600,7 +600,7 @@ The additional semantic rules not already covered by the grammar are listed here
   - Max/MinLOD cannot be NaN.
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
-  - When flag `SAMPLER_FLAG_NON_NORMALIZED_COORDINATES` is set:
+  - When the flag `SAMPLER_FLAG_NON_NORMALIZED_COORDINATES` is set:
     - `Filter` must be one of
       - `FILTER_MIN_MAG_MIP_POINT`
       - `FILTER_MIN_MAG_LINEAR_MIP_POINT`
@@ -628,7 +628,7 @@ The additional semantic rules not already covered by the grammar are listed here
   Note that a valid value for `numDescriptors` is `unbounded` and requires
   overlap analysis.
 
-- When flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
+- When the flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
   - `BorderColor` must be one of
     - STATIC_BORDER_COLOR_TRANSPARENT_BLACK
     - STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT
@@ -927,7 +927,7 @@ Operands:
     the ComparisonFunc cannot be 0.
   
   - Valid values for Flags
-    - For root signature version 1.0 and 1.1 must be 0
+    - For root signature versions 1.0 and 1.1, Flags must be 0
     - For root signature version 1.2:
       - SAMPLER_FLAG_UINT_BORDER_COLOR
       - SAMPLER_FLAG_NON_NORMALIZED_COORDINATES
