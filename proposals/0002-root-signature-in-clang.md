@@ -600,6 +600,16 @@ The additional semantic rules not already covered by the grammar are listed here
   - Max/MinLOD cannot be NaN.
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
+  - When flag `SAMPLER_FLAG_NON_NORMALIZED_COORDINATES` is set:
+    - `Filter` must be one of
+      - `FILTER_MIN_MAG_MIP_POINT`
+      - `FILTER_MIN_MAG_LINEAR_MIP_POINT`
+      - `FILTER_MINIMUM_MIN_MAG_MIP_POINT`
+      - `FILTER_MINIMUM_MIN_MAG_LINEAR_MIP_POINT`
+      - `FILTER_MAXIMUM_MIN_MAG_MIP_POINT`
+      - `FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT`
+    - `MinLOD` and `MaxLOD` must be 0
+    - `AddressU` and `AddressV` must be `TEXTURE_ADDRESS_MODE_CLAMP` or `TEXTURE_ADDRESS_MODE_BORDER`
 
 - Register Value
   The value `0xFFFFFFFF` is invalid.
@@ -617,17 +627,6 @@ The additional semantic rules not already covered by the grammar are listed here
 
   Note that a valid value for `numDescriptors` is `unbounded` and requires
   overlap analysis.
-
-- When flag `SAMPLER_FLAG_NON_NORMALIZED_COORDINATES` is set:
-  - `Filter` must be one of
-    - `FILTER_MIN_MAG_MIP_POINT`
-    - `FILTER_MIN_MAG_LINEAR_MIP_POINT`
-    - `FILTER_MINIMUM_MIN_MAG_MIP_POINT`
-    - `FILTER_MINIMUM_MIN_MAG_LINEAR_MIP_POINT`
-    - `FILTER_MAXIMUM_MIN_MAG_MIP_POINT`
-    - `FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT`
-  - `MinLOD` and `MaxLOD` must be 0
-  - `AddressU` and `AddressV` must be `TEXTURE_ADDRESS_MODE_CLAMP` or `TEXTURE_ADDRESS_MODE_BORDER`
 
 - When flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
   - `BorderColor` must be one of
