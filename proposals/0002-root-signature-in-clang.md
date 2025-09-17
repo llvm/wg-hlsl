@@ -250,7 +250,8 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
       ( 'minLOD' '=' NUMBER ) |
       ( 'maxLOD' '=' NUMBER ) |
       ( 'space' '=' POS_INT ) |
-      ( 'visibility' '=' SHADER_VISIBILITY ) ;
+      ( 'visibility' '=' SHADER_VISIBILITY ) |
+      ( 'flags' '=' STATIC_SAMPLER_FLAGS ) ;
 
     BReg = 'b' DIGITS ;
 
@@ -308,14 +309,21 @@ subsequent tokens. Additionally, all keywords and enums are case-insensitive.
 
     STATIC_BORDER_COLOR = 'STATIC_BORDER_COLOR_TRANSPARENT_BLACK' |
                           'STATIC_BORDER_COLOR_OPAQUE_BLACK' |
-                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' ;
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE' |
+                          'STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT' |
+                          'STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT' ;
+
+    STATIC_SAMPLER_FLAGS = 'SAMPLER_FLAG_UINT_BORDER_COLOR' |
+                           'SAMPLER_FLAG_NON_NORMALIZED_COORDINATES';
 ```
 
 ### Root Signature Versioning 
 
-Currently, DirectX supports two "versions" of root signatures: 1.0 and 1.1. 
-Version 1.1 includes additional flags for descriptor ranges and root descriptors. 
+Currently, DirectX supports three versions of root signatures: 1.0, 1.1 and 1.2. 
+Version 1.1 includes additional flags for descriptor ranges and root descriptors.
 See the [DirectX Documentation][root_signature_versions_doc] for full details.
+Version 1.2 includes additions flags for static samplers. These changes are documented
+in the [VulkanOn12 Spec][root_signature_version12_doc] for root signatures.
 
 The metadata format specification will be the same, regardless of the version. 
 Each version has different defaults and different valid flag combinations.
@@ -457,11 +465,12 @@ As specified in the grammar, '0' denotes there are no flags set.
     - `SRV`: `DATA_VOLATILE | DESCRIPTORS_VOLATILE`
     - `UAV`: `DATA_VOLATILE | DESCRIPTORS_VOLATILE`
     - `Sampler`: `DESCRIPTORS_VOLATILE`
-  - Version 1.1:
+  - Version 1.1 onwards:
     - `CBV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
     - `SRV`: `DATA_STATIC_WHILE_SET_AT_EXECUTE`
     - `UAV`: `DATA_VOLATILE`
     - `Sampler`: `0`
+- `STATIC_SAMPLER_FLAGS`: `0`
 
 ### Root Signatures in the LLVM IR
 
@@ -558,7 +567,7 @@ The additional semantic rules not already covered by the grammar are listed here
 
 - For ROOT_DESCRIPTOR_FLAGS, only the following values are valid
   - For version 1.0, only the value DATA_VOLATILE is valid.
-  - For version 1.1, the following values are valid:  
+  - For version 1.1 onwards, the following values are valid:  
     - 0
     - DATA_STATIC
     - DATA_STATIC_WHILE_SET_AT_EXECUTE
@@ -566,14 +575,14 @@ The additional semantic rules not already covered by the grammar are listed here
 
 - For DESCRIPTOR_RANGE_FLAGS on a Sampler, only the following values are valid
   - For version 1.0, only the value DESCRIPTORS_VOLATILE is valid.
-  - For version 1.1, the following values are valid:  
+  - For version 1.1 onwards, the following values are valid:  
     - 0
     - DESCRIPTORS_VOLATILE
     - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
 
 - For DESCRIPTOR_RANGE_FLAGS on a CBV/SRV/UAV
   - For version 1.0, only the value DATA_VOLATILE | DESCRIPTORS_VOLATILE is valid.
-  - For version 1.1, the following values are valid:  
+  - For version 1.1 onwards, the following values are valid:  
     - 0
     - DESCRIPTORS_VOLATILE
     - DATA_VOLATILE
@@ -591,6 +600,22 @@ The additional semantic rules not already covered by the grammar are listed here
   - Max/MinLOD cannot be NaN.
   - MaxAnisotropy cannot exceed 16.
   - MipLODBias must be within range of [-16, 15.99].
+  - When the flag `SAMPLER_FLAG_NON_NORMALIZED_COORDINATES` is set:
+    - `Filter` must be one of
+      - `FILTER_MIN_MAG_MIP_POINT`
+      - `FILTER_MIN_MAG_LINEAR_MIP_POINT`
+      - `FILTER_MINIMUM_MIN_MAG_MIP_POINT`
+      - `FILTER_MINIMUM_MIN_MAG_LINEAR_MIP_POINT`
+      - `FILTER_MAXIMUM_MIN_MAG_MIP_POINT`
+      - `FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT`
+    - `MinLOD` and `MaxLOD` must be 0
+    - `AddressU` and `AddressV` must be `TEXTURE_ADDRESS_MODE_CLAMP` or `TEXTURE_ADDRESS_MODE_BORDER`
+  - When the flag `SAMPLER_FLAG_UINT_BORDER_COLOR` is set:
+    - `BorderColor` must be one of
+      - `STATIC_BORDER_COLOR_TRANSPARENT_BLACK`
+      - `STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT`
+      - `STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT`
+  - If `BorderColor` is any of `*_UINT` values, then flag `SAMPLER_FLAG_UINT_BORDER_COLOR` must be set.
 
 - Register Value
   The value `0xFFFFFFFF` is invalid.
@@ -608,7 +633,6 @@ The additional semantic rules not already covered by the grammar are listed here
 
   Note that a valid value for `numDescriptors` is `unbounded` and requires
   overlap analysis.
-
 
 ### Metadata Schema
 
@@ -633,6 +657,7 @@ reference to a root signature (the second operand) and its version (the third op
 following. The valid values for version are:
  * 1: version 1.0
  * 2: version 1.1
+ * 3: version 1.2
 
 #### Root Signature
 
@@ -759,8 +784,10 @@ Operands:
 * i32: ShaderRegister
 * i32: RegisterSpace
 * i32: ShaderVisibility ([D3D12_SHADER_VISIBILITY][d3d12_shader_visibility])
+* i32: Flags ([D3D12_SAMPLER_FLAGS][root_signature_version12_doc])
 
 [root_signature_versions_doc]: https://learn.microsoft.com/en-us/windows/win32/direct3d12/root-signature-version-1-1
+[root_signature_version12_doc]: https://microsoft.github.io/DirectX-Specs/d3d/VulkanOn12.html#definition-9
 [d3d12_root_signature_flags]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_root_signature_flags
 [d3d12_shader_visibility]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_visibility
 [d3d12_descriptor_range_append]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_descriptor_range
@@ -807,7 +834,7 @@ Operands:
 
 - Valid values for DescriptorRangeFlags on CBV/SRV/UAV
   - For root signature version 1.0 must be DATA_VOLATILE | DESCRIPTORS_VOLATILE.
-  - For root signature version 1.1:
+  - For root signature version 1.1 onwards:
     - 0
     - DESCRIPTORS_VOLATILE
     - DATA_VOLATILE
@@ -822,7 +849,7 @@ Operands:
 
 - Valid values for DescriptorRangeFlags on Sampler
   - For root signature version 1.0 must be DESCRIPTORS_VOLATILE.
-  - For root signature version 1.1:
+  - For root signature version 1.1 onwards:
     - 0
     - DESCRIPTORS_VOLATILE
     - DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS
@@ -898,6 +925,12 @@ Operands:
 
     When the Filter of a StaticSampler is `FILTER_COMPARISON*`,
     the ComparisonFunc cannot be 0.
+  
+  - Valid values for Flags
+    - For root signature versions 1.0 and 1.1, Flags must be 0
+    - For root signature version 1.2:
+      - SAMPLER_FLAG_UINT_BORDER_COLOR
+      - SAMPLER_FLAG_NON_NORMALIZED_COORDINATES
 
 #### Samplers cannot be mixed with other resource types in a descriptor table.
 
