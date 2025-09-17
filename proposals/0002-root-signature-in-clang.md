@@ -615,6 +615,7 @@ The additional semantic rules not already covered by the grammar are listed here
       - `STATIC_BORDER_COLOR_TRANSPARENT_BLACK`
       - `STATIC_BORDER_COLOR_OPAQUE_BLACK_UINT`
       - `STATIC_BORDER_COLOR_OPAQUE_WHITE_UINT`
+  - If `BorderColor` is any of `*_UINT` values, then flag `SAMPLER_FLAG_UINT_BORDER_COLOR` must be set.
 
 - Register Value
   The value `0xFFFFFFFF` is invalid.
