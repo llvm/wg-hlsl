@@ -24,39 +24,167 @@ explicit that they are separate resources.
 
 ## Motivation
 
-The counter variables are a core feature in HLSL, and must be represented.
+The counter variables are a core feature in HLSL and must be represented.
 
 ## Proposed solution
 
 Access to resources occurs through handles stored in a static global variable.
-Currently, RWStructuredBuffer objects contain a single handle for both main
-storage and counter access.
+In SPIR-V, a resource and its counter are represented by distinct handles, while
+in DXIL they share the same handle. We propose that the IR representation adopt
+the more explicit SPIR-V model, representing the main buffer and its counter
+with two separate handles. The DXIL backend will then be responsible for merging
+these into a single handle.
 
-We propose that RWStructuredBuffer objects be modified to include two separate
-handles: one for main storage (bufferHandle) and one for the counter
-(counterHandle). These handles would be initialized independently in the
-constructor using separate calls to resource.handlefrombinding.
+We propose that `RWStructuredBuffer` objects, and others with a counter, be
+modified to include two separate handles: one for main storage (`bufferHandle`)
+and one for the counter (`counterHandle`). The `bufferHandle` is initialized as
+usual via a call to `llvm.dx.resource.handlefrom*binding` or
+`llvm.spv.resource.handlefrom*binding`, depending on the target.
 
-For DXIL, both handles would share the same type, and the calls to
-resource.handlefrombinding will be identical. They could potentially be commoned
-by the compiler.
+To establish an explicit link between the resource and its counter, we propose
+introducing two new backend-specific intrinsics:
 
-For SPIR-V, the handles would have distinct types as detailed in
-[0018-spirv-resource-representation.md](http://0018-spirv-resource-representation.md).
-The method for determining the counter variable's binding number is beyond the
-scope of this proposal.
+*   `llvm.{dx|spv}.resource.counterhandlefromimplicitbinding(ResourceHandle,
+    order_id, space_id)`
+*   `llvm.{dx|spv}.resource.counterhandlefromexplicitbinding(ResourceHandle,
+    register_id, space_id)`
+
+The `counterHandle` will be initialized by calling one of these intrinsics,
+passing the `bufferHandle` of the main storage as the first argument. This makes
+the relationship explicit in the IR, which simplifies SPIR-V code generation for
+the `CounterBuffer` decoration. For the DXIL backend, this allows it to
+recognize that the counter handle is an alias for the main buffer handle and
+merge them accordingly.
 
 ## Detailed design
 
-## Alternatives considered (Optional)
+The implementation will introduce a two-handle model directly into the resource
+class definition. This will be achieved through a combination of new AST nodes,
+Sema actions, and code generation logic.
 
-### Multiple binding numbers on `resource.handlefrombinding`
+### AST and Type Representation
+
+1.  **Two-Member Struct:** Resource types that support counters (e.g.,
+    `RWStructuredBuffer`) will be defined as structs containing two handle
+    members: `__handle` for the primary data and `__counter_handle` for the
+    counter.
+
+2.  **`IsCounter` Attribute:** To differentiate the types of the two handles, a
+    new attribute, `[[hlsl::is_counter]]`, will be introduced. The type of the
+    `__counter_handle` member will be the same as the type for `__handle` except
+    it will be annotated with this attribute. This will be tracked in the AST by
+    adding an `IsCounter` flag to `HLSLAttributedResourceType::Attributes`. By
+    making the counter handle's type identical to the main resource handle's
+    type, distinguished only by this attribute, we enable flexible and correct
+    code generation. Clang's code generation for each target
+    (`clang/lib/CodeGen/Targets/`) will be responsible for interpreting this
+    attribute. The implementation for the DirectX target can ignore this
+    attribute, resulting in the same target type for both handles, which aligns
+    with its single-handle model. Conversely, the implementation for the SPIR-V
+    target can detect this attribute and generate a distinct and appropriate
+    target type for the counter (e.g., a buffer of `i32`), fitting its
+    separate-resource model.
+
+3.  **Sema and Builtin Construction:**
+    *   In `HLSLExternalSemaSource.cpp`, the `setupBufferType` function will be
+        modified. For UAVs that can have counters, it will call
+        `addCounterHandleMember` in the `BuiltinTypeDeclBuilder`.
+    *   `addCounterHandleMember` will create the `__counter_handle` field and
+        apply the necessary attributes, including `HLSLIsCounterAttr`, to its
+        type.
+
+4.  **Counter Operations:** Methods like `IncrementCounter` and
+    `DecrementCounter` will be modified in `HLSLBuiltinTypeDeclBuilder.cpp` to
+    operate on the `__counter_handle` member instead of the `__handle` member,
+    directing the atomic operations to the correct resource.
+
+### Initialization and Binding
+
+The core of this design lies in how these two handles are initialized. In Sema,
+new static methods will be added to the resource class to initialize them.
+
+1.  **New Static Methods:** Two new static methods will be added to
+    counter-enabled resource classes:
+    *   `__createFromBindingWithCounter`
+    *   `__createFromImplicitBindingWithCounter`
+
+2.  **Sema Logic:** In `SemaHLSL.cpp`, the `initGlobalResourceDecl` function will
+    check if a resource type has more than one field. If it does, it will deduce
+    that it has a counter and emit a call to the appropriate `...WithCounter`
+    static method instead of the regular creation methods.
+
+3.  **Handle Creation:** The `...WithCounter` methods will initialize the two
+    handles using a combination of existing and new built-in functions.
+    *   The `__handle` (main data) will be initialized using the existing
+        `__builtin_hlsl_resource_handlefrombinding` or
+        `__builtin_hlsl_resource_handlefromimplicitbinding` built-ins.
+    *   To initialize the `__counter_handle`, new built-in functions will be
+        introduced: `__builtin_hlsl_resource_counterhandlefromimplicitbinding`
+        and `__builtin_hlsl_resource_counterhandlefromexplicitbinding`. These
+        built-ins will take the main resource handle (`__handle`) as an
+        argument, along with the counter's binding information.
+    *   During Clang's code generation, these new built-ins will be lowered
+        directly to their corresponding target-specific LLVM intrinsics:
+        `llvm.dx.resource.counterhandle...` for DirectX and
+        `llvm.spv.resource.counterhandle...` for SPIR-V. This approach
+        correctly models the relationship between the main resource and its
+        counter directly in the IR, as described in the "Proposed solution".
+
+## LLVM IR Generation and Backend Handling
+
+1.  **SPIR-V Target Type Generation:** In
+    `clang/lib/CodeGen/Targets/SPIR.cpp`, the `getHLSLType` function will check
+    for the `IsCounter` flag on the `HLSLAttributedResourceType`. If the flag is
+    present, it will generate a `target("spirv.VulkanBuffer", ...)` in the
+    `Uniform` storage class with an `i32` element type, correctly representing
+    the counter as a 32-bit integer buffer in SPIR-V.
+
+2.  **DirectX Backend Intrinsic Handling:** The DirectX backend in LLVM will be
+    updated to recognize the `llvm.dx.resource.counterhandlefrom...`
+    intrinsics. When it encounters one, it will return the parameter handle.
+
+3.  **SPIR-V Backend Intrinsic Handling:** The SPIR-V backend in LLVM will be
+    updated to recognize the `llvm.spv.resource.counterhandlefrom...`
+    intrinsics. When it encounters one, it will generate a new, distinct
+    `OpVariable` for the counter buffer. It will then use the information from
+    the intrinsic (linking the main handle to the counter handle) to emit an
+    `OpDecorate` instruction with the `CounterBuffer` decoration, pointing from
+    the main buffer's `OpVariable` to the newly created counter buffer's
+    `OpVariable` when necessary.
+
+## Alternatives considered
+
+### Independent `llvm.dx.resource.handlefrombinding` calls
+
+The initial proposal was to initialize both the main buffer handle and the
+counter handle with separate calls to `llvm.dx.resource.handlefrombinding` (or
+the `spv` equivalent). This would have treated them as two entirely independent
+resources from the point of view of the frontend.
+
+However, this approach is problematic for both DXIL and SPIR-V:
+1.  **Impossible to Unify Calls for DXIL:** The original idea suggested the two
+    `llvm.dx.resource.handlefrombinding` calls could be identical. This is not
+    feasible. A resource like `RWStructuredBuffer<T> MyBuffer : register(u0)`
+    has an explicit binding and the name "MyBuffer". Its counter, however, has
+    an implicit binding assigned by the compiler and a different name (e.g.,
+    "MyBuffer_counter"). Because the binding points and names are different, the
+    arguments to their respective `llvm.dx.resource.handlefrombinding` calls
+    must also be different, making them impossible to common.
+2.  **Lost Connection:** Treating the counter as a completely separate resource
+    severs the explicit link between the main buffer and its counter in the IR.
+    For DXIL, this makes it difficult to know that the two resources are related
+    and share the same underlying handle. For SPIR-V, this link is required to
+    emit the `CounterBuffer` decoration on the main buffer, pointing to the
+    counter. Reconstructing this relationship in the backend would be complex
+    and rely on fragile naming conventions.
+
+### Multiple binding numbers on `llvm.spv.resource.handlefrombinding`
 
 One possible solution is to incorporate multiple binding locations into
-resource.handlefrombinding. This would allow the SPIR-V backend to expand the
-call into multiple resources. However, this solution is not ideal because it
-would necessitate the creation of an ad hoc target type within the SPIR-V
-backend.
+`llvm.spv.resource.handlefrombinding`. This would allow the SPIR-V backend to
+expand the call into multiple resources. However, this solution is not ideal
+because it would necessitate the creation of an ad hoc target type within the
+SPIR-V backend.
 
 In contrast, the proposed solution only requires a single target type to
 represent a generic Vulkan buffer. This type could potentially be reused by any
@@ -65,9 +193,7 @@ language targeting Vulkan.
 ### Including the binding for the counter in the handle type.
 
 The inclusion of the counter's binding number in the type returned by
-resource.handlefrombinding was another potential solution. However, this
+`llvm.dx.resource.handlefrombinding` was another potential solution. However, this
 solution is not feasible due to resource aliases. As an example, it would be
 impossible to determine the type for a RWStructuredBuffer function parameter
 because it lacks a single binding location.
-
-## Acknowledgments
