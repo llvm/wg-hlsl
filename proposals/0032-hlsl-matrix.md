@@ -28,24 +28,23 @@ HLSL matrices must:
 * Have initialization using vectors, scalars or a single splatted scalar.
 * Determine orientation via (row|column)_major qualifiers.
 * Have orientation-appropriate column or row access using a single subscript operator
-* Zero-based ( `._m<row><col>`) and one-based (`._<row><col>`) point accessors
+* Have Zero-based ( `._m<row><col>`) and one-based (`._<row><col>`) point accessors
 * Support for all piecewise comparison operators
-* Piecewise division by a scalar.
-* Boolean matrices with full operator support
-* Implicit element type conversions allowing operations on matrices of different
-  element types.
-* When both destination dimensions are less than or equal to the source, 
-  matrices can be implicitly truncated to smaller sizes with a warning.
-* Usable as resource element types
-* Usable as entry point semantics
-* Matrix multiplication with compatible vectors
+* Support Piecewise division by a scalar.
+* Support Boolean matrices with full operator support
+* Support Implicit element type conversions allowing operations on matrices of
+  different element types.
+* Support implicitly truncation When both destination dimensions are less than
+  or equal to the source matrices.
+* Be usable as resource element types
+* Be usable as entry point semantics
+* Support Matrix multiplication with compatible vectors
 * Resolve overloaded functions taking matrix parameters.
 
 ## Solution
 
 The Clang matrix extension gives us the frontend support we need to build HLSL
 matrices. We will essentially map the matrix keyword to the `matrix_type`
-
 attribute using semantics.
 
 ```hlsl
