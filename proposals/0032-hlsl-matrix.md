@@ -4,7 +4,7 @@ params:
   authors:
   + farzonl: Farzon Lotfi
   + pow2clk: Greg Roth
-  status: Design In Progress
+  status: Accepted
 ---
 
 # HLSL Matrices
