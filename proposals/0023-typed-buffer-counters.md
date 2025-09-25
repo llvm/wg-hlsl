@@ -46,7 +46,7 @@ introducing two new backend-specific intrinsics:
 
 *   `llvm.{dx|spv}.resource.counterhandlefromimplicitbinding(ResourceHandle,
     order_id, space_id)`
-*   `llvm.{dx|spv}.resource.counterhandlefromexplicitbinding(ResourceHandle,
+*   `llvm.{dx|spv}.resource.counterhandlefrombinding(ResourceHandle,
     register_id, space_id)`
 
 The `counterHandle` will be initialized by calling one of these intrinsics,
@@ -120,7 +120,7 @@ new static methods will be added to the resource class to initialize them.
         `__builtin_hlsl_resource_handlefromimplicitbinding` built-ins.
     *   To initialize the `__counter_handle`, new built-in functions will be
         introduced: `__builtin_hlsl_resource_counterhandlefromimplicitbinding`
-        and `__builtin_hlsl_resource_counterhandlefromexplicitbinding`. These
+        and `__builtin_hlsl_resource_counterhandlefrombinding`. These
         built-ins will take the main resource handle (`__handle`) as an
         argument, along with the counter's binding information.
     *   During Clang's code generation, these new built-ins will be lowered
