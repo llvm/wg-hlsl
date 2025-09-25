@@ -23,13 +23,15 @@ and we need to support it in Clang.
 
 ## Proposed solution
 
+### Clang builtin function
+
 There are 54 `GetDimensions` member function overloads across all resource
 classes. We need to add a number of builtin functions to Clang that will be used
 to implement these. It will most likely amount to one builtin function per
 unique argument list, altough the same builtin function could be used for
 `GetDimensions` overloads that different only in `uint` vs. `float` argument
-types that are otherwise doing the same thing. This should reduce the number of
-builtins function to 8.
+types that are otherwise doing the same thing. This should greatly reduce the
+number of needed builtins function.
 
 In Clang codegen, these builtin functions will be translated into one or more
 LLVM intrinsics, depending on the target platform.
@@ -92,7 +94,6 @@ or `float`.
 |Buffer<br/>RWBuffer|GetDimensions(out uint width)|OpImageQuerySize|dx.op.getDimensions|
 |ByteAddressBuffer<br/>RWByteAddressBuffer|GetDimensions(out uint width)|OpArrayLength|dx.op.getDimensions|
 |StructuredBuffer<br/>RWStructuredBuffer<br/>AppendStructuredBuffer<br/>ConsumeStructuredBuffer|GetDimensions(out uint count, out uint stride)|OpArrayLength|dx.op.getDimensions|
-|
 
 Builtin for overloads that just has a single `width` argument will look like
 this:
@@ -106,8 +107,7 @@ like this:
 
 
 ```c++
-  void __builtin_hlsl_buffer_getdimensions_and_stride(__hlsl_resource_t handle, out 
-                                                      uint count, out uint stride);
+  void __builtin_hlsl_buffer_getdimensions_and_stride(__hlsl_resource_t handle, out uint count, out uint stride);
 ```
 
 The value for stride will be provided in by Clang codegen.
@@ -121,36 +121,30 @@ maps to `OpImageQuerySize` or to `OpArrayLength`.
 | Resource class | Overloads   | SPIR-V op |
 |----------------|-------------|-----------|
 |Texture1D|GetDimensions(out [uint\|float] width)<br/>GetDimensions(uint x, out [uint\|float] width, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
-|Texture2D|GetDimensions(out [uint\|float] width, out $type1 height)<br/>GetDimensions(uint x, out [uint\|float]width, out $type2 height, out $type2 levels)|OpImageQuerySizeLod<br/>+ OpImageQueryLevels|
-|Texture3D|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 depth)<br/>GetDimensions(uint x, out [uint\|float]width, out $type2 height, out $type1 depth, out $type2 levels)|OpImageQuerySizeLod<br/>+ OpImageQueryLevels|
-|TextureCUBE|GetDimensions(out [uint\|float] width, out $type1 height)<br/>GetDimensions(uint x, out [uint\|float]width, out $type2 height, out $type2 levels)|OpImageQuerySizeLod<br/>+ OpImageQueryLevels|
+|Texture2D|GetDimensions(out [uint\|float] width, out $type1 height)<br/>GetDimensions(uint x, out [uint\|float]width, out $type2 height, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
+|Texture3D|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 depth)<br/>GetDimensions(uint x, out [uint\|float]width, out $type2 height, out $type1 depth, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
+|TextureCUBE|GetDimensions(out [uint\|float] width, out $type1 height)<br/>GetDimensions(uint x, out [uint\|float]width, out $type2 height, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
 |RWTexture1D|GetDimensions(out [uint\|float] width)|OpImageQuerySize|
 |RWTexture2D|GetDimensions(out [uint\|float] width, out $type1 height)|OpImageQuerySize|
 |RWTexture3D|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 depth)|OpImageQuerySize|
-|
 
 The builtin for overloads that do not use the MIP levels will look like this:
 ```
 void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width)
 
-void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle,out [uint|float] width,
-                                         $type2 height)
+void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle,out [uint|float] width, $type2 height)
 
-void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width,
-                                         $type2 height, out $type2 depth)
+void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width, $type2 height, out $type2 depth)
 ```
 
 And those that use MIP levels are:
 ```
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, 
-                                                     out [uint|float] width, out $type3 levels)
+void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 levels)
 
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x,
-                                                     out [uint|float] width, out $type3 height,
+void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
                                                      out $type3 levels)
 
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x,
-                                                     out [uint|float] width, out $type3 height,
+void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
                                                      out $type3 depth, out $type3 levels)
 ```
 
@@ -162,39 +156,32 @@ expected and validated for each resource.
 
 | Resource class | Overloads   | SPIR-V op |
 |----------------|-------------|-----------|
-|Texture1DArray|GetDimensions(out [uint\|float] width, out $type1 elements)<br/>GetDimensions(in uint x, out [uint\|float] width, out $type2 elements, out $type2 levels)|OpImageQuerySizeLod<br/>+ OpImageQueryLevels|
-|Texture2DArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)<br/>GetDimensions(in uint x, out [uint\|float] width, out $type1 height, out $type2 elements, out $type2 levels)|OpImageQuerySizeLod<br/>+ OpImageQueryLevels|
-|TextureCUBEArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)<br/>GetDimensions(in uint x, out [uint\|float]width, out $type1 height, out $type2 elements, out $type2 levels)|OpImageQuerySizeLod<br/>+ OpImageQueryLevels|
+|Texture1DArray|GetDimensions(out [uint\|float] width, out $type1 elements)<br/>GetDimensions(in uint x, out [uint\|float] width, out $type2 elements, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
+|Texture2DArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)<br/>GetDimensions(in uint x, out [uint\|float] width, out $type1 height, out $type2 elements, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
+|TextureCUBEArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)<br/>GetDimensions(in uint x, out [uint\|float]width, out $type1 height, out $type2 elements, out $type2 levels)|OpImageQuerySizeLod<br/>+OpImageQueryLevels|
 |RWTexture1DArray|GetDimensions(out [uint\|float] width, out $type1 elements)|OpImageQuerySize|
 |RWTexture2DArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)|OpImageQuerySize|
-|
 
 The builtin for overloads that do not use the MIP levels will look like this:
 
 ```
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width,
-                                              out $type2 elements)
+void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 elements)
 
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width,
-                                              out $type2 height, out $type3 elements)
+void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height, out $type3 elements)
                                               
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width,
-                                              out $type2 height, out $type2 depth, out $type3 elements)
+void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height, out $type2 depth,
+                                              out $type3 elements)
 ```
 And those that use MIP levels are:
 ```
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, 
-                                              out [uint|float] width, out $type3 elements,
+void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 elements,
                                               out $type3 levels)
 
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x,
-                                              out [uint|float] width, out $type3 height,
+void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
                                               out $type3 elements, out $type3 levels)
 
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x,
-                                              out [uint|float] width, out $type3 height,
-                                              $type3 depth, out $type3 elements,
-                                              out $type3 levels)
+void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
+                                              $type3 depth, out $type3 elements, out $type3 levels)
 ```
 Clang codegen can inspect the dimension attribute on the handle type (design
 TBD) to identify which combination of width, height, and depth values should be
@@ -204,25 +191,22 @@ expected and validated for each resource.
 
 | Resource class | Overloads   | SPIR-V op |
 |----------------|-------------|-----------|
-|Texture2DMS|GetDimensions(out [uint\|float] width, out $type1 height, out $type2 samples)|OpImageQuerySize<br/>+ OpImageQuerySamples|
+|Texture2DMS|GetDimensions(out [uint\|float] width, out $type1 height, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples|
 |RWTexture2DMS|GetDimensions(out [uint\|float] width, out $type1 height, out $type2 samples)|_unimplemented_|
-|Texture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|OpImageQuerySize<br/>+ OpImageQuerySamples|
+|Texture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples|
 |RWTexture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|_unimplemented_|
-|
 
 The builtin for multisampled texture overloads will look like this:
 
 ```
-void __builtin_hlsl_texture_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width,
-                                            out $type2 height, out $type2 samples)
+void __builtin_hlsl_texture_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type2 height, out $type2 samples)
 ```
 
 And the builtin for multisampled texture array overloads will look like this:
 
 ```
-void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width,
-                                                out $type3 height, out $type3 elements,
-                                                out $type3 samples)
+void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type3 height, 
+                                                out $type3 elements, out $type3 samples)
 ```
 
 ## Alternatives considered (Optional)
