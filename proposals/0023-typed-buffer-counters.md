@@ -109,8 +109,8 @@ new static methods will be added to the resource class to initialize them.
     *   `__createFromImplicitBindingWithCounter`
 
 2.  **Sema Logic:** In `SemaHLSL.cpp`, the `initGlobalResourceDecl` function will
-    check if a resource type has more than one field. If it does, it will deduce
-    that it has a counter and emit a call to the appropriate `...WithCounter`
+    check if a resource type has a second field with a handle type that has
+    `[[hlsl::is_counter]]` attribute. If it does, it will emit a call to the appropriate `...WithCounter`
     static method instead of the regular creation methods.
 
 3.  **Handle Creation:** The `...WithCounter` methods will initialize the two
