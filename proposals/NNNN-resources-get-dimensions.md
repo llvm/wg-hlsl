@@ -23,7 +23,7 @@ and we need to support it in Clang.
 
 ## Proposed solution
 
-### Clang builtin function
+### Clang builtin functions
 
 There are 54 `GetDimensions` member function overloads across all resource
 classes. We need to add a number of builtin functions to Clang that will be used
@@ -139,13 +139,14 @@ void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|flo
 
 And those that use MIP levels are:
 ```
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 levels)
-
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
+void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width,
                                                      out $type3 levels)
 
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
-                                                     out $type3 depth, out $type3 levels)
+void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width,
+                                                     out $type3 height, out $type3 levels)
+
+void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width,
+                                                     out $type3 height, out $type3 depth, out $type3 levels)
 ```
 
 Clang codegen can inspect the dimension attribute on the handle type (design
@@ -167,21 +168,22 @@ The builtin for overloads that do not use the MIP levels will look like this:
 ```
 void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 elements)
 
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height, out $type3 elements)
-                                              
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height, out $type2 depth,
+void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
                                               out $type3 elements)
+
+void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
+                                              out $type2 depth, out $type3 elements)
 ```
 And those that use MIP levels are:
 ```
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 elements,
-                                              out $type3 levels)
-
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
+void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width,
                                               out $type3 elements, out $type3 levels)
 
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width, out $type3 height,
-                                              $type3 depth, out $type3 elements, out $type3 levels)
+void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width,
+                                              out $type3 height, out $type3 elements, out $type3 levels)
+
+void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint x, out [uint|float] width,
+                                              out $type3 height, $type3 depth, out $type3 elements, out $type3 levels)
 ```
 Clang codegen can inspect the dimension attribute on the handle type (design
 TBD) to identify which combination of width, height, and depth values should be
@@ -199,14 +201,15 @@ expected and validated for each resource.
 The builtin for multisampled texture overloads will look like this:
 
 ```
-void __builtin_hlsl_texture_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type2 height, out $type2 samples)
+void __builtin_hlsl_texture_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
+                                            out $type2 samples)
 ```
 
 And the builtin for multisampled texture array overloads will look like this:
 
 ```
-void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type3 height, 
-                                                out $type3 elements, out $type3 samples)
+void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type3 height,
+                                                 out $type3 elements, out $type3 samples)
 ```
 
 ## Alternatives considered (Optional)
