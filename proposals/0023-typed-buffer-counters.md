@@ -57,7 +57,8 @@ passing the `bufferHandle` of the main storage as the first argument. This makes
 the relationship explicit in the IR, which simplifies SPIR-V code generation for
 the `CounterBuffer` decoration. For the DXIL backend, this allows it to
 recognize that the counter handle is an alias for the main buffer handle and
-merge them accordingly.
+merge them accordingly. For cases where the counter binding needs to be
+explicitly specified, a `[[vk::counter_binding]]` attribute will be available.
 
 ## Detailed design
 
@@ -135,6 +136,45 @@ new static methods will be added to the resource class to initialize them.
         and its counter directly in the IR, as described in the "Proposed
         solution".
 
+### Array Handling
+
+For arrays of resources, the counter binding information is stored in the
+`HLSLResourceBindingAttr` of the array declaration itself. A new optional
+member, `ImplicitCounterBindingOrderID`, is added to the
+`HLSLResourceBindingAttr` class to store the implicit binding order ID for the
+counter.
+
+When the SPIR-V backend encounters a `llvm.spv.resource.counterhandlefrom...`
+intrinsic, it will use the main resource handle to access the array size,
+index, and name. This information is then used to construct the counter
+resource. This approach avoids duplicating information and ensures that the
+counter resource is correctly associated with its main resource.
+
+### Explicit Counter Binding with `[[vk::counter_binding]]`
+
+To allow for explicit control over counter bindings, a new attribute,
+`[[vk::counter_binding(N)]]`, will be introduced. While this is a separate
+attribute from a user's perspective, its information will be immediately
+consolidated by Sema to simplify the compiler's internal representation.
+
+The process will be as follows:
+1.  Sema will parse the `[[vk::counter_binding(N)]]` attribute on a variable
+    declaration.
+2.  It will then find the primary `HLSLResourceBindingAttr` on that same
+    declaration.
+3.  The explicit binding `N` from the `vk::counter_binding` attribute will be
+    stored within the main `HLSLResourceBindingAttr`. This will likely require
+    adding a new member to `HLSLResourceBindingAttr` to hold an explicit
+    counter binding, separate from the implicit one.
+4.  The original `HLSLCounterBindingAttr` will be discarded after its
+    information has been merged.
+
+This approach ensures that all downstream components, such as CodeGen, only
+need to inspect a single attribute (`HLSLResourceBindingAttr`) to get all
+necessary binding information for a resource and its associated counter. This
+provides a clean user-facing syntax while maintaining a simple and unified
+internal representation.
+
 ## LLVM IR Generation and Backend Handling
 
 1.  **SPIR-V Target Type Generation:** In
@@ -152,7 +192,9 @@ new static methods will be added to the resource class to initialize them.
     from the intrinsic (linking the main handle to the counter handle) to
     emit an `OpDecorate` instruction with the `CounterBuffer` decoration,
     pointing from the main buffer's `OpVariable` to the newly created
-    counter buffer's `OpVariable` when necessary.
+    counter buffer's `OpVariable` when necessary. The backend will use the
+    main resource handle to access the array size, index, and name for the
+    counter resource.
 
 ## Alternatives considered
 
