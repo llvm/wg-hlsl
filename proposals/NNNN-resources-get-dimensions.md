@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - GetDimensions mapping to builtins and intrinsics"
+title: "[NNNN] - GetDimensions mapping to built-ins and intrinsics"
 params:
   authors:
     - github_username: hekota
@@ -10,11 +10,11 @@ params:
 
 ## Introduction
 
-All buffer and texture resources have a `GetDimensions` member function and,
-which must be supported across all resource types. There are many different
-overloads of this function. This proposal summarizes the variants and outlines
-how they can be implemented in Clang using built-in functions, as well as how
-they map to LLVM intrinsics.
+All buffer and texture resources have a `GetDimensions` member function which
+must be supported across all resource types. There are many different overloads
+of this function. This proposal summarizes the variants and outlines how they
+can be implemented in Clang using built-in functions, as well as how they map to
+LLVM intrinsics.
 
 ## Motivation
 
@@ -23,17 +23,17 @@ and we need to support it in Clang.
 
 ## Proposed solution
 
-### Clang builtin functions
+### Clang built-in functions
 
 There are 54 `GetDimensions` member function overloads across all resource
-classes. We need to add a number of builtin functions to Clang that will be used
-to implement these. It will most likely amount to one builtin function per
-unique argument list, altough the same builtin function could be used for
-`GetDimensions` overloads that different only in `uint` vs. `float` argument
-types that are otherwise doing the same thing. This should greatly reduce the
-number of needed builtins function.
+classes. We need to add a number of built-in functions to Clang to implement
+these. This will most likely amount to one built-in function per unique argument
+list. However, `GetDimensions` overloads that differ only by the types of their
+arguments (namely, `uint` vs. `float`) can be consolidated under the same
+built-in function, thereby greatly reducing the number of needed built-in
+functions.
 
-In Clang codegen, these builtin functions will be translated into one or more
+In Clang codegen, these built-in functions will be translated into one or more
 LLVM intrinsics, depending on the target platform.
 
 ### Lowering to DXIL
@@ -52,7 +52,7 @@ exact mapping depends on the resource type and is documented
 The LLVM intrinsic that maps to the DXIL op could look something like this:
 
 ```
-{i32, i32, i32, i32} llvm.dx.resource.getdimensions(target("dx.*",..) resource_handle, i32 mip_level)
+{i32, i32, i32, i32} @llvm.dx.resource.getdimensions(target("dx.*",..) resource_handle, i32 mip_level)
 ```
 
 The four-value struct returned from this intrisic uses the same mapping to
@@ -95,14 +95,14 @@ or `float`.
 |ByteAddressBuffer<br/>RWByteAddressBuffer|GetDimensions(out uint width)|OpArrayLength|dx.op.getDimensions|
 |StructuredBuffer<br/>RWStructuredBuffer<br/>AppendStructuredBuffer<br/>ConsumeStructuredBuffer|GetDimensions(out uint count, out uint stride)|OpArrayLength|dx.op.getDimensions|
 
-Builtin for overloads that just has a single `width` argument will look like
+Built-in function for overloads that just have a single `width` argument will look like
 this:
 
 ```c++
   void __builtin_hlsl_buffer_getdimensions(__hlsl_resource_t handle, out uint width);
 ```
 
-Builtin for this overloads that hasve `count` and `stride` arguments will look
+Built-in function for this overloads that have `count` and `stride` arguments will look
 like this:
 
 
@@ -128,7 +128,7 @@ maps to `OpImageQuerySize` or to `OpArrayLength`.
 |RWTexture2D|GetDimensions(out [uint\|float] width, out $type1 height)|OpImageQuerySize|
 |RWTexture3D|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 depth)|OpImageQuerySize|
 
-The builtin for overloads that do not use the MIP levels will look like this:
+The built-in function for overloads that do not use the MIP levels will look like this:
 ```
 void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width)
 
@@ -163,7 +163,7 @@ expected and validated for each resource.
 |RWTexture1DArray|GetDimensions(out [uint\|float] width, out $type1 elements)|OpImageQuerySize|
 |RWTexture2DArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)|OpImageQuerySize|
 
-The builtin for overloads that do not use the MIP levels will look like this:
+The built-in function for overloads that do not use the MIP levels will look like this:
 
 ```
 void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 elements)
@@ -198,14 +198,14 @@ expected and validated for each resource.
 |Texture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples|
 |RWTexture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|_unimplemented_|
 
-The builtin for multisampled texture overloads will look like this:
+The built-in function for multisampled texture overloads will look like this:
 
 ```
 void __builtin_hlsl_texture_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
                                             out $type2 samples)
 ```
 
-And the builtin for multisampled texture array overloads will look like this:
+And for multisampled texture array overloads it will look like this:
 
 ```
 void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type3 height,
