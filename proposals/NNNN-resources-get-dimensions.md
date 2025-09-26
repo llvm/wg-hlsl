@@ -26,9 +26,12 @@ and we need to support it in Clang.
 ### Clang built-in functions
 
 There are 54 `GetDimensions` member function overloads across all resource
-classes. We need to add a number of built-in functions to Clang to implement
-these. This will most likely amount to one built-in function per unique argument
-list. However, `GetDimensions` overloads that differ only by the types of their
+classes, and that does not even include resource classes with rasterizer ordered
+views (resources whose names start with `RasterizerOrdered*`).
+
+We need to add a number of built-in functions to Clang to implement these. This
+will most likely amount to one built-in function per unique argument list.
+However, `GetDimensions` overloads that differ only by the types of their
 arguments (namely, `uint` vs. `float`) can be consolidated under the same
 built-in function, thereby greatly reducing the number of needed built-in
 functions.
