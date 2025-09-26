@@ -123,16 +123,33 @@ new static methods will be added to the resource class to initialize them.
 
     *   `__createFromBindingWithImplicitCounter(unsigned registerNo, unsigned
         spaceNo, int range, unsigned index, const char *name, unsigned
-        counterOrderId)`
+        counterOrderId)`:
+
+        Creates a resource with an explicit binding for the main buffer and an
+        implicit binding for its counter.
+
     *   `__createFromImplicitBindingWithImplicitCounter(unsigned orderId,
         unsigned spaceNo, int range, unsigned index, const char *name, unsigned
-        counterOrderId)`
+        counterOrderId)`:
+
+        Creates a resource with implicit bindings for both the main buffer and
+        its counter.
+
     *   `__createFromBindingWithCounter(unsigned registerNo, unsigned spaceNo,
-        int range, unsigned index, const char *name, unsigned counterRegisterNo,
-        unsigned counterSpaceNo)`
+        int range, unsigned index, const char *name, unsigned
+        counterRegisterNo)`:
+
+        Creates a resource with an explicit binding for the main buffer and an
+        explicit binding for its counter. The counter will be in the same space
+        as the main buffer.
+
     *   `__createFromImplicitBindingWithCounter(unsigned orderId, unsigned
         spaceNo, int range, unsigned index, const char *name, unsigned
-        counterRegisterNo, unsigned counterSpaceNo)`
+        counterRegisterNo)`:
+
+        Creates a resource with an implicit binding for the main buffer and an
+        explicit binding for its counter. The counter will be in the same space
+        as the main buffer.
 
 2.  **Sema Logic:** In `SemaHLSL.cpp`, the `initGlobalResourceDecl` function
     will check if a resource type has a second field with a handle type that has
