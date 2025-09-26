@@ -39,21 +39,11 @@ explicit padding, but some care needs to be taken:
 Introduce an explicit padding type and use this type for the padding in the
 various constructs that need it.
 
-The padding type will be defined as one of the following:
-
-- A first class LLVM type called `pad8`, which is equivalent but distinct from
-  `i8`. This would need an RFC to the wider LLVM community and would need to be
-  useful in other contexts (such as ABI-mandated padding).
-- A well-known named type `%pad8`, defined as a named struct containing a
-  single `i8`. This is the simplest option but requires backends that are
-  interested in this type to participate in a secret handshake.
-- Target types such as `target("dx.pad8")` and `target("spirv.pad8")`. This is
-  somewhat awkward because the type isn't really tied to a target, but target
-  types need to be. Targets that don't need to differentiate between padding
-  and actual members could simply use `i8`.
-
-> TODO: Choose one of these three options and move the others to the
-> "alternatives" section.
+The padding type will be a target type with a parameter for the size in bytes.
+For DirectX, this would look like `target("dx.Layout", 4)` for 4 bytes of
+padding. For SPIR-V, `target("spirv.Padding", 8)` for 8 bytes of padding. We
+may attempt to come up with a first-class type in LLVM for these purposes in
+the future.
 
 ### Structs with annotations
 
@@ -132,10 +122,12 @@ cbuffer cb1 : register(b0) {
 
 ```llvm
 %__cblayout_cb1 = type <{
-  <{ [2 x <{ float, [12 x %pad8] }>], float }>, [12 x %pad8],
-  <{ [1 x <{ <3 x double>, [8 x %pad8] }>], <3 x double> }>, [8 x %pad8],
+  <{ [2 x <{ float, target("dx.Padding", 12) }>], float }>,
+  target("dx.Padding", 12"),
+  <{ [1 x <{ <3 x double>, target("dx.Padding", 8) }>], <3 x double> }>,
+  target("dx.Padding", 8),
   [ 2 x <4 x i32> ],
-  <{ [3 x <{ half, [14 x %pad8] }>], half }>
+  <{ [3 x <{ half, target("dx.Padding", 14) }>], half }>
 }>
 ```
 
@@ -144,47 +136,39 @@ cbuffer cb1 : register(b0) {
 ### CBuffer Padded arrays at the HLSL-level
 
 Arrays in cbuffers need padding between elements if the element size is not a
-multiple of 16 bytes. This can be implemented as if these were objects of a C++
-type like the following rather than simple arrays:
+multiple of 16 bytes. However, we can ignore this at the AST level as the
+padding is invisible to all operations representable in HLSL. We already mark
+objects in cbuffers via an address space, so nothing needs to change here.
 
-```c++
-#include <cstdint>
-#include <type_traits>
+In clang codegen we'll need to recognize that a type is in a cbuffer and
+generate struct and array accesses appropriately. By keying off of the address
+space, we can ensure that when we lower accesses to LLVM IR we are able to do
+so using the padded type logic.
 
-using pad8_t = uint8_t;
-
-template <typename T, std::size_t N, bool NeedsPadding = sizeof(T) % 16 != 0>
-struct CBufArray;
-
-template <typename T, std::size_t N> struct CBufArray<T, N, true> {
-  struct PaddedT {
-    T Element;
-    uint8_t Padding[16 - (sizeof(T) % 16)];
-  };
-  PaddedT Elems[N - 1];
-  T LastElem;
-
-  const T &operator[](std::size_t I) const {
-    return I == N - 1 ? LastElem : Elems[I].Element;
-  }
-};
-
-template <typename T, std::size_t N> struct CBufArray<T, N, false> {
-  T Elems[N];
-
-  const T &operator[](std::size_t I) const { return Elems[I]; }
-};
-```
-
-We won't actually implement this type in HLSL, but we do need to model arrays
-in cbuffers equivalently to this in the clang ASTs. This has to be done in the
-AST and not later during clang codegen because offsets into arrays are
-calculated in various places based off of the AST types.
+When an object is copied from an object with a cbuffer layout to one with a
+standard layout, this goes through codegen logic to emit aggregate copies in
+clang. Here we can recognize that the source of the copy is in the cbuffer
+address space and break the copy up into elementwise pieces.
 
 ## Alternatives considered
 
 See [llvm-project/wg-hlsl#171] for the previous attempt at representing these
 types.
+
+Regarding the padding type, we considered the following options:
+
+- A first class LLVM type called `pad8`, which is equivalent but distinct from
+  `i8`. This would need an RFC to the wider LLVM community and would need to be
+  useful in other contexts (such as ABI-mandated padding).
+- A well-known named type `%pad8`, defined as a named struct containing a
+  single `i8`. This is the simplest option but requires backends that are
+  interested in this type to participate in a secret handshake.
+- Target types such as `target("dx.pad8")` and `target("spirv.pad8")`. This is
+  somewhat awkward because the type isn't really tied to a target, but target
+  types need to be. Targets that don't need to differentiate between padding
+  and actual members could simply use `i8`.
+  
+We settled on a target type with a size parameter for now.
 
 [llvm-project/wg-hlsl#171]: https://github.com/llvm/wg-hlsl/pull/171
 
