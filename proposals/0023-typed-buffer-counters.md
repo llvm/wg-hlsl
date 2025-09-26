@@ -47,7 +47,7 @@ introducing two new SPIR-V specific intrinsics:
 *   `llvm.spv.resource.counterhandlefromimplicitbinding(ResourceHandle,
     order_id, space_id)`
 *   `llvm.spv.resource.counterhandlefrombinding(ResourceHandle,
-    register_id, space_id)`
+    binding_id, space_id)`
 
 For DirectX, the counter handle is an alias for the main resource handle. Clang's
 code generation will handle this by simply copying the main resource handle.
@@ -102,23 +102,35 @@ Sema actions, and code generation logic.
     operate on the `__counter_handle` member instead of the `__handle` member,
     directing the atomic operations to the correct resource.
 
+### Explicit Counter Binding with `[[vk::counter_binding]]`
+
+To allow for explicit control over counter bindings, a new attribute,
+`[[vk::counter_binding(binding)]]`, will be introduced. Internally, this will be a new attribute HLSLCounterBindingAttr
+that will be modeled after the `HLSLResourceBindingAttr`. It will have a value for an explicit binding or an implicit order id.
+
 ### Initialization and Binding
 
 The core of this design lies in how these two handles are initialized. In Sema,
 new static methods will be added to the resource class to initialize them.
 
-1.  **New Static Methods:** Two new static methods will be added to
-    counter-enabled resource classes:
-    *   `__createFromBindingWithCounter`
-    *   `__createFromImplicitBindingWithCounter`
+1.  **New Static Methods:** Four new static methods will be added to
+    counter-enabled resource classes to handle all combinations of implicit and
+    explicit bindings for the main resource and its counter:
+    *   `__createFromBindingWithImplicitCounter(unsigned registerNo, unsigned spaceNo, int range, unsigned index, const char *name, unsigned counterOrderId)`
+    *   `__createFromImplicitBindingWithImplicitCounter(unsigned orderId, unsigned spaceNo, int range, unsigned index, const char *name, unsigned counterOrderId)`
+    *   `__createFromBindingWithCounter(unsigned registerNo, unsigned spaceNo, int range, unsigned index, const char *name, unsigned counterRegisterNo, unsigned counterSpaceNo)`
+    *   `__createFromImplicitBindingWithCounter(unsigned orderId, unsigned spaceNo, int range, unsigned index, const char *name, unsigned counterRegisterNo, unsigned counterSpaceNo)`
 
 2.  **Sema Logic:** In `SemaHLSL.cpp`, the `initGlobalResourceDecl` function will
     check if a resource type has a second field with a handle type that has
     `[[hlsl::is_counter]]` attribute. If it does, it will emit a call to the appropriate `...WithCounter`
     static method instead of the regular creation methods.
 
-3.  **Handle Creation:** The `...WithCounter` methods will initialize the two
-    handles using a combination of existing and new built-in functions.
+
+3.  **Handle Creation:** The `...With*Counter` methods, defined in
+    `clang/lib/Sema/HLSLBuiltinTypeDeclBuilder.cpp`, will initialize the two
+    handles using a combination of existing and new built-in functions defined
+    in `clang/include/clang/Basic/Builtins.td`.
     *   The `__handle` (main data) will be initialized using the existing
         `__builtin_hlsl_resource_handlefrombinding` or
         `__builtin_hlsl_resource_handlefromimplicitbinding` built-ins.
@@ -139,10 +151,12 @@ new static methods will be added to the resource class to initialize them.
 ### Array Handling
 
 For arrays of resources, the counter binding information is stored in the
-`HLSLResourceBindingAttr` of the array declaration itself. A new optional
-member, `ImplicitCounterBindingOrderID`, is added to the
-`HLSLResourceBindingAttr` class to store the implicit binding order ID for the
-counter.
+`HLSLCounterBindingAttr` of the array declaration itself. When Sema acts on the
+variable declaration, it will add an `HLSLCounterBindingAttr` with an implicit
+binding if the attribute does not already exist. When an array element is
+initialized with a call to a `__createHandle...` function during CodeGen, the
+appropriate `...With*Counter` version of the create function will be called for
+resources that have the `HLSLCounterBindingAttr`.
 
 When the SPIR-V backend encounters a `llvm.spv.resource.counterhandlefrom...`
 intrinsic, it will use the main resource handle to access the array size,
@@ -150,38 +164,13 @@ index, and name. This information is then used to construct the counter
 resource. This approach avoids duplicating information and ensures that the
 counter resource is correctly associated with its main resource.
 
-### Explicit Counter Binding with `[[vk::counter_binding]]`
-
-To allow for explicit control over counter bindings, a new attribute,
-`[[vk::counter_binding(N)]]`, will be introduced. While this is a separate
-attribute from a user's perspective, its information will be immediately
-consolidated by Sema to simplify the compiler's internal representation.
-
-The process will be as follows:
-1.  Sema will parse the `[[vk::counter_binding(N)]]` attribute on a variable
-    declaration.
-2.  It will then find the primary `HLSLResourceBindingAttr` on that same
-    declaration.
-3.  The explicit binding `N` from the `vk::counter_binding` attribute will be
-    stored within the main `HLSLResourceBindingAttr`. This will likely require
-    adding a new member to `HLSLResourceBindingAttr` to hold an explicit
-    counter binding, separate from the implicit one.
-4.  The original `HLSLCounterBindingAttr` will be discarded after its
-    information has been merged.
-
-This approach ensures that all downstream components, such as CodeGen, only
-need to inspect a single attribute (`HLSLResourceBindingAttr`) to get all
-necessary binding information for a resource and its associated counter. This
-provides a clean user-facing syntax while maintaining a simple and unified
-internal representation.
-
 ## LLVM IR Generation and Backend Handling
 
 1.  **SPIR-V Target Type Generation:** In
     `clang/lib/CodeGen/Targets/SPIR.cpp`, the `getHLSLType` function will
     check for the `IsCounter` flag on the `HLSLAttributedResourceType`. If
     the flag is present, it will generate a `target("spirv.VulkanBuffer",
-    ...)` in the `Uniform` storage class with an `i32` element type,
+    ...)` in the `StorageBuffer` storage class with an `i32` element type,
     correctly representing the counter as a 32-bit integer buffer in
     SPIR-V.
 
