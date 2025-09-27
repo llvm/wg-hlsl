@@ -173,4 +173,3 @@ We settled on a target type with a size parameter for now.
 
 [llvm-project/wg-hlsl#171]: https://github.com/llvm/wg-hlsl/pull/171
 
-<!-- {% endraw %} -->
