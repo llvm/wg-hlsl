@@ -1,10 +1,11 @@
-<!-- {% raw %} -->
+---
+title: "[NNNN] - Explicit Padding in Structs and CBuffer Arrays"
+params:
+    status: Design In Progress
+    authors:
+        - bogner: Justin Bogner
+---
 
-# Explicit Padding in Structs and CBuffer Arrays
-
-* Proposal: [NNNN](NNNN-explicit-padding.md)
-* Author(s): [Justin Bogner](https://github.com/bogner)
-* Status: **Design In Progress**
 
 ## Introduction
 
