@@ -9,9 +9,11 @@ params:
 
 ## Introduction
 
-We introduce an explicit padding type for HLSL, and construct cbuffer arrays
-and structs that are annotated with `packoffset` or `vk::offset` using this
-type to unambiguously lay out these objects.
+We introduce an explicit padding type for HLSL, and construct cbuffers using
+this type to unambiguously represent their layout. This will be used for layout
+rules implicit to cbuffers (such as struct and array alignment and element
+size) as well as for `packoffset` annotations in cbuffers and `vk::offset`
+annotations outside of cbuffers.
 
 ## Motivation
 
@@ -46,6 +48,25 @@ padding. For SPIR-V, `target("spirv.Padding", 8)` for 8 bytes of padding. We
 may attempt to come up with a first-class type in LLVM for these purposes in
 the future.
 
+### Implicit layout rules in a cbuffer
+
+CBuffers in HLSL have very specific layout rules. Scalars and vectors follow
+the HLSL/DirectX alignment rules and are aligned as per their scalar size.
+Structs and arrays are always aligned on a 16-byte boundary, regardless of
+their contents. Furthermore, array elements are each aligned on a 16-byte
+boundary.
+
+Since we can't really represent these rules by simply forcing alignments, we
+instead use explicit padding between elements to enforce that all arrays and
+structs start on 16 byte boundary.
+
+We then emulate the array padding with an array of objects that consist of a
+struct containing the element type and padding to 16 bytes, followed by a
+single instance of the element type itself. See [CBuffer Padded arrays at the
+HLSL-level] for details.
+
+[CBuffer Padded arrays at the HLSL-level]: #cbuffer-padded-arrays-at-the-hlsl-level
+
 ### Structs with annotations
 
 Generally speaking HLSL structs are equivalent to packed structs in C++. We can
@@ -69,18 +90,6 @@ with `{ float, i32 }` here, losing the lexicographical order. This is probably
 okay since we need to create artificial types for cbuffers anyway (such as when
 we filter out resource types that are declared within the cbuffer), but may not
 make for a particularly good debugging experience.
-
-### Arrays in a cbuffer
-
-CBuffers in HLSL have very specific layout rules. Each "object" starts at a
-16-byte boundary, which is mostly explainable as a 16-byte alignment
-requirement, but applies to array elements rather than the array itself in a
-way that doesn't match the general language. We can emulate this with an array
-of objects that consist of a struct containing the element type and padding to
-16 bytes, followed by a single instance of the element type itself. See
-[CBuffer Padded arrays at the HLSL-level] for details.
-
-[CBuffer Padded arrays at the HLSL-level]: #cbuffer-padded-arrays-at-the-hlsl-level
 
 ## Detailed design
 
@@ -108,12 +117,32 @@ cbuffer cb0 : register(b0) {
 }>
 ```
 
+For structs, we add padding to align them as appropriate:
+
+```hlsl
+struct S {
+  int v;
+};
+cbuffer cb1 : register(b0) {
+  int i; // offset   0,  size 4  (+12)
+  S s;   // offset  16,  size 4
+  int j; // offset  20,  size 4
+}
+
+```llvm
+%__cblayout_cb1 = type <{
+  i32, target("dx.Padding", 12),
+  i32,
+  i32
+}>
+```
+
 For arrays, we'll have padding within elements to fill to a 16-byte boundary,
 and padding before arrays in order for them to start at 16-byte boundaries.
 Consider `cb1`:
 
 ```hlsl
-cbuffer cb1 : register(b0) {
+cbuffer cb2 : register(b0) {
   float a1[3];        // offset   0,  size 4  (+12) * 3
   double3 a2[2];      // offset   48, size 24  (+8) * 2
   uint4 a3[2];        // offset  112, size 16       * 2
@@ -122,7 +151,7 @@ cbuffer cb1 : register(b0) {
 ```
 
 ```llvm
-%__cblayout_cb1 = type <{
+%__cblayout_cb2 = type <{
   <{ [2 x <{ float, target("dx.Padding", 12) }>], float }>,
   target("dx.Padding", 12"),
   <{ [1 x <{ <3 x double>, target("dx.Padding", 8) }>], <3 x double> }>,
