@@ -70,8 +70,8 @@ For SPIR-V, the specific instructions generated for a `GetDimensions` call
 depend on both the resource type and the arguments of the member function. Based
 on initial testing, the following SPIR-V operations are used:
 
-- `OpOmageQuerySize`
-- `OpOmageQuerySizeLod`
+- `OpImageQuerySize`
+- `OpImageQuerySizeLod`
 - `OpArrayLength`
 - `OpImageQueryLevels`
 - `OpImageQuerySamples`
@@ -94,9 +94,9 @@ or `float`.
 
 | Resource class | Overloads   | SPIR-V op |
 |----------------|-------------|-----------|
-|Buffer<br/>RWBuffer|GetDimensions(out uint width)|OpImageQuerySize|dx.op.getDimensions|
-|ByteAddressBuffer<br/>RWByteAddressBuffer|GetDimensions(out uint width)|OpArrayLength|dx.op.getDimensions|
-|StructuredBuffer<br/>RWStructuredBuffer<br/>AppendStructuredBuffer<br/>ConsumeStructuredBuffer|GetDimensions(out uint count, out uint stride)|OpArrayLength|dx.op.getDimensions|
+|Buffer<br/>RWBuffer|GetDimensions(out uint width)|OpImageQuerySize|
+|ByteAddressBuffer<br/>RWByteAddressBuffer|GetDimensions(out uint width)|OpArrayLength|
+|StructuredBuffer<br/>RWStructuredBuffer<br/>AppendStructuredBuffer<br/>ConsumeStructuredBuffer|GetDimensions(out uint count, out uint stride)|OpArrayLength|
 
 Built-in function for overloads that just have a single `width` argument will look like
 this:
@@ -197,9 +197,9 @@ expected and validated for each resource.
 | Resource class | Overloads   | SPIR-V op |
 |----------------|-------------|-----------|
 |Texture2DMS|GetDimensions(out [uint\|float] width, out $type1 height, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples|
-|RWTexture2DMS|GetDimensions(out [uint\|float] width, out $type1 height, out $type2 samples)|_unimplemented_|
+|RWTexture2DMS|GetDimensions(out [uint\|float] width, out $type1 height, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples<br/>_unimplemented in DXC_|
 |Texture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples|
-|RWTexture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|_unimplemented_|
+|RWTexture2DMSArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements, out $type2 samples)|OpImageQuerySize<br/>+OpImageQuerySamples<br/>_unimplemented in DXC_|
 
 The built-in function for multisampled texture overloads will look like this:
 
