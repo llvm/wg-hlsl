@@ -181,12 +181,12 @@ new static methods will be added to the resource class to initialize them.
 ### Array Handling
 
 For arrays of resources, the counter binding information is stored in the
-`HLSLCounterBindingAttr` of the array declaration itself. When Sema acts on the
-variable declaration, it will add an `HLSLCounterBindingAttr` with an implicit
+`HLSLVkCounterBindingAttr` of the array declaration itself. When Sema acts on the
+variable declaration, it will add an `HLSLVkCounterBindingAttr` with an implicit
 binding if the attribute does not already exist. When an array element is
 initialized with a call to a `__createHandle...` function during CodeGen, the
 appropriate `...With*Counter` version of the create function will be called for
-resources that have the `HLSLCounterBindingAttr`.
+resources that have the `HLSLVkCounterBindingAttr`.
 
 When the SPIR-V backend encounters a `llvm.spv.resource.counterhandlefrom...`
 intrinsic, it will use the main resource handle to access the array size, index,
