@@ -104,13 +104,24 @@ Sema actions, and code generation logic.
     operate on the `__counter_handle` member instead of the `__handle` member,
     directing the atomic operations to the correct resource.
 
-### Explicit Counter Binding with `[[vk::counter_binding]]`
+### Counter Binding with `[[vk::counter_binding]]`
 
 To allow for explicit control over counter bindings, a new attribute,
-`[[vk::counter_binding(binding)]]`, will be introduced. Internally, this will be
-a new attribute HLSLVkCounterBindingAttr that will be modeled after the
-`HLSLResourceBindingAttr`. It will have a value for an explicit binding or an
-implicit order id.
+`[[vk::counter_binding(binding)]]`, will be introduced. This attribute will be
+represented internally by `HLSLVkCounterBindingAttr`, which is modeled after
+`HLSLVkBindingAttr` and is used for explicit bindings only.
+
+Implicit bindings for both the resource and its counter will be stored in the
+`HLSLResourceBindingAttr`. This attribute will be extended to hold an optional
+implicit `counter_order_id` for the counter, in addition to the resource's own
+`order_id`. If a resource has a counter but no explicit
+`[[vk::counter_binding]]` attribute, Sema will assign an implicit binding
+`counter_order_id` for the counter and store it in the
+`HLSLResourceBindingAttr`. If a `[[vk::counter_binding]]` is present, it
+signifies an explicit binding, and `HLSLResourceBindingAttr` will not store a
+`counter_order_id`. This approach centralizes all implicit binding information
+in one place and maintains a clear distinction between implicit and explicit
+bindings, mirroring the existing behavior for resource bindings.
 
 ### Initialization and Binding
 
@@ -180,13 +191,18 @@ new static methods will be added to the resource class to initialize them.
 
 ### Array Handling
 
-For arrays of resources, the counter binding information is stored in the
-`HLSLVkCounterBindingAttr` of the array declaration itself. When Sema acts on the
-variable declaration, it will add an `HLSLVkCounterBindingAttr` with an implicit
-binding if the attribute does not already exist. When an array element is
-initialized with a call to a `__createHandle...` function during CodeGen, the
-appropriate `...With*Counter` version of the create function will be called for
-resources that have the `HLSLVkCounterBindingAttr`.
+For arrays of resources, the counter binding information is stored on the array
+declaration itself. If an explicit `[[vk::counter_binding]]` is used, it will be
+stored as an `HLSLVkCounterBindingAttr`. If the counter binding is implicit, its
+`counter_order_id` will be stored in the `HLSLResourceBindingAttr` of the array
+declaration. When Sema acts on the variable declaration, if the resource type
+has a counter and no explicit `[[vk::counter_binding]]` attribute is present, it
+will add an implicit counter `counter_order_id` to the
+`HLSLResourceBindingAttr`.
+
+When an array element is initialized with a call to a `__createHandle...`
+function during CodeGen, the appropriate `...With*Counter` version of the create
+function will be called for resources that have a counter.
 
 When the SPIR-V backend encounters a `llvm.spv.resource.counterhandlefrom...`
 intrinsic, it will use the main resource handle to access the array size, index,
