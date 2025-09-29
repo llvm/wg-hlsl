@@ -108,7 +108,7 @@ Sema actions, and code generation logic.
 
 To allow for explicit control over counter bindings, a new attribute,
 `[[vk::counter_binding(binding)]]`, will be introduced. Internally, this will be
-a new attribute HLSLCounterBindingAttr that will be modeled after the
+a new attribute HLSLVkCounterBindingAttr that will be modeled after the
 `HLSLResourceBindingAttr`. It will have a value for an explicit binding or an
 implicit order id.
 
