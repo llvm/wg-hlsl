@@ -130,9 +130,10 @@ cbuffer cb1 : register(b0) {
 }
 
 ```llvm
+%S = type <{ i32 }>
 %__cblayout_cb1 = type <{
   i32, target("dx.Padding", 12),
-  i32,
+  %S,
   i32
 }>
 ```
