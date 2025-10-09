@@ -42,9 +42,8 @@ LLVM intrinsics, depending on the target platform.
 ### Lowering to DXIL
 
 For DXIL, all `GetDimensions` calls should be lowered to the
-`dx.op.getDimensions` DXIL operation, which can likely be represented by a
-single LLVM intrinsic. The `dx.op.getDimensions` operation takes a resource
-handle and a MIP level as inputs, and returns a struct containing four integers:
+`dx.op.getDimensions` DXIL operation. This operation takes a resource handle and
+a MIP level as inputs, and returns a struct containing four integers:
 
 `%dx.types.Dimensions = type { i32, i32, i32, i32 }`.
  
@@ -52,17 +51,14 @@ Values in this struct correspond to the requested resource dimension values. The
 exact mapping depends on the resource type and is documented
 [here](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#getdimensions).
 
-The LLVM intrinsic that maps to the DXIL op could look something like this:
+While it would be possible to map this DXIL op to a single LLVM intrinsic for
+all cases, it is cleaner and more maintainable from a design perspective to
+define multiple LLVM intrinsics. Ideally, there would be one intrinsic for each
+unique mapping of the values in the `dx.op.getDimensions`
+[table](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#getdimensions).
 
-```
-{i32, i32, i32, i32} @llvm.dx.resource.getdimensions(target("dx.*",..) resource_handle, i32 mip_level)
-```
-
-The four-value struct returned from this intrisic uses the same mapping to
-resource dimension values as `%dx.types.Dimensions`. Although the struct
-contains `i32` types, some `GetDimensions` overloads have `float` output values;
-in those cases, Clang code generation will handle the conversion from `i32` to
-`float`.
+For `GetDimensions` overloads that require `float` outputs, Clang code
+generation will insert the necessary conversions from `i32` to `float`.
 
 ### Lowering to SPIR-V
 
@@ -76,8 +72,9 @@ on initial testing, the following SPIR-V operations are used:
 - `OpImageQueryLevels`
 - `OpImageQuerySamples`
 
-Therefore, for SPIR-V code generation, we will likely need to define multiple
-LLVM intrinsics, each corresponding to one of these SPIR-V operations.
+SPIR-V code generation can either mirror the same set of LLVM intrinsics as DXIL
+codegen, or define its own set of intrinsics corresponding to the specific
+SPIR-V operations. The design below assumes the former approach.
 
 ## Detailed design
 
@@ -109,16 +106,20 @@ and
 ```c++
   void __builtin_hlsl_buffer_getstride(__hlsl_resource_t handle, uint &stride);
 ```
-
-For `__builtin_hlsl_buffer_getdimensions`, Clang codegen for SPIR-V can check
-whether the handle type has the `[[hlsl::raw_buffer]]` attribute to decide
-whether to use the intrinsic that maps to `OpImageQuerySize` or to
-`OpArrayLength`.
-
 The `__builtin_hlsl_buffer_getstride` builtin will be implemented entirely by
-Clang codegen and will not results in any LLVM instrictss.
+Clang codegen and will not results in any LLVM intrinsic call.
 
+The `__builtin_hlsl_buffer_getdimensions` built-in will be translated to
+`llvm.{dx|spv}.resource.getdimensions.buffer` LLVM instrinsic that will look
+like this:
 
+```
+i32 @llvm.dx.resource.getdimensions.buffer(target("dx.*",..) resource_handle)
+i32 @llvm.spv.resource.getdimensions.buffer(target("spirv.*",..) resource_handle)
+```
+
+The SPIR-V lowerer can decide whether to use `OpImageQuerySize` or
+`OpArrayLength` op based on `resource_handle` target type.
 
 ### Textures
 
@@ -157,6 +158,8 @@ Clang codegen can inspect the dimension attribute on the handle type (design
 TBD) to identify which combination of width, height, and depth values should be
 expected and validated for each resource.
 
+LLVM intrinsic design TBD later.
+
 ### Texture Arrays
 
 | Resource class | Overloads   | SPIR-V op |
@@ -193,6 +196,8 @@ Clang codegen can inspect the dimension attribute on the handle type (design
 TBD) to identify which combination of width, height, and depth values should be
 expected and validated for each resource.
 
+LLVM intrinsic design TBD later.
+
 ### Multisampled Textures and Arrays
 
 | Resource class | Overloads   | SPIR-V op |
@@ -215,6 +220,8 @@ And for multisampled texture array overloads it will look like this:
 void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, [uint|float] &width, $type2 &height,
                                                  $type2 &elements, $type2 &samples_count)
 ```
+
+LLVM intrinsic design TBD later.
 
 ## Alternatives considered (Optional)
 
