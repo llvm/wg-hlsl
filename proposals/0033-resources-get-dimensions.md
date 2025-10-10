@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - GetDimensions mapping to built-ins and intrinsics"
+title: "[0033] - GetDimensions mapping to built-ins functions and LLVM intrinsics"
 params:
   authors:
     - github_username: hekota
@@ -42,9 +42,8 @@ LLVM intrinsics, depending on the target platform.
 ### Lowering to DXIL
 
 For DXIL, all `GetDimensions` calls should be lowered to the
-`dx.op.getDimensions` DXIL operation, which can likely be represented by a
-single LLVM intrinsic. The `dx.op.getDimensions` operation takes a resource
-handle and a MIP level as inputs, and returns a struct containing four integers:
+`dx.op.getDimensions` DXIL operation. This operation takes a resource handle and
+a MIP level as inputs, and returns a struct containing four integers:
 
 `%dx.types.Dimensions = type { i32, i32, i32, i32 }`.
  
@@ -52,17 +51,31 @@ Values in this struct correspond to the requested resource dimension values. The
 exact mapping depends on the resource type and is documented
 [here](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#getdimensions).
 
-The LLVM intrinsic that maps to the DXIL op could look something like this:
+While it would be possible to map this DXIL op to a single LLVM intrinsic for
+all cases, it is cleaner and more maintainable from a design perspective to
+define multiple LLVM intrinsics. Ideally, there would be one intrinsic for each
+unique mapping of the values in the `dx.op.getDimensions`
+[table](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#getdimensions).
+
+Based on the mapping the set of LLVM intrinsic could look like this:
 
 ```
-{i32, i32, i32, i32} @llvm.dx.resource.getdimensions(target("dx.*",..) resource_handle, i32 mip_level)
+i32 @llvm.dx.resource.getdimensions.x( target("dx.*") handle )
+{i32, i32} @llvm.dx.resource.getdimensions.xy( target("dx.*") handle )
+{i32, i32, i32} @llvm.dx.resource.getdimensions.xyz( target("dx.*") handle )
+{i32, i32} @llvm.dx.resource.getdimensions.levels.x( target("dx.*") handle, i32 mip_level )
+{i32, i32, i32} @llvm.dx.resource.getdimensions.levels.xy( target("dx.*") handle, i32 mip_level )
+{i32, i32, i32, i32} @llvm.dx.resource.getdimensions.levels.xyx( target("dx.*") handle, i32 mip_level )
+{i32, i32, i32} @llvm.dx.resource.getdimensions.ms.xy( target("dx.*") handle )
+{i32, i32, i32, i32} @llvm.dx.resource.getdimensions.ms.xyz( target("dx.*") handle )
 ```
 
-The four-value struct returned from this intrisic uses the same mapping to
-resource dimension values as `%dx.types.Dimensions`. Although the struct
-contains `i32` types, some `GetDimensions` overloads have `float` output values;
-in those cases, Clang code generation will handle the conversion from `i32` to
-`float`.
+The `.x`, `.xy` and `.xyz` suffix corresponds to the number of dimensions being
+returned by the intrinsic. For `.levels.` and `.ms` variants the last `i32`
+value is the number of levels or samples.
+
+For `GetDimensions` overloads that require `float` outputs, Clang code
+generation will insert the necessary conversions from `i32` to `float`.
 
 ### Lowering to SPIR-V
 
@@ -76,8 +89,9 @@ on initial testing, the following SPIR-V operations are used:
 - `OpImageQueryLevels`
 - `OpImageQuerySamples`
 
-Therefore, for SPIR-V code generation, we will likely need to define multiple
-LLVM intrinsics, each corresponding to one of these SPIR-V operations.
+SPIR-V code generation can either mirror the same set of LLVM intrinsics as DXIL
+codegen, or define its own set of intrinsics corresponding to the specific
+SPIR-V operations. The design below assumes the former approach.
 
 ## Detailed design
 
@@ -98,26 +112,25 @@ or `float`.
 |ByteAddressBuffer<br/>RWByteAddressBuffer|GetDimensions(out uint dim)|OpArrayLength|
 |StructuredBuffer<br/>RWStructuredBuffer<br/>AppendStructuredBuffer<br/>ConsumeStructuredBuffer|GetDimensions(out uint numStructs, out uint stride)|OpArrayLength|
 
-Built-in function for overloads that just have a single `width` argument will look like
-this:
+These overloads will be implemented using built-in function
 
 ```c++
-  void __builtin_hlsl_buffer_getdimensions(__hlsl_resource_t handle, out uint width);
+  void __builtin_hlsl_resource_getdimensions_x(__hlsl_resource_t handle, uint &width);
 ```
 
-Built-in function for this overloads that have `count` and `stride` arguments will look
-like this:
-
+and
 
 ```c++
-  void __builtin_hlsl_buffer_getdimensions_and_stride(__hlsl_resource_t handle, out uint count, out uint stride);
+  void __builtin_hlsl_resource_getstride(__hlsl_resource_t handle, uint &stride);
 ```
+The `__builtin_hlsl_resource_getstride` builtin will be implemented entirely by
+Clang codegen and will not results in any LLVM intrinsic call.
 
-The value for stride will be provided in by Clang codegen.
+The `__builtin_hlsl_resource_getdimensions_x` built-in will be translated to
+`llvm.{dx|spv}.resource.getdimensions.x` LLVM instrinsic.
 
-Clang codegen for SPIR-V can check whether the handle type has the
-`[[hlsl::raw_buffer]]` attribute to decide whether to use the intrinsic that
-maps to `OpImageQuerySize` or to `OpArrayLength`.
+The SPIR-V lowerer can decide whether to use `OpImageQuerySize` or
+`OpArrayLength` op based on `handle` target type.
 
 ### Textures
 
@@ -133,28 +146,28 @@ maps to `OpImageQuerySize` or to `OpArrayLength`.
 
 The built-in function for overloads that do not use the MIP levels will look like this:
 ```
-void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width)
+void __builtin_hlsl_resource_getdimensions_x(__hlsl_resource_t handle, [uint|float] &width)
 
-void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width, $type2 height)
+void __builtin_hlsl_resource_getdimensions_xy(__hlsl_resource_t handle, [uint|float] &width, $type2 &height)
 
-void __builtin_hlsl_texture_getdimension(__hlsl_resource_t handle, out [uint|float] width, $type2 height, out $type2 depth)
+void __builtin_hlsl_resource_getdimensions_xyz(__hlsl_resource_t handle, [uint|float] &width, $type2 &height, $type2 &depth)
 ```
 
 And those that use MIP levels are:
 ```
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint mip_level, out [uint|float] width,
-                                                     out $type3 levels_count)
+void __builtin_hlsl_resource_getdimensions_levels_x(__hlsl_resource_t handle, uint mip_level, [uint|float] &width,
+                                                     $type3 &levels_count)
 
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint mip_level, out [uint|float] width,
-                                                     out $type3 height, out $type3 levels_count)
+void __builtin_hlsl_resource_getdimensions_levels_xy(__hlsl_resource_t handle, uint mip_level, [uint|float] &width,
+                                                     $type3 &height, $type3 &levels_count)
 
-void __builtin_hlsl_texture_getdimension_with_levels(__hlsl_resource_t handle, uint mip_level, out [uint|float] width,
-                                                     out $type3 height, out $type3 depth, out $type3 levels_count)
+void __builtin_hlsl_resource_getdimensions_levels_xyz(__hlsl_resource_t handle, uint mip_level, [uint|float] &width,
+                                                     $type3 &height, $type3 &depth, $type3 &levels_count)
 ```
 
-Clang codegen can inspect the dimension attribute on the handle type (design
-TBD) to identify which combination of width, height, and depth values should be
-expected and validated for each resource.
+These built-in functions will map to LLVM intrinsics with matching names. For
+example `__builtin_hlsl_resource_getdimensions_levels_xy` will be translated to a
+call of `llvm.{dx|spv}.resource.getdimensions.levels.xy`.
 
 ### Texture Arrays
 
@@ -166,31 +179,16 @@ expected and validated for each resource.
 |RWTexture1DArray|GetDimensions(out [uint\|float] width, out $type1 elements)|OpImageQuerySize|
 |RWTexture2DArray|GetDimensions(out [uint\|float] width, out $type1 height, out $type1 elements)|OpImageQuerySize|
 
-The built-in function for overloads that do not use the MIP levels will look like this:
+For texture arrays, the number of elements in the array is treated as an
+additional dimension of the resource, and these overloads can be implemented
+using the same built-in functions outlined in the [Textures](#textures) section:
 
 ```
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 elements)
-
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
-                                              out $type3 elements)
-
-void __builtin_hlsl_texturearray_getdimension(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
-                                              out $type2 depth, out $type3 elements)
+__builtin_hlsl_resource_getdimensions_xy
+__builtin_hlsl_resource_getdimensions_xyz
+__builtin_hlsl_resource_getdimensions_levels_xy
+__builtin_hlsl_resource_getdimensions_levels_xyz
 ```
-And those that use MIP levels are:
-```
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint mip_level, out [uint|float] width,
-                                              out $type3 elements, out $type3 levels_count)
-
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint mip_level, out [uint|float] width,
-                                              out $type3 height, out $type3 elements, out $type3 levels_count)
-
-void __builtin_hlsl_texturearray_getdimension_with_levels(__hlsl_resource_t handle, uint mip_level, out [uint|float] width,
-                                              out $type3 height, $type3 depth, out $type3 elements, out $type3 levels_count)
-```
-Clang codegen can inspect the dimension attribute on the handle type (design
-TBD) to identify which combination of width, height, and depth values should be
-expected and validated for each resource.
 
 ### Multisampled Textures and Arrays
 
@@ -204,16 +202,19 @@ expected and validated for each resource.
 The built-in function for multisampled texture overloads will look like this:
 
 ```
-void __builtin_hlsl_texture_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
-                                            out $type2 samples_count)
+void __builtin_hlsl_resource_getdimensions_ms_xy(__hlsl_resource_t handle, [uint|float] &width, $type2 &height,
+                                            $type2 &samples_count)
 ```
 
-And for multisampled texture array overloads it will look like this:
+For multisampled texture array, the array is treated as an additional dimension
+of the resource, and so the built-in will look like this:
 
 ```
-void __builtin_hlsl_texturearray_getdimension_ms(__hlsl_resource_t handle, out [uint|float] width, out $type2 height,
-                                                 out $type2 elements, out $type2 samples_count)
+void __builtin_hlsl_resource_getdimension_ms_xyz(__hlsl_resource_t handle, [uint|float] &width, $type2 &height,
+                                                 $type2 &depth, $type2 &samples_count)
 ```
+
+The built-in functions will map to LLVM intrinsics with matching names.
 
 ## Alternatives considered (Optional)
 
