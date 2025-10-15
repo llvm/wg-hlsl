@@ -391,14 +391,16 @@ say `unknown HLSL system semantic X`.
 For each entrypoint, we take the list of parameters & return values,
 and iterate on them, checking each value/struct field has a valid semantic
 following the inheritance/shadowing rules described above.
-We modify the attached attribute to each element so the only left is the
-active semantic depending on context.
+We create a new function attribute for each active semantic, which associates
+the semantic attribute to the parameter/return-value declaration.
+This will allow codegen to easily retrieve which semantic applies to which
+input/output.
 Semantic indices collision is handled at this stage.
 
-At this stage, each leaf element has a valid semantic attached, or diagnostic
+At this stage, each leaf element has a valid semantic, or diagnostic
 has been emitted. All code passed down to codegen is considered valid.
-This means each struct field will have its own semantic attribute with proper
-indexing, even if the semantic was inherited from a parent construct.
+This means we have one function attribute for each function input/output
+describing the active semantic for this function.
 Codegen will be able to handle each element independently.
 
 In some cases, DXC considered a `SV_` semantic to either be a system semantic,
@@ -467,8 +469,14 @@ def loadSemanticStructRecurively(decl)
     output.insert(val, field.index)
   return output
 
+def getActiveSemantic(decl):
+  for attr in entrypoint.getAttrs<HLSLSemantic>():
+    if decl == attr->getTargetDecl()
+      return attr
+  unreachable("Sema should have failed").
+
 def loadSemanticScalarRecursively(decl):
-  auto appliedSemantic = decl->getAttr<HLSLSemantic>();
+  auto appliedSemantic = getActiveSemantic(decl);
   if appliedSemantic->isUserSemantic():
     return emitUserSemanticLoad(decl, appliedSemantic)
   return emitSystemSemanticLoad(decl, appliedSemantic)
