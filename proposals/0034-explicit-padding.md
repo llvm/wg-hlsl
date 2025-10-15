@@ -1,7 +1,7 @@
 ---
 title: "[0034] - Explicit Padding in Structs and CBuffer Arrays"
 params:
-    status: Design In Progress
+    status: Accepted
     authors:
         - bogner: Justin Bogner
 ---
