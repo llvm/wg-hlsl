@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Explicit Padding in Structs and CBuffer Arrays"
+title: "[0034] - Explicit Padding in Structs and CBuffer Arrays"
 params:
     status: Design In Progress
     authors:
