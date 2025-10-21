@@ -2,8 +2,8 @@
 title: 0032 - HLSL Matrices
 params:
   authors:
-  + farzonl: Farzon Lotfi
-  + pow2clk: Greg Roth
+  - farzonl: Farzon Lotfi
+  - pow2clk: Greg Roth
   status: Accepted
 ---
 
