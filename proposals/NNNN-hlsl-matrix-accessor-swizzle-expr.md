@@ -1,5 +1,5 @@
 ---
-title: NNNN - HLSL Matrix Swizzle Expression
+title: NNNN - HLSL Matrix Element Expression
 params:
   authors:
   + farzonl: Farzon Lotfi
