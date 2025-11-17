@@ -75,7 +75,8 @@ The created global variable after parsing has the following characteristics:
   - the variable address space will be `hlsl_push_constant`.
 
 Codegen will be left almost as-is as we simply load a variable in a different
-address space.
+address space. The layout rule for those struct follows the same rules as
+[RW]StructuredBuffers.
 What we need to fixup is the cbuffer logic as a global variable with the
 HLSLVkPushConstant attribute should not be added to the constant buffer.
 
