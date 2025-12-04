@@ -387,7 +387,106 @@ We need to support this in Clang.
 
 ## Proposed solution
 
+### Single Resources
+
+For each resource that is a member of a struct declared at global scope or
+inside a `cbuffer`, a global variable of the resource type will be created. The
+variable name will be constructed from the struct instance name and the resource
+member name, following the same naming convention as DXC in [Example
+1](#example-1). Attached to this variable will be a resource binding attribute
+specifying the binding information (explicit or implicit).
+
+All accesses to the resource member will be redirected to the resource global
+during Clang code generation.
+
+### Resources Arrays
+
+Resource arrays that are members of a struct will be handled similarly. For each
+resource array member, a global variable of the array type will be created.
+Unlike DXC, which treats each array element as an individual resource, Clang
+will treat resource arrays as one global. Because of this, dynamic indexing of
+the resource array should just work.
+
+In [Example 2](#example-2), DXC creates individual resources for each used array
+element, such as `b1.Bufs.0` or `b1.Bufs.7`, and each of these has binding size
+set to `1`. In Clang we will create a proper resource array global named
+`b1.Bufs` and with the binding size of `10`.
+
+```
+; Resource Bindings:
+;
+; Name                                 Type  Format         Dim      ID      HLSL Bind  Count
+; ------------------------------ ---------- ------- ----------- ------- -------------- ------
+; b1.Bufs                               UAV     f32         buf      U0             u2     10
+```
+
+All accesses to the resource array member will be redirected to the global
+resource array during Clang code generation.
+
+### Resources inside Struct Arrays
+
+When a resource or resource array is a member of a struct type used in a struct
+array, separate global variables will be created for the resource in array
+element. The variable names will be constructed from the struct array name, the
+array index, and the resource member name. This is the same as in DXC in
+[Example 4](#example-4). Because the array index is baked into the resource
+name, dynamic indexing of the struct array will not be supported, which is
+consistent with DXC's current behavior.
+
+All accesses to the resource member will be redirected to the resource global
+array during Clang code generation.
+
+### Resources Bindings
+
+Clang will apply the same implicit binding rules for resources declared in
+structs as for those declared at global scope. This means:
+
+- Implicit bindings will be assigned in the order resources or resource arrays
+  are declared in the shader.
+- Resource arrays will be assigned a range of register slots corresponding to
+  the array size, with individual array elements having sequential bindings.
+
+This differs from DXC's behavior, which mostly assigns bindings in the order
+resources are first used in the shader, though not consistently, making it
+unpredictable.
+
+### Binding Range Validation
+
+Clang will detect out-of-range bindings during semantic analysis and report a
+clear error message that points to the resource declaration, improving upon
+DXC's late-stage validation (or non-existent) errors.
+
+### Specifying `space` for resources in structs
+
+Clang will support specifying register `space` for struct instances containing
+resources, addressing a limitation in DXC (see [Example 10](#example-10)).
+
 ## Detailed design
+
+We need a way to connect resource member access with the global resource
+variable.
+
+One idea is to have an implicit attribute attached to the struct var decl for
+each resource global that is associated with the decl. On access Clang codegen
+would scan the attributes to find the global decl corresponding to the member.
+It would probably need to find it by name, but there are likely no going to be
+too many of them. The resource name would be constructed based on the
+member/array access AST nodes.
+
+Another way would be to build a global map of all declared resources in
+GCHLSLRuntime. The resource global would be looked up by name from the set of
+all global resources, but the map would make the lookup efficient.
+
+Clang codegen needs to handle:
+- single resource member access
+- resource array member access
+- base class member access
+- resource in a struct array access
+- copy of the whole struct
+  - for a single resource member the handle must be copied from a resource
+    global
+  - for array member a local array with initialized handles needs to be created
+- using the struct with resources as parameter of a function
 
 ## Alternatives considered (Optional)
 
