@@ -1,9 +1,9 @@
 ---
-title: NNNN - HLSL Matrix Element Expression
+title: 0036 - HLSL Matrix Element Expression
 params:
   authors:
     farzonl: Farzon Lotfi
-status: Design In Progress
+status: Accepted
 ---
 
 ## Introduction
@@ -33,7 +33,7 @@ explicit per-component list and per-component source locations, the final
 design:
 
 - Reuses the existing `ExtVectorElementExpr` machinery via a shared base class.
-  - Per [Aaron Ballman Feedback](https://discourse.llvm.org/t/rfc-extend-extvectorelementexpr-for-hlsl-matrix-accessors/88802/4)
+  - Per [Aaron Ballman's Feedback](https://discourse.llvm.org/t/rfc-extend-extvectorelementexpr-for-hlsl-matrix-accessors/88802/4)
   - ExtVectorElementExpr is migrated to use this base.
   - MatrixElementExpr is introduced as a sibling.
 - Keeps the AST node compact, storing only the base expression, the accessor
