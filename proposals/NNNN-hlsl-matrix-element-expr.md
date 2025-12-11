@@ -49,7 +49,7 @@ of the matrix element type, as well as single-element cases like `M._m00`.
 
 - The node must be usable for:
   - Scalar element access: `float r = A._m00;`
-  - Swizzle access with length 1–4: `float3 v = A._11_22_33;`
+  - Swizzle access for 1 to 4 elements: `float3 v = A._11_22_33;`
 - The accessor must follow the HLSL matrix rules:
   - Zero-based form: `_mRC` where `R` and `C` are decimal digits.
   - One-based form: `_RC` where `R` and `C` are decimal digits.
@@ -65,7 +65,7 @@ For l-value (assignment) cases:
 - The base must be a modifiable l-value matrix.
 - The swizzle must not contain duplicate element references (same `(row, col)`
   pair repeated) when used as a store destination.
-  - Example (not allowed): `A._m00_m00 = 1.xx;`
+  - Example (not allowed): `A._m00_m00 = float2(1, 2);`
 - Assignments with duplicate components should be rejected with an error akin
   to “matrix is not assignable (contains duplicate components)”.
 
