@@ -66,6 +66,7 @@ been designed:
 * Target types: See [0018 - HLSL resources in
   SPIR-V](0018-spirv-resource-representation.md) and [0015 - Mapping Resource
   Attributes to DXIL and SPIR-V](0015-resource-attributes-in-dxil-and-spirv.md).
+* GetDimensions: See [0033 - Resource GetDimensions](0033-resources-get-dimensions.md).
 
 The detailed design in this proposal will fill in the details of the
 `HLSLAttributedResourceType` for these types. It should follow the design in
@@ -169,7 +170,7 @@ public:
 
   // Load / Access
   T Load(int3 location) {
-    return __builtin_hlsl_resource_load(Handle, location);
+    return __builtin_hlsl_resource_load(Handle, location.xy, location.z);
   }
   // ... other Load overloads ...
 
@@ -177,6 +178,22 @@ public:
   const T& operator[](int2 pos) {
     return *__builtin_hlsl_resource_getpointer(Handle, pos);
   }
+
+  // mips operator
+  struct MipsCurry {
+    __hlsl_resource_t Handle;
+    uint MipLevel;
+    T operator[](int2 Loc) {
+      return __builtin_hlsl_resource_load(Handle, Loc, MipLevel);
+    }
+  };
+
+  struct Mips {
+    __hlsl_resource_t Handle;
+    MipsCurry operator[](uint MipLevel) {
+      return {Handle, MipLevel};
+    }
+  } mips;
 
   // Gather
   float4 Gather(SamplerState s, float2 location) {
@@ -226,28 +243,51 @@ them.
 
 | Function | Supported Types | Description |
 | :--- | :--- | :--- |
-| `Sample` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture using a sampler. |
-| `SampleBias` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture after applying a bias value to the mip level. |
-| `SampleGrad` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture using gradients to influence the sample location calculation. |
-| `SampleLevel` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture on the specified mip level. |
-| `SampleCmp` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Samples the texture and compares the result against a comparison value. |
-| `SampleCmpLevelZero` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Samples the texture (mip level 0 only) and compares the result against a comparison value. |
-| `Load` | All `Texture*` and `RWTexture*` types | Reads texture data directly (texel fetch) without a sampler. |
-| `Gather` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the four texels that would be used in a bilinear filtering operation. |
-| `GatherRed` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the red component of the four texels that would be used in a bilinear filtering operation. |
-| `GatherGreen` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the green component of the four texels that would be used in a bilinear filtering operation. |
-| `GatherBlue` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the blue component of the four texels that would be used in a bilinear filtering operation. |
-| `GatherAlpha` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the alpha component of the four texels that would be used in a bilinear filtering operation. |
-| `GatherCmp` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers four texels and compares them against a reference value. |
-| `GatherCmpRed` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the red component of four texels and compares them against a reference value. |
-| `GatherCmpGreen` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the green component of four texels and compares them against a reference value. |
-| `GatherCmpBlue` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the blue component of four texels and compares them against a reference value. |
-| `GatherCmpAlpha` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the alpha component of four texels and compares them against a reference value. |
-| `GetDimensions` | All `Texture*` and `RWTexture*` types | Retrieves the resource dimensions (width, height, and optionally mip levels or sample count). |
 | `CalculateLevelOfDetail` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Calculates the LOD that would be used for a given location, returning a clamped result. |
 | `CalculateLevelOfDetailUnclamped` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Calculates the LOD without clamping. |
+| `Gather` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the four texels that would be used in a bilinear filtering operation. |
+| `GatherAlpha` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the alpha component of the four texels that would be used in a bilinear filtering operation. |
+| `GatherBlue` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the blue component of the four texels that would be used in a bilinear filtering operation. |
+| `GatherCmp` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers four texels and compares them against a reference value. |
+| `GatherCmpAlpha` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the alpha component of four texels and compares them against a reference value. |
+| `GatherCmpBlue` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the blue component of four texels and compares them against a reference value. |
+| `GatherCmpGreen` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the green component of four texels and compares them against a reference value. |
+| `GatherCmpRed` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Gathers the red component of four texels and compares them against a reference value. |
+| `GatherGreen` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the green component of the four texels that would be used in a bilinear filtering operation. |
+| `GatherRed` | `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Returns the red component of the four texels that would be used in a bilinear filtering operation. |
+| `GetDimensions` | All `Texture*` and `RWTexture*` types | Retrieves the resource dimensions (width, height, and optionally mip levels or sample count). |
 | `GetSamplePosition` | `Texture2DMS`, `Texture2DMSArray` | Gets the position of the specified sample within a pixel. |
+| `Load` | All `Texture*` and `RWTexture*` types | Reads texture data directly (texel fetch) without a sampler. |
+| `mips.Operator[][]` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D` | Accesses a texel at a specific mip level and location. |
+| `Sample` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture using a sampler. |
+| `SampleBias` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture after applying a bias value to the mip level. |
+| `SampleCmp` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Samples the texture and compares the result against a comparison value. |
+| `SampleCmpLevelZero` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `TextureCube`, `TextureCubeArray` | Samples the texture (mip level 0 only) and compares the result against a comparison value. |
+| `SampleGrad` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture using gradients to influence the sample location calculation. |
+| `SampleLevel` | `Texture1D`, `Texture1DArray`, `Texture2D`, `Texture2DArray`, `Texture3D`, `TextureCube`, `TextureCubeArray` | Samples the texture on the specified mip level. |
 | `operator[]` | All `Texture*` and `RWTexture*` types | Accesses a texel at a specific location. |
+
+### HLSL Builtin Interface
+
+This section details the parameters for the clang builtins. Optional parameters
+are indicated. If an optional parameter is not provided, a default value of 0 is
+used.
+
+*   `T __builtin_hlsl_resource_sample(Handle, Sampler, Coord, int2 Offset = 0)`
+*   `T __builtin_hlsl_resource_sample_bias(Handle, Sampler, Coord, float Bias, int2 Offset = 0)`
+*   `T __builtin_hlsl_resource_sample_grad(Handle, Sampler, Coord, float2 DDX, float2 DDY, int2 Offset = 0)`
+*   `T __builtin_hlsl_resource_sample_level(Handle, Sampler, Coord, float LOD, int2 Offset = 0)`
+*   `float __builtin_hlsl_resource_sample_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
+*   `float __builtin_hlsl_resource_sample_cmp_level_zero(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
+*   `T __builtin_hlsl_resource_load(Handle, Coord, int MipLevelOrSampleIndex = 0, int2 Offset = 0)`
+*   `float4 __builtin_hlsl_resource_gather(Handle, Sampler, Coord, int2 Offset = 0)`
+*   `float4 __builtin_hlsl_resource_gather_[red|green|blue|alpha](Handle, Sampler, Coord, int2 Offset = 0)`
+*   `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
+*   `float4 __builtin_hlsl_resource_gather_cmp_[red|green|blue|alpha](Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
+*   `float __builtin_hlsl_resource_calculate_lod(Handle, Sampler, Coord)`
+*   `float __builtin_hlsl_resource_calculate_lod_unclamped(Handle, Sampler, Coord)`
+*   `float2 __builtin_hlsl_resource_get_sample_position(Handle, uint SampleIndex)`
+*   For `GetDimensions` intrinsics, see [0033 - Resource GetDimensions](0033-resources-get-dimensions.md).
 
 ### Codegen
 
@@ -257,6 +297,11 @@ The HLSL builtins used in the record type implementation are lowered to
 target-specific LLVM intrinsics in Clang codegen. The naming convention follows
 [0014 - Consistent Naming for DX
 Intrinsics](0014-consistent-naming-for-dx-intrinsics.md).
+
+The `__builtin_hlsl_resource_load` builtin will support default values for
+optional operands. Specifically, `SampleIndex` will default to 0 for
+non-multisampled textures, and `Offset` will default to 0 if not provided.
+This allows a single builtin to handle the various `Load` overloads.
 
 The LLVM intrinsics will be overloaded on the return type and the types of their
 arguments (e.g., coordinates, offsets, derivatives). This avoids the need for
@@ -325,8 +370,57 @@ instructions.
 | `llvm.spv.resource.gather_blue` | `OpImageGather` with component 2 |
 | `llvm.spv.resource.gather_alpha` | `OpImageGather` with component 3 |
 | `llvm.spv.resource.gathercmp` | `OpImageDrefGather` |
-| `llvm.spv.resource.calculatelod` | `OpImageQueryLod` |
-| `llvm.spv.resource.texturesamplepos` | Not supported |
+| llvm.spv.resource.calculatelod | `OpImageQueryLod` |
+| llvm.spv.resource.texturesamplepos | Emulated |
+
+The intrinsic `llvm.spv.resource.texturesamplepos` is not directly supported in
+Vulkan, but it is emulated by using a lookup table of standard sample positions.
+The implementation works as follows:
+
+1.  **Query Sample Count**: The sample count of the texture is queried using
+    `OpImageQuerySamples`.
+2.  **Select Position Array**: Based on the sample count, a specific constant
+    array of sample positions is selected.
+    *   **Count 1**: Returns `(0, 0)`
+    *   **Count 2**:
+        *   0: `(0.25, 0.25)`
+        *   1: `(-0.25, -0.25)`
+    *   **Count 4**:
+        *   0: `(-0.125, -0.375)`
+        *   1: `(0.375, -0.125)`
+        *   2: `(-0.375, 0.125)`
+        *   3: `(0.125, 0.375)`
+    *   **Count 8**:
+        *   0: `(0.0625, -0.1875)`
+        *   1: `(-0.0625, 0.1875)`
+        *   2: `(0.3125, 0.0625)`
+        *   3: `(-0.1875, -0.3125)`
+        *   4: `(-0.3125, 0.3125)`
+        *   5: `(-0.4375, -0.0625)`
+        *   6: `(0.1875, 0.4375)`
+        *   7: `(0.4375, -0.4375)`
+    *   **Count 16**:
+        *   0: `(0.0625, 0.0625)`
+        *   1: `(-0.0625, -0.1875)`
+        *   2: `(-0.1875, 0.125)`
+        *   3: `(0.25, -0.0625)`
+        *   4: `(-0.3125, -0.125)`
+        *   5: `(0.125, 0.3125)`
+        *   6: `(0.3125, 0.1875)`
+        *   7: `(0.1875, -0.3125)`
+        *   8: `(-0.125, 0.375)`
+        *   9: `(0, -0.4375)`
+        *   10: `(-0.25, -0.375)`
+        *   11: `(-0.375, 0.25)`
+        *   12: `(-0.5, 0)`
+        *   13: `(0.4375, -0.25)`
+        *   14: `(0.375, 0.4375)`
+        *   15: `(-0.4375, -0.5)`
+3.  **Lookup**: The `SampleIndex` is used to index into the selected array.
+4.  **Fallback**: If the sample count is not supported or no array is found, the
+    function returns `(0, 0)`.
+
+This matches the current DXC implementation.
 
 ### Sampler type in clang
 
