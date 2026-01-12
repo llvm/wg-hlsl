@@ -238,12 +238,13 @@ public:
 
 #### Member functions
 
-The following table lists the member functions and the texture types that support
+The following sections describe the member functions and the texture types that support
 them.
 
-### `CalculateLevelOfDetail`
+##### `CalculateLevelOfDetail`
 
 * **Description**: Calculates the LOD that would be used for a given location, returning a clamped result.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_calculate_lod` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod)
@@ -253,9 +254,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod)
 
-### `CalculateLevelOfDetailUnclamped`
+##### `CalculateLevelOfDetailUnclamped`
 
 * **Description**: Calculates the LOD without clamping.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_calculate_lod_unclamped` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod-unclamped)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod-unclamped)
@@ -265,99 +267,110 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod-unclamped)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod-unclamped)
 
-### `Gather`
+##### `Gather`
 
 * **Description**: Returns the four texels that would be used in a bilinear filtering operation.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gather)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gather)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gather)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gather)
 
-### `GatherAlpha`
+##### `GatherAlpha`
 
 * **Description**: Returns the alpha component of the four texels that would be used in a bilinear filtering operation.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_alpha` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatheralpha)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gatheralpha)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gatheralpha)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gatheralpha)
 
-### `GatherBlue`
+##### `GatherBlue`
 
 * **Description**: Returns the blue component of the four texels that would be used in a bilinear filtering operation.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_blue` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatherblue)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gatherblue)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gatherblue)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gatherblue)
 
-### `GatherCmp`
+##### `GatherCmp`
 
 * **Description**: Gathers four texels and compares them against a reference value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmp)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmp)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmp)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmp)
 
-### `GatherCmpAlpha`
+##### `GatherCmpAlpha`
 
 * **Description**: Gathers the alpha component of four texels and compares them against a reference value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_alpha` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpalpha)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpalpha)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpalpha)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpalpha)
 
-### `GatherCmpBlue`
+##### `GatherCmpBlue`
 
 * **Description**: Gathers the blue component of four texels and compares them against a reference value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_blue` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpblue)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpblue)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpblue)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpblue)
 
-### `GatherCmpGreen`
+##### `GatherCmpGreen`
 
 * **Description**: Gathers the green component of four texels and compares them against a reference value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_green` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpgreen)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpgreen)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpgreen)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpgreen)
 
-### `GatherCmpRed`
+##### `GatherCmpRed`
 
 * **Description**: Gathers the red component of four texels and compares them against a reference value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_red` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpred)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpred)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpred)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpred)
 
-### `GatherGreen`
+##### `GatherGreen`
 
 * **Description**: Returns the green component of the four texels that would be used in a bilinear filtering operation.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_green` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathergreen)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathergreen)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathergreen)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathergreen)
 
-### `GatherRed`
+##### `GatherRed`
 
 * **Description**: Returns the red component of the four texels that would be used in a bilinear filtering operation.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_red` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatherred)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gatherred)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gatherred)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gatherred)
 
-### `GetDimensions`
+##### `GetDimensions`
 
 * **Description**: Retrieves the resource dimensions (width, height, and optionally mip levels or sample count).
+* **Implementation**: Implemented using the builtins defined in [0033 - Resource GetDimensions](0033-resources-get-dimensions.md).
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-getdimensions)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-getdimensions)
@@ -374,16 +387,18 @@ them.
   * [RWTexture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwtexture2darray-getdimensions)
   * [RWTexture3D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwtexture3d-getdimensions)
 
-### `GetSamplePosition`
+##### `GetSamplePosition`
 
 * **Description**: Gets the position of the specified sample within a pixel.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_get_sample_position` builtin.
 * **Supported Types**:
   * [Texture2DMS](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-get-sample-position)
   * [Texture2DMSArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-get-sample-position)
 
-### `Load`
+##### `Load`
 
 * **Description**: Reads texture data directly (texel fetch) without a sampler.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_load` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-load)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-load)
@@ -398,9 +413,10 @@ them.
   * [RWTexture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwtexture2darray-load)
   * [RWTexture3D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwtexture3d-load)
 
-### `mips.Operator[][]`
+##### `mips.Operator[][]`
 
 * **Description**: Accesses a texel at a specific mip level and location.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_load` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1d-mipsoperatorindex)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1darray-mipsoperatorindex)
@@ -408,16 +424,18 @@ them.
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2darray-mipsoperatorindex)
   * [Texture3D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture3d-mipsoperatorindex)
 
-### `sample.operator[][]`
+##### `sample.operator[][]`
 
 * **Description**: Accesses a single sample.
+* **Implementation**: TODO
 * **Supported Types**:
   * [Texture2DMS](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dms-sampleoperatorindex)
   * [Texture2DMSArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dmsarray-sampleoperatorindex)
 
-### `Sample`
+##### `Sample`
 
 * **Description**: Samples the texture using a sampler.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_sample` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-sample)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-sample)
@@ -427,9 +445,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-sample)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-sample)
 
-### `SampleBias`
+##### `SampleBias`
 
 * **Description**: Samples the texture after applying a bias value to the mip level.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_bias` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplebias)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-samplebias)
@@ -439,9 +458,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-samplebias)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-samplebias)
 
-### `SampleCmp`
+##### `SampleCmp`
 
 * **Description**: Samples the texture and compares the result against a comparison value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_cmp` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplecmp)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-samplecmp)
@@ -450,9 +470,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-samplecmp)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-samplecmp)
 
-### `SampleCmpLevelZero`
+##### `SampleCmpLevelZero`
 
 * **Description**: Samples the texture (mip level 0 only) and compares the result against a comparison value.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_cmp_level_zero` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplecmplevelzero)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-samplecmplevelzero)
@@ -461,9 +482,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-samplecmplevelzero)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-samplecmplevelzero)
 
-### `SampleGrad`
+##### `SampleGrad`
 
 * **Description**: Samples the texture using gradients to influence the sample location calculation.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_grad` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplegrad)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-samplegrad)
@@ -473,9 +495,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-samplegrad)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-samplegrad)
 
-### `SampleLevel`
+##### `SampleLevel`
 
 * **Description**: Samples the texture on the specified mip level.
+* **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_level` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplelevel)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1darray-samplelevel)
@@ -485,9 +508,10 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-samplelevel)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-samplelevel)
 
-### `operator[]`
+##### `operator[]`
 
 * **Description**: Accesses a texel at a specific location.
+* **Implementation**: Implemented by dereferencing the result of the `__builtin_hlsl_resource_getpointer` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1d-operatorindex)
   * [Texture1DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1darray-operatorindex)
