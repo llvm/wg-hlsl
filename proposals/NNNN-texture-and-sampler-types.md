@@ -86,10 +86,14 @@ that the compiler is correctly picking the correct sampler and the correct level
 of detail when doing the sample. We will also ensure we are using the correct
 coordinates.
 
-Note that we will not be using mipmapped textures. This makes the
-description of the test in the offload test suite more complicated without
-adding more test coverage. This turns into testing for the drivers and is best
-left for the API's conformance tests.
+We will use mipmapped textures to verify that the compiler and drivers correctly
+handle multiple levels of detail. This allows us to verify:
+*   `CalculateLevelOfDetail` and `CalculateLevelOfDetailUnclamped` correctly 
+    report the level of detail across multiple levels.
+*   `SampleGrad` correctly selects the expected mip level based on provided
+    derivatives.
+*   `mips.operator[][]` correctly accesses data from non-zero mip levels.
+*   `GetDimensions` correctly reports the total number of mip levels.
 
 ## Detailed design
 
