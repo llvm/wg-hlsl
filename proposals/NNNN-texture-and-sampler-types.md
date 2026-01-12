@@ -628,8 +628,10 @@ instructions.
 | `llvm.spv.resource.gather_blue` | `OpImageGather` with component 2 |
 | `llvm.spv.resource.gather_alpha` | `OpImageGather` with component 3 |
 | `llvm.spv.resource.gathercmp` | `OpImageDrefGather` |
-| llvm.spv.resource.calculatelod | `OpImageQueryLod` |
-| llvm.spv.resource.texturesamplepos | Emulated |
+| `llvm.spv.resource.calculatelod` | `OpImageQueryLod` |
+| `llvm.spv.resource.texturesamplepos` | Emulated |
+
+Note: `GatherCmpGreen`, `GatherCmpBlue`, and `GatherCmpAlpha` are not supported in SPIR-V as `OpImageDrefGather` does not support selecting a component (it always uses component 0).
 
 The intrinsic `llvm.spv.resource.texturesamplepos` is not directly supported in
 Vulkan, but it is emulated by using a lookup table of standard sample positions.
