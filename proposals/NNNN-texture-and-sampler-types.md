@@ -243,7 +243,8 @@ them.
 
 ##### `CalculateLevelOfDetail`
 
-* **Description**: Calculates the LOD that would be used for a given location, returning a clamped result.
+* **Description**: Calculates the LOD that would be used for a given location,
+  returning a clamped result.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_calculate_lod` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod)
@@ -269,7 +270,8 @@ them.
 
 ##### `Gather`
 
-* **Description**: Returns the four texels that would be used in a bilinear filtering operation.
+* **Description**: Returns the four texels that would be used in a bilinear
+  filtering operation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gather)
@@ -279,7 +281,8 @@ them.
 
 ##### `GatherAlpha`
 
-* **Description**: Returns the alpha component of the four texels that would be used in a bilinear filtering operation.
+* **Description**: Returns the alpha component of the four texels that would be
+  used in a bilinear filtering operation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_alpha` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatheralpha)
@@ -289,7 +292,8 @@ them.
 
 ##### `GatherBlue`
 
-* **Description**: Returns the blue component of the four texels that would be used in a bilinear filtering operation.
+* **Description**: Returns the blue component of the four texels that would be
+  used in a bilinear filtering operation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_blue` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatherblue)
@@ -309,7 +313,9 @@ them.
 
 ##### `GatherCmpAlpha`
 
-* **Description**: Gathers the alpha component of four texels and compares them against a reference value.
+* **Description**: Gathers the alpha component of four texels and compares them
+  against a reference value. This is not supported in SPIR-V and will error
+  during semantic analysis.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_alpha` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpalpha)
@@ -319,7 +325,9 @@ them.
 
 ##### `GatherCmpBlue`
 
-* **Description**: Gathers the blue component of four texels and compares them against a reference value.
+* **Description**: Gathers the blue component of four texels and compares them
+  against a reference value. This is not supported in SPIR-V and will error
+  during semantic analysis.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_blue` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpblue)
@@ -329,7 +337,9 @@ them.
 
 ##### `GatherCmpGreen`
 
-* **Description**: Gathers the green component of four texels and compares them against a reference value.
+* **Description**: Gathers the green component of four texels and compares them
+  against a reference value. This is not supported in SPIR-V and will error
+  during semantic analysis.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_green` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpgreen)
@@ -339,7 +349,8 @@ them.
 
 ##### `GatherCmpRed`
 
-* **Description**: Gathers the red component of four texels and compares them against a reference value.
+* **Description**: Gathers the red component of four texels and compares them
+  against a reference value.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_red` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpred)
@@ -349,7 +360,8 @@ them.
 
 ##### `GatherGreen`
 
-* **Description**: Returns the green component of the four texels that would be used in a bilinear filtering operation.
+* **Description**: Returns the green component of the four texels that would be
+  used in a bilinear filtering operation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_green` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathergreen)
@@ -359,7 +371,8 @@ them.
 
 ##### `GatherRed`
 
-* **Description**: Returns the red component of the four texels that would be used in a bilinear filtering operation.
+* **Description**: Returns the red component of the four texels that would be
+  used in a bilinear filtering operation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_red` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatherred)
@@ -369,7 +382,8 @@ them.
 
 ##### `GetDimensions`
 
-* **Description**: Retrieves the resource dimensions (width, height, and optionally mip levels or sample count).
+* **Description**: Retrieves the resource dimensions (width, height, and
+  optionally mip levels or sample count).
 * **Implementation**: Implemented using the builtins defined in [0033 - Resource GetDimensions](0033-resources-get-dimensions.md).
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-getdimensions)
@@ -460,7 +474,8 @@ them.
 
 ##### `SampleCmp`
 
-* **Description**: Samples the texture and compares the result against a comparison value.
+* **Description**: Samples the texture and compares the result against a
+  comparison value.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_cmp` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplecmp)
@@ -472,7 +487,8 @@ them.
 
 ##### `SampleCmpLevelZero`
 
-* **Description**: Samples the texture (mip level 0 only) and compares the result against a comparison value.
+* **Description**: Samples the texture (mip level 0 only) and compares the
+  result against a comparison value.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_cmp_level_zero` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplecmplevelzero)
@@ -484,7 +500,8 @@ them.
 
 ##### `SampleGrad`
 
-* **Description**: Samples the texture using gradients to influence the sample location calculation.
+* **Description**: Samples the texture using gradients to influence the sample
+  location calculation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_sample_grad` builtin.
 * **Supported Types**:
   * [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-samplegrad)
@@ -630,8 +647,6 @@ instructions.
 | `llvm.spv.resource.gathercmp` | `OpImageDrefGather` |
 | `llvm.spv.resource.calculatelod` | `OpImageQueryLod` |
 | `llvm.spv.resource.texturesamplepos` | Emulated |
-
-Note: `GatherCmpGreen`, `GatherCmpBlue`, and `GatherCmpAlpha` are not supported in SPIR-V as `OpImageDrefGather` does not support selecting a component (it always uses component 0).
 
 The intrinsic `llvm.spv.resource.texturesamplepos` is not directly supported in
 Vulkan, but it is emulated by using a lookup table of standard sample positions.
