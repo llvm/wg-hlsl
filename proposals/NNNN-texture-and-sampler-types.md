@@ -202,30 +202,29 @@ public:
   } mips;
 
   // Gather
-  vec<GetElementType(T), 4> Gather(SamplerState s, float2 location) {
-    return __builtin_hlsl_resource_gather(Handle, s.Handle, 
-                                          location);
+  vec<GetElementType(T), 4> Gather(SamplerState s, float2 location, int2 Offset = 0) {
+    return __builtin_hlsl_resource_gather(Handle, s.Handle, location, 0, Offset);
   }
   // ... other Gather overloads ...
 
   // Variants for Green, Blue, Alpha
-  vec<GetElementType(T), 4> GatherRed(SamplerState s, float2 location) {
-      return __builtin_hlsl_resource_gather_red(Handle, s.Handle, 
-                                                location);
+  vec<GetElementType(T), 4> GatherRed(SamplerState s, float2 location, int2 Offset = 0) {
+      return __builtin_hlsl_resource_gather(Handle, s.Handle, location, 0, Offset);
   }
-  // ...
+  vec<GetElementType(T), 4> GatherGreen(SamplerState s, float2 location, int2 Offset = 0) {
+      return __builtin_hlsl_resource_gather(Handle, s.Handle, location, 1, Offset);
+  }
+  // ... Blue (2), Alpha (3)
 
    vec<GetElementType(T), 4> GatherCmp(SamplerComparisonState s, float2 location, 
-                             float compare_value) {
-    return __builtin_hlsl_resource_gather_cmp(Handle, s.Handle, 
-                                              location, compare_value);
+                             float compare_value, int2 Offset = 0) {
+    return __builtin_hlsl_resource_gather_cmp(Handle, s.Handle, location, compare_value, 0, Offset);
   }
   // ... other GatherCmp overloads ...
 
   vec<GetElementType(T), 4> GatherCmpRed(SamplerComparisonState s, float2 location, 
-                                float compare_value) {
-      return __builtin_hlsl_resource_gather_cmp_red(Handle, s.Handle, 
-                                                    location, compare_value);
+                                float compare_value, int2 Offset = 0) {
+      return __builtin_hlsl_resource_gather_cmp(Handle, s.Handle, location, compare_value, 0, Offset);
   }
 
   // Info
@@ -274,9 +273,9 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod-unclamped)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-calculate-lod-unclamped)
 
-##### `Gather`
+##### `Gather`, `GatherAlpha`, `GatherBlue`, `GatherRed`, `GatherGreen`
 
-* **Description**: Returns the four texels that would be used in a bilinear
+* **Description**: Returns the appropriate componenets of the four texels that would be used in a bilinear
   filtering operation.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather` builtin.
 * **Supported Types**:
@@ -285,106 +284,15 @@ them.
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gather)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gather)
 
-##### `GatherAlpha`
+##### `GatherCmp`, `GatherCmpAlpha`, `GatherCmpBlue`, `GatherCmpRed`, `GatherCmpGreen`
 
-* **Description**: Returns the alpha component of the four texels that would be
-  used in a bilinear filtering operation.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_alpha` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatheralpha)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gatheralpha)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gatheralpha)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gatheralpha)
-
-##### `GatherBlue`
-
-* **Description**: Returns the blue component of the four texels that would be
-  used in a bilinear filtering operation.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_blue` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatherblue)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gatherblue)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gatherblue)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gatherblue)
-
-##### `GatherCmp`
-
-* **Description**: Gathers four texels and compares them against a reference value.
+* **Description**: Gathers four texels and compares appropriate components against a reference value.
 * **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp` builtin.
 * **Supported Types**:
   * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmp)
   * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmp)
   * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmp)
   * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmp)
-
-##### `GatherCmpAlpha`
-
-* **Description**: Gathers the alpha component of four texels and compares them
-  against a reference value. This is not supported in SPIR-V and will error
-  during semantic analysis.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_alpha` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpalpha)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpalpha)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpalpha)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpalpha)
-
-##### `GatherCmpBlue`
-
-* **Description**: Gathers the blue component of four texels and compares them
-  against a reference value. This is not supported in SPIR-V and will error
-  during semantic analysis.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_blue` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpblue)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpblue)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpblue)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpblue)
-
-##### `GatherCmpGreen`
-
-* **Description**: Gathers the green component of four texels and compares them
-  against a reference value. This is not supported in SPIR-V and will error
-  during semantic analysis.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_green` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpgreen)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpgreen)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpgreen)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpgreen)
-
-##### `GatherCmpRed`
-
-* **Description**: Gathers the red component of four texels and compares them
-  against a reference value.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_cmp_red` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathercmpred)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathercmpred)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathercmpred)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathercmpred)
-
-##### `GatherGreen`
-
-* **Description**: Returns the green component of the four texels that would be
-  used in a bilinear filtering operation.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_green` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gathergreen)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gathergreen)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gathergreen)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gathergreen)
-
-##### `GatherRed`
-
-* **Description**: Returns the red component of the four texels that would be
-  used in a bilinear filtering operation.
-* **Implementation**: Implemented using the `__builtin_hlsl_resource_gather_red` builtin.
-* **Supported Types**:
-  * [Texture2D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2d-gatherred)
-  * [Texture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture2darray-gatherred)
-  * [TextureCube](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecube-gatherred)
-  * [TextureCubeArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texturecubearray-gatherred)
 
 ##### `GetDimensions`
 
@@ -561,10 +469,8 @@ used.
 *   `float __builtin_hlsl_resource_sample_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
 *   `float __builtin_hlsl_resource_sample_cmp_level_zero(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
 *   `T __builtin_hlsl_resource_load(Handle, Coord, int MipLevelOrSampleIndex = 0, int2 Offset = 0)`
-*   `float4 __builtin_hlsl_resource_gather(Handle, Sampler, Coord, int2 Offset = 0)`
-*   `float4 __builtin_hlsl_resource_gather_[red|green|blue|alpha](Handle, Sampler, Coord, int2 Offset = 0)`
-*   `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
-*   `float4 __builtin_hlsl_resource_gather_cmp_[red|green|blue|alpha](Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
+*   `float4 __builtin_hlsl_resource_gather(Handle, Sampler, Coord, int Component, int2 Offset = 0)`
+*   `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, Coord, float CompareValue, int Component, int2 Offset = 0)`
 *   `float __builtin_hlsl_resource_calculate_lod(Handle, Sampler, Coord)`
 *   `float __builtin_hlsl_resource_calculate_lod_unclamped(Handle, Sampler, Coord)`
 *   `float2 __builtin_hlsl_resource_get_sample_position(Handle, uint SampleIndex)`
@@ -598,9 +504,7 @@ distinct intrinsic names for each texture dimension or type.
 | `__builtin_hlsl_resource_sample_cmp_level_zero`   | `llvm.<target>.resource.samplecmplevelzero` |
 | `__builtin_hlsl_resource_load`                    | `llvm.<target>.resource.load.texture` |
 | `__builtin_hlsl_resource_gather`                  | `llvm.<target>.resource.gather`       |
-| `__builtin_hlsl_resource_gather_red`              | `llvm.<target>.resource.gather`       |
 | `__builtin_hlsl_resource_gather_cmp`              | `llvm.<target>.resource.gathercmp`    |
-| `__builtin_hlsl_resource_gather_cmp_red`          | `llvm.<target>.resource.gathercmp`    |
 | `__builtin_hlsl_resource_calculate_lod`           | `llvm.<target>.resource.calculatelod` |
 | `__builtin_hlsl_resource_calculate_lod_unclamped` | `llvm.<target>.resource.calculatelod` |
 | `__builtin_hlsl_resource_get_sample_position`     | `llvm.<target>.resource.texturesamplepos` |
@@ -646,10 +550,6 @@ instructions.
 | `llvm.spv.resource.samplecmplevelzero` | `OpImageSampleDrefExplicitLod` with `Lod` 0 |
 | `llvm.spv.resource.load.texture` | `OpImageFetch` |
 | `llvm.spv.resource.gather` | `OpImageGather` |
-| `llvm.spv.resource.gather_red` | `OpImageGather` with component 0 |
-| `llvm.spv.resource.gather_green` | `OpImageGather` with component 1 |
-| `llvm.spv.resource.gather_blue` | `OpImageGather` with component 2 |
-| `llvm.spv.resource.gather_alpha` | `OpImageGather` with component 3 |
 | `llvm.spv.resource.gathercmp` | `OpImageDrefGather` |
 | `llvm.spv.resource.calculatelod` | `OpImageQueryLod` |
 | `llvm.spv.resource.texturesamplepos` | Emulated |
