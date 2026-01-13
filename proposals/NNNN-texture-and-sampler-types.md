@@ -9,16 +9,16 @@ params:
 
 ## Introduction
 
-This proposal describes the design for implementing Texture and Sampler types in
-Clang for HLSL, including their frontend representation, LLVM IR generation, and
-testing strategy within the offload-test-suite.
+This proposal describes the design for implementing Texture and Sampler types
+in Clang for HLSL, including their frontend representation, LLVM IR
+generation, and testing strategy within the offload-test-suite.
 
-The implementation of the Texture and Sampler types will be modeled after the
-implementation of `Buffer` and `RWBuffer`. We will define a resource record type
-for each resource type. It will contain a handle with the appropriate
-attributes. The member functions for the class will be implemented as HLSL
-builtin functions. The builtin functions will be translated to target-specific
-intrinsics during codegen.
+The implementation of the Texture and Sampler types will be modeled after
+the implementation of `Buffer` and `RWBuffer`. We will define a resource
+record type for each resource type. It will contain a handle with the
+appropriate attributes. The member functions for the class will be
+implemented as HLSL builtin functions. The builtin functions will be
+translated to target-specific intrinsics during codegen.
 
 ## Motivation
 
@@ -29,7 +29,7 @@ programming in HLSL.
 ## Proposed solution
 
 The design follows the pattern established for `Buffer` and `RWBuffer`. Textures
-and Samplers will be defined as record types in the HLSL library. These records
+and Samplers will be defined as record types in the HLSL External Sema Source. These records
 will wrap an internal `__hlsl_resource_t` handle. Member functions will be
 implemented as wrappers that call clang builtins, passing the underlying
 resource handles.
@@ -102,10 +102,14 @@ handle multiple levels of detail. This allows us to verify:
 #### The resource record type
 
 Texture resources are represented in Clang using a record type defined in the
-HLSL library. This record exposes the interface that the developer uses. Its
+HLSL External Sema Source. This record exposes the interface that the developer uses. Its
 implementation contains a single member of type `__hlsl_resource_t`, annotated
 with appropriate attributes to denote the specific resource kind (e.g.,
-`Texture2D`, `TextureCube`) and element type.
+`Texture2D`, `TextureCube`) and element type. See [0015 - Mapping Resource
+Attributes to DXIL and SPIR-V](0015-resource-attributes-in-dxil-and-spirv.md) for detail 
+on which attributes will apply to which texture types.
+
+
 
 The member functions are implemented as calls to HLSL builtin functions. These
 builtins take the resource handle as the first parameter and forward the
@@ -115,20 +119,18 @@ When a member function requires a sampler (e.g., `Sample`), the `SamplerState`
 object is passed to the member function. The implementation extracts the handle
 from the `SamplerState` record and passes it to the underlying builtin.
 
-For example, `Texture2D<float4>` would look effectively like:
+For example, `Texture2D<T>` would look effectively like:
 
 ```cpp
 template <typename T>
 class Texture2D {
   __hlsl_resource_t [[hlsl::resource_class(SRV)]]
                     [[hlsl::dimension(2D)]]
-                    [[hlsl::contained_type(T)]]
-                    [[hlsl::is_rov(false)]]
-                    [[hlsl::is_multisample(false)]]
-                    [[hlsl::is_array(false)]] Handle;
+                    [[hlsl::contained_type(T)]] Handle;
 
 public:
-  Texture2D() = default;
+  // ... Standard constructors ...
+  // See 0025 - Resource Initialization and Constructors
 
   // Sampling methods
   T Sample(SamplerState s, float2 location) {
@@ -200,27 +202,27 @@ public:
   } mips;
 
   // Gather
-  float4 Gather(SamplerState s, float2 location) {
+  vec<GetElementType(T), 4> Gather(SamplerState s, float2 location) {
     return __builtin_hlsl_resource_gather(Handle, s.Handle, 
                                           location);
   }
   // ... other Gather overloads ...
 
   // Variants for Green, Blue, Alpha
-  float4 GatherRed(SamplerState s, float2 location) {
+  vec<GetElementType(T), 4> GatherRed(SamplerState s, float2 location) {
       return __builtin_hlsl_resource_gather_red(Handle, s.Handle, 
                                                 location);
   }
   // ...
 
-  float4 GatherCmp(SamplerComparisonState s, float2 location, 
+   vec<GetElementType(T), 4> GatherCmp(SamplerComparisonState s, float2 location, 
                              float compare_value) {
     return __builtin_hlsl_resource_gather_cmp(Handle, s.Handle, 
                                               location, compare_value);
   }
   // ... other GatherCmp overloads ...
 
-  float4 GatherCmpRed(SamplerComparisonState s, float2 location, 
+  vec<GetElementType(T), 4> GatherCmpRed(SamplerComparisonState s, float2 location, 
                                 float compare_value) {
       return __builtin_hlsl_resource_gather_cmp_red(Handle, s.Handle, 
                                                     location, compare_value);
