@@ -1,11 +1,9 @@
 ---
 title: "[NNNN] - Resources in Structures"
 params:
+  status: Design In Progress
   authors:
-    - github_username: Helena Kotas
-  status: Under Consideration
-  sponsors:
-    - github_username: Helena Kotas
+    - hekota: Helena Kotas
 ---
 
 ## Introduction
@@ -115,8 +113,10 @@ code**. For example, `b2.Bufs[7]` is accessed first and gets assigned register
 ### Dynamic Indexing of Resource Arrays
 
 DXC does not support dynamic indexing of resource arrays that are members of
-structs. Attempting to use a non-constant index produces the error:
-`Index for resource array inside cbuffer must be a literal expression`.
+structs. Attempting to use a non-constant index produces the error: `Index for
+resource array inside cbuffer must be a literal expression`. The error mentions
+`cbuffer` because all declarations at a global scope are technically in a global
+`cbuffer` scope named `$Globals`.
 
 #### Example 3
 ```
@@ -189,7 +189,7 @@ For example, `e[7].Buf` is bound to `u0` and `e[1].Buf` is bound to `u1` because
 
 ### Dynamic Indexing of Struct Arrays with Resources
 
-If a resource is a members of a struct that is in an array, DXC does not support
+If a resource is a member of a struct that is in an array, DXC does not support
 accessing this resource with non-constant index into the struct array.
 Attempting to do so produces an error.
 
@@ -270,7 +270,7 @@ All of the resources have explicit binding and the Resource Bindings table looks
 
 #### Example 7
 
-If we remove the `register` annotations are the `G` instance in [Example
+If we remove the `register` annotations on the `G` instance in [Example
 6](#example-6), its resources are bound **mostly in the order they are first
 referenced in the shader**. However, the resource inside class `E` is assigned
 the highest UAV register slot (indicating it was bound last), despite being
