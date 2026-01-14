@@ -20,8 +20,13 @@ because multiple instances of the same struct could have conflicting bindings.
 
 ## Current Behavior in DXC
 
-This section documents how DXC handles resources declared as members of structs
-and theirs bindings.
+This section documents how DXC handles resources that are members of non-static
+structs instances declared at the shader global scope, i.e. in the default
+`cbuffer` context `$Globals`, and how it handles their register binding.
+
+Additional information about how structs with resources can be used as local
+variables, function parameters or static global decls, and their initialization,
+assignment, and access behaviors will be added later on.
 
 ### Struct with a Single Resource
 
@@ -381,9 +386,32 @@ https://godbolt.org/z/Mo8Paoq7G
 <source>:5:7: error: register space cannot be specified on global constants.
 ```
 
+### Summary
+
+- DXC supports resources as members of structs, generating global resources
+  named after both the struct instance and member.
+
+- Register binding for these resources is determined by explicit `register`
+  annotations on the struct instance; if there are no binding annotations,
+  resources are implicitly bound in the order they are first referenced, which
+  can lead to unpredictable assignments.
+
+- Resource arrays within structs are treated as collections of individual
+  resources, with only accessed elements consuming registers. This differs from
+  global arrays which reserve the entire range.
+
+- Dynamic (non-constant) indexing into resource arrays or arrays of structs with
+  resources is not supported and results in compilation errors.
+
+- Structs may contain multiple resource types, including those inherited or
+  nested, with binding rules applied per resource type.
+
+- DXC validates register ranges for global resources but does not check for
+  overflow in struct members, which may result in silently overflow.
+
 ## Motivation
 
-We need to support this in Clang.
+We need to support resources in structs in Clang.
 
 ## Proposed solution
 
