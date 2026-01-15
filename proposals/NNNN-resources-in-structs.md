@@ -386,6 +386,83 @@ https://godbolt.org/z/Mo8Paoq7G
 <source>:5:7: error: register space cannot be specified on global constants.
 ```
 
+### Static Structs with Resources
+
+Structs with resources can be declared as static. Same as other statically
+declared resources, these struct resource members are not automatically bound.
+Instead, the user must explicitly initialize them by assigning an existing
+resource to the struct member.
+
+#### Example 11
+
+```
+struct M {
+  RWBuffer<float> Bufs[10];
+};
+
+RWBuffer<float> GlobalBufs[10];
+
+static M m = { GlobalBufs };
+
+[numthreads(4,4,4)]
+void main(uint3 ID : SV_GroupID) {
+  m.Bufs[ID.y][1] = m.Bufs[ID.x][0];
+}
+```
+https://godbolt.org/z/8fcTfz6d8
+
+### Local variables and  Function Parameters
+
+Structs with resources can also be declared as local variables or used as function parameters.
+
+#### Example 12
+
+```
+struct N {
+  RWBuffer<float> Buf;
+};
+
+N n : register(u2);
+
+void foo(N paramN, uint i) {
+  paramN.Buf[i] = 10;
+}
+
+[numthreads(4,4,4)]
+void main(uint3 ID : SV_GroupID) {
+  N localN = n;
+  n.Buf[10] = 0.13;
+
+  foo(n, ID.x);
+}
+```
+https://godbolt.org/z/1TYxM45qz
+
+### Initialization list
+
+Local or static declarations of structs with resources can be initialized using
+initialized lists.
+
+```
+struct P {
+  RWBuffer<float> Bufs[4];
+};
+
+RWBuffer<float> GlobalBufs[4];
+
+static P p1 = { GlobalBufs };
+
+[numthreads(4,4,4)]
+void main(uint3 ID : SV_GroupID) {
+  P p2 = { GlobalBufs[3], GlobalBufs[2],
+           GlobalBufs[1], GlobalBufs[0]};
+
+  p1.Bufs[ID.y][0] = p2.Bufs[ID.x][0];
+}
+```
+
+https://godbolt.org/z/1TYxM45qz
+
 ### Summary
 
 - DXC supports resources as members of structs, generating global resources
@@ -409,9 +486,15 @@ https://godbolt.org/z/Mo8Paoq7G
 - DXC validates register ranges for global resources but does not check for
   overflow in struct members, which may result in silently overflow.
 
+- Structs with resources can be declared as static or local variables, used as
+  function parameters, and initialized with initializer lists.
+
 ## Motivation
 
-We need to support resources in structs in Clang.
+While resources in structs may not be a widely used HLSL feature, DXC does
+support them, and so should the Clang implementation. This also presents an
+opportunity to address usability issues, such as the unpredictable implicit
+binding order, to make the feature more robust and user-friendly.
 
 ## Proposed solution
 
