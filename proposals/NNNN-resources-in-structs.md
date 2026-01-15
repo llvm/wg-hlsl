@@ -411,7 +411,7 @@ void main(uint3 ID : SV_GroupID) {
 ```
 https://godbolt.org/z/8fcTfz6d8
 
-### Local variables and  Function Parameters
+### Local variables and Function Parameters
 
 Structs with resources can also be declared as local variables or used as function parameters.
 
@@ -443,6 +443,8 @@ https://godbolt.org/z/1TYxM45qz
 Local or static declarations of structs with resources can be initialized using
 initialized lists.
 
+#### Example 13
+
 ```
 struct P {
   RWBuffer<float> Bufs[4];
@@ -460,7 +462,6 @@ void main(uint3 ID : SV_GroupID) {
   p1.Bufs[ID.y][0] = p2.Bufs[ID.x][0];
 }
 ```
-
 https://godbolt.org/z/1TYxM45qz
 
 ### Summary
