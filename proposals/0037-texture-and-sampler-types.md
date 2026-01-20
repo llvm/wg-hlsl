@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Texture and Sampler Types"
+title: "[0037] - Texture and Sampler Types"
 params:
   authors:
     - s-perron: Steven Perron
