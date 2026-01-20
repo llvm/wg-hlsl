@@ -312,8 +312,8 @@ https://godbolt.org/z/3TW565acT
 #### Example 8
 
 For resources declared at global scope, DXC validates that they fit within the
-specified register slots. If they do not fit, an error is reported during
-validation, though the error message is cryptic and the source location points
+specified register slots. If they do not fit, errors are reported, though the
+error messages are not clear and the source location points
 to where the resource is first used rather than where it is declared.
 
 ```
@@ -321,12 +321,15 @@ RWBuffer<float> Buf[10] : register(u4294967293);
 
 [numthreads(4,1,1)]
 void main() {
-  Buf[0][0] = 0;
+  Buf[0][0] = 0; // line 5
 }
 ```
 https://godbolt.org/z/93d317Ej4
 ```
-<source>:12:3: error: Constant values must be in-range for operation.
+<source>:5:3: error: Constant values must be in-range for operation.
+<source>:5:3: error: Resource handle should returned by createHandle.
+<source>:5:13: error: store should be on uav resource.
+<source>:5:13: error: buffer load/store only works on Raw/Typed/StructuredBuffer.
 ```
 
 #### Example 9
@@ -411,6 +414,12 @@ void main(uint3 ID : SV_GroupID) {
 ```
 https://godbolt.org/z/8fcTfz6d8
 
+Unlike resource arrays in non-static global struct instances, resource arrays
+inside static or local struct variables may be dynamically indexable. This is
+possible when all resource elements are initialized from a range of the same
+dynamically indexable global resource array, as shown in the example above where
+`m.Bufs` is initialized from `GlobalBufs`.
+
 ### Local variables and Function Parameters
 
 Structs with resources can also be declared as local variables or used as function parameters.
@@ -431,12 +440,11 @@ void foo(N paramN, uint i) {
 [numthreads(4,4,4)]
 void main(uint3 ID : SV_GroupID) {
   N localN = n;
-  n.Buf[10] = 0.13;
-
-  foo(n, ID.x);
+  localN.Buf[10] = 0.13;
+  foo(localN, ID.x);
 }
 ```
-https://godbolt.org/z/1TYxM45qz
+https://godbolt.org/z/eKq3jzM5r
 
 ### Initialization list
 
@@ -462,7 +470,31 @@ void main(uint3 ID : SV_GroupID) {
   p1.Bufs[ID.y][0] = p2.Bufs[ID.x][0];
 }
 ```
-https://godbolt.org/z/1TYxM45qz
+https://godbolt.org/z/zzKe8bjff
+
+### Assignments
+
+Assignment to resource or resource array members of a global non-static structs
+is not allowed.
+
+```c++
+struct P {
+  RWBuffer<float> Buf;
+};
+
+P p : register(u2);
+
+RWBuffer<float> GlobalBuf;
+
+[numthreads(4,4,4)]
+void main(uint3 ID : SV_GroupID) {
+  p.Buf = GlobalBuf; // error
+  p.Buf[0] = 10;
+}
+```
+https://godbolt.org/z/f9dd4GYWq
+
+DXC reports an error `cast<X>() argument of incompatible type!`.
 
 ### Summary
 
