@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Resources in Structures"
+title: "[0038] - Resources in Structures"
 params:
   status: Design In Progress
   authors:
