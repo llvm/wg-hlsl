@@ -49,9 +49,9 @@ This is the place that needs extensive testing. In the example below, a compiler
 may reorder the code (e.g SimplifyCFG pass) so that statements are moved
 inside the branches, producing incorrect results.
 
-| Before Optmization | After Optimization |
-| --- | --- |
-| <pre><code>if (non_uniform_cond) {<br>   doA(); <br>   Out[...] = waveOperations();<br>} else {<br>   doB(); <br>   Out[...] = waveOperations(); <br>}<br></code></pre> |  <pre><code>if (non_uniform_cond) {<br>   doA(); <br>} else {<br>   doB(); <br>} <br> // Invalid transformation. <br> Out[...] = waveOperations(); </code></pre> |
+| Before Optimization | After Optimization |
+| :--- | :--- |
+| <pre>if (non_uniform_cond) {<br>  doA();<br>  Out[...] = waveOperations();<br>} else {<br>  doB();<br>  Out[...] = waveOperations();<br>}</pre> | <pre>if (non_uniform_cond) {<br>  doA();<br>} else {<br>  doB();<br>}<br>// Invalid transformation.<br>Out[...] = waveOperations();</pre> |
 
 This kind of optimization should be prevented. In DXC, spirv-opt is used to
 optimize when targeting Vulkan. It is aware of HLSL's
@@ -68,7 +68,7 @@ Testing for correct convergence behavior is critical for reliability. Currently,
 only a few unit tests exist. We need to extend this coverage to include complex
 and highly divergent cases.
 
-## Proposed solution
+## Proposed Solution
 
 We propose implementing a comprehensive test suite in the offload-test-suite
 repository that mirrors the logic of the Vulkan Conformance Testing Suite
@@ -93,7 +93,7 @@ We will generate a set of yaml test files for the offload-test-suite. For each
 shader and wave size (4, 8, 16, 32), a test file will be generated that
 executes the shader and verifies that the results match the CPU simulation.
 
-## Detailed design
+## Detailed Design
 
 ### Test Generation
 
@@ -113,7 +113,7 @@ This is an [example](https://github.com/llvm/offload-test-suite/pull/685) of the
 test generator and the generated
 [tests](https://github.com/llvm/offload-test-suite/pull/620).
 
-#### 1. Random shaders
+#### 1. Random Shaders
 
 Random control flow will be produced by a fixed-seed RNG and hard-coded
 probabilities. For example, they will determine whether the next instruction
@@ -127,7 +127,7 @@ simulation and later producing HLSL shaders with correct syntax. Each shader
 program is represented as a stack of these IR instructions. e.g `OP_IF`,
 `OP_BALLOT`, `OP_DO_WHILE`, etc.
 
-#### 2. Expected results
+#### 2. Expected Results
 
 During the CPU simulation, these instructions are popped from the stack, and for
 each instruction, active thread masks are calculated and stored in a separate
@@ -144,7 +144,7 @@ the size of the output buffer is unknown at the start. Therefore, it will also
 be calculated in a separate "dry-run" pass, before running the CPU simulation.
 It will simply walk-through the instructions and count the number of writes.
 
-#### 3. HLSL translation.
+#### 3. HLSL Translation.
 
 Once the expected results are calculated, the intermediate representations are
 lowered to HLSL. Similar to the CPU simulation, each instruction is popped from
@@ -152,7 +152,7 @@ the stack and translated to HLSL. (e.g. `OP_ELECT` --> `WaveIsFirstLane()`
 `OP_BALLOT` --> `WaveActiveBallot()`, etc.). This is the part that will be
 different from Vulkan-CTS, which produces GLSL shaders.
 
-#### 4. Final test file
+#### 4. Final Test File
 
 At this point, the expected results and shaders are ready to be formatted for
 offload-test-suite.
