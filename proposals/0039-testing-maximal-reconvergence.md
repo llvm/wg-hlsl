@@ -178,7 +178,8 @@ pipeline.
 
 We will implement a cmake target `check-hlsl-{platform}-reconvergence`, similar
 to the existing targets. Running this will generate the physical tests and run
-them.
+them. We may also implement a command line option for easily tuning the 
+parameters (e.g. `--seed=123`).
 
 #### Github Workflow
 
