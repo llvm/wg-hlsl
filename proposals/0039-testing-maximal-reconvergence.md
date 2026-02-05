@@ -90,7 +90,7 @@ will ensure that we can get the expected results on any platform.
 ### Verification
 
 We will generate a set of yaml test files for the offload-test-suite. For each
-shader and wave size (4, 8, 16, 32), a test file will be generated that
+shader and wave size (4, 8, 16, 32, 64), a test file will be generated that
 executes the shader and verifies that the results match the CPU simulation.
 
 ## Detailed Design
@@ -163,8 +163,8 @@ at the test generation step, since it will require setting up a Graphics
 pipeline to query the value.
 
 Therefore, we will prepare the tests in all possible wave sizes (every
-power-of-2 between 4 and 32, i.e. 4, 8, 16, 32) and have the test pipeline skip
-those that do not match the wave size at test runtime. We will implement
+power-of-2 between 4 and 64, i.e. 4, 8, 16, 32, 64) and have the test pipeline 
+skip those that do not match the wave size at test runtime. We will implement
 `WaveSizeX` directive and append this condition in the test files. As an
 example, a GPU with wave size 32 will have `# UNSUPPORTED: !WaveSize32`.
 
