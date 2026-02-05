@@ -37,7 +37,7 @@ corresponds to the programmer’s view of flow control</i>".
 When lowering HLSL to SPIR-V, we must make sure the output matches this
 expectation. To do so, there are 2 areas that need to be looked at:
 
-#### 1. Adding `SPV_KHR_maximal_reconvergence` extension and `MaximallyReconvergesKHR` capability.
+#### 1. Adding `SPV_KHR_maximal_reconvergence` extension and `MaximallyReconvergesKHR` capability. These are Vulkan-specific.
 
 This is an indicator for the driver compilers to respect the above requirement
 downstream. The frontend compilers will append these instructions if the
@@ -45,18 +45,18 @@ downstream. The frontend compilers will append these instructions if the
 
 #### 2. Ensuring the frontend compilers themselves do not alter the state during optimizations.
 
-This is the place that needs extensive testing. In the below example, a compiler
-may reorder the code (e.g loop unswitch pass) so that statements are moved
+This is the place that needs extensive testing. In the example below, a compiler
+may reorder the code (e.g SimplifyCFG pass) so that statements are moved
 inside the branches, producing incorrect results.
 
 | Before Optmization | After Optimization |
 | --- | --- |
-| <pre><code>if (non_uniform_cond) {<br>   doA(); <br>} else {<br>   doB(); <br>}<br>// Expected converged. <br>Out[...] = waveOperations(); </code></pre>| <pre><code>if (non_uniform_cond) {<br>   doA(); <br>   // Invalid transformation <br>   Out[...] = waveOperations();<br>} else {<br>   doB(); <br>   // Invalid transformation <br>   Out[...] = waveOperations(); <br>}<br></code></pre> |
+| <pre><code>if (non_uniform_cond) {<br>   doA(); <br>   Out[...] = waveOperations();<br>} else {<br>   doB(); <br>   Out[...] = waveOperations(); <br>}<br></code></pre> |  <pre><code>if (non_uniform_cond) {<br>   doA(); <br>} else {<br>   doB(); <br>} <br> // Invalid transformation. <br> Out[...] = waveOperations(); </code></pre> |
 
-This kind of optimization should be prevented, and in DXC, SPIR-V is used for
-optimizing, so the instructions such as  `OpSelectionMerge` and `OpLoopMerge`
-explicitly indicate a merge point and help avoid those control flow
-modifications.
+This kind of optimization should be prevented. In DXC, spirv-opt is used to
+optimize when targeting Vulkan. It is aware of HLSL's
+Single-Program-Multiple-Data (SPMD) programming model, since spir-v has a
+similar programing model.
 
 In Clang, we leverage [control convergence
 tokens](https://llvm.org/docs/ConvergentOperations.html#overview) within the IR,
@@ -77,108 +77,133 @@ of if/switch statements, loops, and nesting) and verifying the results.
 
 ### Shader Generation
 
-Approximately _N_ number of  HLSL shaders will be generated. These shaders use
-fixed input buffers and write results to output buffers, where randomness is
-derived from branching logic.
+A large number of shader with random control flow will be generated. These
+shaders use fixed input buffers and write results to output buffers to verify
+which threads are active at each point in the shader.
 
 ### CPU Simulation
 
-A CPU simulation will track active thread indices and calculate the expected
-result of wave operations based on specific subgroup sizes.
-
+The expected results will be calculated by simulating the execution of the
+shader on the CPU using characteristics of the machine, like wave size. This
+will ensure that we can get the expected results on any platform.
 
 ### Verification
 
 We will generate a set of yaml test files for the offload-test-suite. For each
-shader and subgroup size (4, 8, 16, 32), a test file will be generated that
+shader and wave size (4, 8, 16, 32), a test file will be generated that
 executes the shader and verifies that the results match the CPU simulation.
 
 ## Detailed design
 
-[This](https://github.com/llvm/offload-test-suite/pull/685) is an example of the
-proposed design.
+### Test Generation
 
-### Test Generation and Simulation
+Logic from [Vulkan
+CTS](https://github.com/KhronosGroup/VK-GL-CTS/blob/main/external/vulkancts/modules/vulkan/reconvergence/vktReconvergenceTests.cpp)
+will be ported to produce HLSL.
 
-Since each GPU has different subgroup sizes, each machine will have a version
-for every power-of-2 wave size between 4 and 32 (e.g., 4, 8, 16, 32). The tests
-that do not match the subgroup size of the running GPU will be skipped (e.g.
-through `# UNSUPPORTED: !SubgroupSizeX` directive).
+At a high level, each test generation goes through the following steps:
 
-### Translation
+1. Generate instructions with a random control flow.
+2. Calculate the expected results (i.e. CPU simulation).
+3. Produce the HLSL shader.
+4. Format the shader and expected results for offload-test-suite.
 
-Logic from [Vulkan CTS GLSL
-generation](https://github.com/KhronosGroup/VK-GL-CTS/blob/main/external/vulkancts/modules/vulkan/reconvergence/vktReconvergenceTests.cpp)
-will be ported to produce HLSL. This includes translating intrinsics such as
-`subgroupElect()` to `WaveIsFirstLane()` and `subgroupBallot()` to
-`WaveActiveBallot()`, etc.
 
-### Execution Pipeline
+This is an [example](https://github.com/llvm/offload-test-suite/pull/685) of the
+test generator and the generated
+[tests](https://github.com/llvm/offload-test-suite/pull/620).
+
+#### 1. Random shaders
+
+Random control flow will be produced by a fixed-seed RNG and hard-coded
+probabilities. For example, they will determine whether the next instruction
+will be a loop, if, switch, etc, and with what conditions. For the random
+number generator, we will port one from the dEQP library, which is operating
+system independent.
+
+These random instructions are represented in a custom intermediate
+representation, to simplify calculating the expected results during the CPU
+simulation and later producing HLSL shaders with correct syntax. Each shader
+program is represented as a stack of these IR instructions. e.g `OP_IF`,
+`OP_BALLOT`, `OP_DO_WHILE`, etc.
+
+#### 2. Expected results
+
+During the CPU simulation, these instructions are popped from the stack, and for
+each instruction, active thread masks are calculated and stored in a separate
+stack. This is what will be used to calculate the expected results of operations
+when any write happens.
+
+There are two types of write operations, storing 1) indices of active threads,
+and 2) a constant value. These values will be kept in a separate vector, and
+this is the output buffer we will use for the test verification. They will help
+determine whether an invalid compiler transformation happened.
+
+Because the program has a random control flow with a random number of writes,
+the size of the output buffer is unknown at the start. Therefore, it will also
+be calculated in a separate "dry-run" pass, before running the CPU simulation.
+It will simply walk-through the instructions and count the number of writes.
+
+#### 3. HLSL translation.
+
+Once the expected results are calculated, the intermediate representations are
+lowered to HLSL. Similar to the CPU simulation, each instruction is popped from
+the stack and translated to HLSL. (e.g. `OP_ELECT` --> `WaveIsFirstLane()` 
+`OP_BALLOT` --> `WaveActiveBallot()`, etc.). This is the part that will be
+different from Vulkan-CTS, which produces GLSL shaders.
+
+#### 4. Final test file
+
+At this point, the expected results and shaders are ready to be formatted for
+offload-test-suite.
+
+One key thing to note is that each GPU has different wave sizes, and different
+wave sizes need different expected results. It's not easy to know the wave size
+at the test generation step, since it will require setting up a Graphics
+pipeline to query the value.
+
+Therefore, we will prepare the tests in all possible wave sizes (every
+power-of-2 between 4 and 32, i.e. 4, 8, 16, 32) and have the test pipeline skip
+those that do not match the wave size at test runtime. We will implement
+`WaveSizeX` directive and append this condition in the test files. As an
+example, a GPU with wave size 32 will have `# UNSUPPORTED: !WaveSize32`.
+
+### Workflow Trigger
 
 Only the code for the **random test generator** will reside in the
 offload-test-suite repository. The shaders will be generated as part of the
 pipeline. 
 
-New steps will be added to the existing workflow at the end.
+#### CMake Target 
+
+We will implement a cmake target `check-hlsl-{platform}-reconvergence`, similar
+to the existing targets. Running this will generate the physical tests and run
+them.
+
+#### Github Workflow
+
+New steps will be added to the existing workflow at the end:
 
 - Build DXC
 - Build LLVM
 - Dump GPU Info
 - Run HLSL Tests
-- **Generate Random Reconvergence Tests**
 - **Run Reconvergence Tests**
 
 This way, the execution of existing HLSL tests and the reconvergence tests are
 separated.
 
-```yaml
-# .github/workflows/build-and-test-callable.yaml
-
-- name: Generate maximal Reconvergence Tests
-  continue-on-error: true
-  if: always()
-  run: |
-      rm -rf OffloadTest/tools/TestGenerator/reconvergence/tests/*
-      cd OffloadTest/tools/TestGenerator/reconvergence
-      cmake -G Ninja -B build/
-      ninja -C build
-- name: Run Maximal Reconvergence Test
-  continue-on-error: true
-  if: always()
-  env:
-      OFFLOADTEST_SUPPRESS_DIFF: 1
-  run: |
-      cd llvm-project
-      cd build
-      ./bin/llvm-lit -v --xunit-xml-output=testresults-max-reconv.xunit.xml ${{ github.workspace }}/OffloadTest/tools/TestGenerator/reconvergence/tests
-      
-```
-
 We don't plan to store the physical test files in the repo. Developers can still
-run the tests locally by running the test generator to output the tests in their
-machine.
+save, run, and inspect the tests locally by running the target in their machine.
 
 ### Reporting
 
-We may implment an environment variable `OFFLOADTEST_SUPPRESS_DIFF` to filter
-out some logs, since for example, diffs will be massive for a failing test.
+Since the output buffer is large, logs can be large if the results don't match.
+We will segment the output buffer and verification into multiple buffers and
+checks or implment an environment variable to filter out some logs.
 
-```cpp
-// lib/Support/Check.cpp
-
-if (!std::getenv("OFFLOADTEST_SUPPRESS_DIFF")) {
-  OS << "Expected:\n";
-  llvm::yaml::Output YAMLOS(OS);
-  YAMLOS << *R.ExpectedPtr;
-  OS << "Got:\n";
-  YAMLOS << *R.ActualPtr;
-  ...
-}
-```
-
-The results of the test will be inspectable separately from the results of the
-existing HLSL tests. We may display the result badge of the reconvergence tests
-in a separate table in README.md.
+If any test fails, it will fail the workflow, so it's noticeable in the badge.
+`XFail` instructions will be added appropriately to suppress failures.
 
 ### Latency
 
@@ -202,8 +227,7 @@ the frontend compilers.
 
 ### Sanity Check
 
-A small subset of pre-generated tests will be included in the repository to
-allow developers to sanity-check without triggering the full pipeline.
+A small subset of pre-generated tests may be included in the repository for sanity-check.
 
 ## Alternatives considered (Optional)
 
@@ -219,9 +243,9 @@ to change the parameters of the generator (e.g. seed, nesting level).
 ### Option 2: Generation and execution in a separate test pipeline
 
 This approach mimics Vulkan-CTS by doing the shader generation, CPU simulation,
-and GPU execution in its own test pipeline, without storing any physical copies
-at any point in time. However, this requires implementing the entire pipeline
-from scratch for multiple backends, including DirectX and Metal.
+and GPU execution in its own custom test pipeline, without storing any physical
+copies at any point in time. However, this requires implementing the entire
+pipeline from scratch for multiple backends, including DirectX and Metal.
 
 ## Acknowledgments
 
