@@ -64,10 +64,10 @@ llvm-project
    └─ ...
 ```
 
-This grouping will be applied retroactively to existing implementation tickets
-so that there is room to add new issues under the parent. Linking completed
+This grouping will be applied retroactively to all implementation tickets
+(including closed ones) to make room for new issues under the parent. Linking
 offload test issues to their corresponding implementation issues will only apply
-to new work.
+to open and newly created test issues.
 
 
 ## Matrix Implementation Tickets
