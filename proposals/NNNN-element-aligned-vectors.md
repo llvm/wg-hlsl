@@ -62,13 +62,24 @@ when emitting SPIR-V.
   `VectorsAreElementAligned`.
 - Update the DirectX and SPIR-V targets to specify both of these.
 
+For DirectX, the new Data Layout would be as follows:
+```
+e-m:e-ve-p:32:32-i1:32-i8:8-i16:16-i32:32-i64:64-f16:16-f32:32-f64:64-n8:16:32:64"
+```
+
+For SPIR-V, we should be able to simplify the existing Data Layout strings so
+that the logical SPIR-V triple (for example), is just:
+```
+e-ve-i64:64-n8:16:32:64-G10
+```
+
 [Data Layout string]: https://llvm.org/docs/LangRef.html#langref-datalayout
 
 ## Alternatives considered
 
 ### Alternatives for how to specify element-alignment in Data Layout
 
-There are a details about hwo we could specify element-alignment in the Data
+There are a details about how we could specify element-alignment in the Data
 Layout that we do not intend to pursue at this time:
 
 - Alternative spellings to "ve"
