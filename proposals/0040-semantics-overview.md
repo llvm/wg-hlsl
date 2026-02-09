@@ -1,5 +1,5 @@
 ---
-title: "NNNN - HLSL Semantics Overview"
+title: "[0040] - HLSL Semantics Overview"
 params:
   authors:
     - tex3d: Tex Riddell
