@@ -17,7 +17,8 @@ params:
 
 Vectors in DirectX and SPIR-V are generally element-aligned, but this isn't
 representable in LLVM's datalayout, and even if it were Clang makes assumptions
-that vectors are naturally aligned without consulting the target at all.
+that vectors are aligned to the vector size or the next power of two without
+consulting the target at all.
 
 ## Motivation
 
@@ -41,17 +42,19 @@ TargetInfo.
 
 We can then update the DirectX and SPIR-V targets to use this specifier. 
 
-For DirectX, the alignment rules for vector types are not explicitly
-documented. However, element-alignment by default matches DXC behaviour and
-driver expectations.
+For DirectX, [vector and matrix types are aligned by their component type's
+alignment][Buffer Packing]. Using an element-aligned default for vectors
+matches the DXC behaviour and driver expectations.
 
-For SPIR-V, element-alignment is [specified in Vulkan] for both "Standard
-Uniform Buffer Layout" and "Standard Storage Buffer Layout". Additionally,
-element-alignment matches all four of DXC's options for [memory layout rules]
-when emitting SPIR-V.
+[Buffer Packing]: https://github.com/microsoft/DirectXShaderCompiler/wiki/Buffer-Packing
 
-[specified in Vulkan]: https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#interfaces-resources-layout
-[memory layout rules]: https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#memory-layout-rules
+For SPIR-V, [element-alignment is specified in Vulkan][Vulkan Layout] for both
+"Standard Uniform Buffer Layout" and "Standard Storage Buffer Layout".
+Additionally, element-alignment matches all four of [DXC's options for memory
+layout rules][Memory Layout Rules] when emitting SPIR-V.
+
+[Vulkan Layout]: https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#interfaces-resources-layout
+[Memory Layout Rules]: https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#memory-layout-rules
 
 ## Detailed design
 
