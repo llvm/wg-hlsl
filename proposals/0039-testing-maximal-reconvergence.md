@@ -117,9 +117,10 @@ test generator and the generated
 
 Random control flow will be produced by a fixed-seed RNG and hard-coded
 probabilities. For example, they will determine whether the next instruction
-will be a loop, if, switch, etc, and with what conditions. For the random
-number generator, we will port one from the dEQP library, which is operating
-system independent.
+will be a loop, if, switch, etc, and with what conditions. For the random number
+generator, we will port one from
+[llvm::RandomNumberGenerator](https://github.com/llvm/llvm-project/blob/8e335d533682b46289058958456c521df0c8fe32/llvm/include/llvm/Support/RandomNumberGenerator.h#L33C1-L38C42),
+which is deterministic and operating system independent.
 
 These random instructions are represented in a custom intermediate
 representation, to simplify calculating the expected results during the CPU
