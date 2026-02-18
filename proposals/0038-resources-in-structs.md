@@ -437,7 +437,7 @@ struct A {
   RWBuffer<float> Buf;
 };
 
-struct B : A {
+struct B {
   A a;
 };
 
@@ -459,7 +459,7 @@ struct C : A {
 C c1;
 ```
 
-The global variable for the inherited resource in `c1` will be named `c1::A.Buf`.
+The global variable for the inherited resource in `c1` will be named `c1.A::Buf`.
 
 > **Note:** DXC uses `.` as the delimiter for both base classes and fields,
 > which can produce ambiguous names when a field and base class share the same
