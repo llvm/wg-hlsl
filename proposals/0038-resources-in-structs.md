@@ -531,7 +531,254 @@ binding order, to make the feature more robust and user-friendly.
 
 ## Proposed solution
 
+For each resource or resource array that is a member of a struct declared at
+global scope or inside a `cbuffer`, an implicit global variable of the resource
+type will be created and associated with the struct instance. All accesses to
+the resource member will be redirected to the associated global variable during
+Clang CodeGen. 
+
 ## Detailed design
+
+### Single Resources
+
+For each resource member of a struct declared at global scope or inside a
+`cbuffer`, Clang will create an implicit global variable of the same resource
+type. The variable name will be derived from the struct instance name and the
+member name, following the naming convention used by DXC (see
+[Example 1](#example-1)).
+
+For example, given the following struct definitions and instances:
+```c++
+struct A {
+  RWBuffer<float> Buf;
+};
+
+struct B {
+  A a;
+};
+
+A a1;
+B b1 : register(u2);
+```
+
+For the resource inside `a1`, Clang will create a global variable of type
+`RWBuffer<float>` named `a1.Buf`. For the nested resource in `b1`, accessed via
+the member `a`, the global variable will be named `b1.a.Buf`.
+
+When a resource is inherited from a base class, the variable name includes the
+base class name as a `::` delimited component. For example:
+
+```c++
+struct C : A {
+};
+
+C c1;
+```
+
+The global variable for the inherited resource in `c1` will be named `c1.A::Buf`.
+
+> **Note:** DXC uses `.` as the delimiter for both base classes and fields,
+> which can produce ambiguous names when a field and base class share the same
+> name. This ambiguity causes DXC to crash:
+> https://godbolt.org/z/5EM418s6T.
+
+### Associated Resource Decl Attribute
+
+To enable efficient lookup of the implicit global variables associated with a
+struct instance, a new `HLSLAssociatedResourceDeclAttr` attribute will be
+introduced. Each attribute instance holds a pointer to one of the global
+resource variables created for the struct. The attribute is attached to the
+struct instance declaration, with one attribute per embedded resource or
+resource array.
+
+### Resources Arrays
+
+Resource array members of a struct are handled similarly: for each resource
+array member, Clang will create a global variable with the same array type.
+Unlike DXC, which treats each array element as a separate resource, Clang will
+represent the entire array as a single global variable. This approach naturally
+supports dynamic indexing of the resource array.
+
+For example:
+
+```c++
+struct D {
+  RWBuffer<float> Bufs[10];
+};
+
+D d1 : register(u5);
+```
+
+Clang creates a global variable named `d1.Bufs` of type `RWBuffer<float>[10]`,
+with a binding range of `10`.
+
+```
+; Resource Bindings:
+;
+; Name                                 Type  Format         Dim      ID      HLSL Bind  Count
+; ------------------------------ ---------- ------- ----------- ------- -------------- ------
+; d1.Bufs                               UAV     f32         buf      U0             u5     10
+```
+
+### Resources inside Struct Arrays
+
+When a resource (or resource array) is a member of a struct type used in an
+array, Clang will create a separate global variable for each array element. The
+variable names will be constructed from the struct array instance name, the
+array index, and the resource member name, matching DXC's behavior in [Example
+4](#example-4). Since the array index is encoded in the resource name, dynamic
+indexing of the struct array will not be supported, consistent with DXC.
+
+For example:
+```c++
+struct A {
+  RWBuffer<float> Buf;
+};
+
+A array[3];
+```
+
+Clang will create three global variables: `array.0.Buf`, `array.1.Buf`, and
+`array.2.Buf`.
+
+Indexing the array with a non-constant index produces an error:
+`Index for resource array inside cbuffer must be a literal expression.`
+
+### Resource Binding
+
+Each implicit global resource variable will have its own binding attribute
+specifying its register binding and whether the binding is explicit or implicit.
+
+When a struct contains multiple resource or resource array members, each one
+receives a portion of the binding based on its register class and required
+range.
+
+For example:
+
+```c++
+struct A {
+  RWBuffer<float> Buf;
+};
+
+struct E {
+  A a;
+  RWBuffer<int> array[5];
+  StructuredBuffer<uint> SB;
+};
+
+E e : register(u2) : register (t5);
+```
+
+Clang will create the following global resource declarations:
+- `e.a.Buf` of type `RWBuffer<float>` with binding `u2` and range `1`
+- `e.array` of type `RWBuffer<int>[5]` with binding `u3` and range `5`
+- `e.SB` of type `StructuredBuffer<uint>` with binding `t5`
+
+For implicit binding of resources in structs, Clang will apply the same rules as
+for resources declared at global scope:
+
+- Implicit bindings are assigned in declaration order of the resources or
+  resource arrays.
+- Resource arrays are assigned a contiguous range of register slots matching the
+  array size.
+
+This differs from DXC's behavior, which mostly assigns bindings in the order
+resources are first used in the shader, though not consistently, making it
+unpredictable.
+
+### CodeGen
+
+During Clang CodeGen, any expression that accesses a resource or resource array
+member of a global struct instance will be translated to an access of the
+corresponding implicit global variable.
+
+#### Single Resource Access
+
+When CodeGen encounters a `MemberExpr` of a resource type, it will traverse the
+AST to locate the parent struct declaration, building the expected global
+variable name along the way. If the parent is a non-static global struct
+instance, CodeGen will search its `HLSLAssociatedResourceDeclAttr` attributes to
+find the matching global variable, and then generate IR code to access it.
+
+For example:
+```c++
+struct A {
+  RWBuffer<float> Buf;
+};
+
+A a1 : register(u5);
+
+[numthreads(4,1,1)]
+void main() {
+  a1.Buf[0] = 13.4;
+}
+```
+
+The `a1.Buf` expression will be translated as access to `@a1.Buf` global
+variable, which has been initialized with resource handle from binding at the
+shader entry point.
+
+#### Resource Array Element Access
+
+Similarly to a single resource access, when Clang CodeGen sees an
+`ArraySubscriptExpr` of a resource or resource array type that is linked to a
+`MemberExpr`, it will walk the AST to find its parent struct declaration and the
+associated global resource array varible. Then it will generate IR code to
+access the array element (or array subset) the same way global resource arrays
+are handled.
+
+For example:
+```c++
+struct B {
+  RWBuffer<float> Bufs[4];
+};
+
+B b1 : register(u2);
+  
+[numthreads(4,4,4)]
+void main(uint3 ID : SV_GroupThreadID) {
+  b1.Bufs[ID.x][ID.y] = 0;
+}
+```
+
+The expression `b1.Bufs[ID.x]` is translated to a resource handle initialized
+from the binding at index `ID.x` within the range of 4 registers starting at
+`u2`. The handle is initialized when the array element is accessed, matching
+the behavior of global resource arrays.
+
+#### Resource Array Assignment
+
+When an entire resource array is assigned or passed as a function argument,
+CodeGen creates a local copy of the array with each element initialized to a
+handle from its binding. This matches how global resource array assignments are
+handled.
+
+#### Copy of struct with resources
+
+When a struct with resources is assigned to a local variable or passed as a
+function parameter, CodeGen creates a local copy. Resource members are
+initialized with handle copies from the corresponding global variables, and
+resource arrays become local copies with each element initialized to a handle
+from its binding.
+
+Note that structs declared at global scope reside in constant address space `2`
+and use `cbuffer` struct layout. Copying these structs requires HLSL-specific
+handling (see
+[llvm/llvm-project#153055](https://github.com/llvm/llvm-project/issues/153055)),
+and support for copying embedded resources and resource arrays must be built on
+top of that.
+
+#### Binding Range Validation
+
+Clang will detect out-of-range bindings during semantic analysis and report
+clear error messages pointing to the resource declaration. This improves upon
+DXC's range validation errors, which are often unclear and sometimes missing
+entirely.
+
+#### Specifying `space` for resources in structs
+
+Clang will support specifying register `space` for struct instances containing
+resources, addressing a limitation in DXC (see [Example 10](#example-10)).
 
 ## Alternatives considered (Optional)
 
