@@ -55,7 +55,7 @@ inside the branches, producing incorrect results.
 
 This kind of optimization should be prevented. In DXC, spirv-opt is used to
 optimize when targeting Vulkan. It is aware of HLSL's
-Single-Program-Multiple-Data (SPMD) programming model, since spir-v has a
+Single-Program-Multiple-Data (SPMD) programming model, since SPIR-V has a
 similar programing model.
 
 In Clang, we leverage [control convergence
@@ -81,7 +81,7 @@ A large number of shader with random control flow will be generated. These
 shaders use fixed input buffers and write results to output buffers to verify
 which threads are active at each point in the shader.
 
-### CPU Simulation
+### Expected Results
 
 The expected results will be calculated by simulating the execution of the
 shader on the CPU using characteristics of the machine, like wave size. This
@@ -91,7 +91,7 @@ will ensure that we can get the expected results on any platform.
 
 We will generate a set of yaml test files for the offload-test-suite. For each
 shader and wave size (4, 8, 16, 32), a test file will be generated that
-executes the shader and verifies that the results match the CPU simulation.
+executes the shader and verifies that the results match the expected results.
 
 ## Detailed design
 
@@ -167,7 +167,8 @@ Therefore, we will prepare the tests in all possible wave sizes (every
 power-of-2 between 4 and 32, i.e. 4, 8, 16, 32) and have the test pipeline skip
 those that do not match the wave size at test runtime. We will implement
 `WaveSizeX` directive and append this condition in the test files. As an
-example, a GPU with wave size 32 will have `# UNSUPPORTED: !WaveSize32`.
+example, a test file will contain `# UNSUPPORTED: !WaveSize32`, and will not 
+on platforms where the wave size is not 32.
 
 ### Workflow Trigger
 
