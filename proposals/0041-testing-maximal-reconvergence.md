@@ -1,12 +1,12 @@
 ---
-title: "0039 - Testing Maximal Reconvergence"
-- draft: true
+title: "0041 - Testing Maximal Reconvergence"
 params:
   authors:
     - luciechoi: Lucie Choi
   sponsors:
     - s-perron: Steven Perron
     - Keenuts: Nathan Gauër
+    - bogner: Justin Bogner
   status: Under Consideration
 ---
 
@@ -49,9 +49,27 @@ This is the place that needs extensive testing. In the example below, a compiler
 may reorder the code (e.g SimplifyCFG pass) so that statements are moved
 inside the branches, producing incorrect results.
 
-| Before Optmization | After Optimization |
-| --- | --- |
-| <pre><code>if (non_uniform_cond) {<br>   doA(); <br>   Out[...] = waveOperations();<br>} else {<br>   doB(); <br>   Out[...] = waveOperations(); <br>}<br></code></pre> |  <pre><code>if (non_uniform_cond) {<br>   doA(); <br>} else {<br>   doB(); <br>} <br> // Invalid transformation. <br> Out[...] = waveOperations(); </code></pre> |
+##### Before Optimization
+```cpp
+if (non_uniform_cond) {
+   doA(); 
+   Out[...] = waveOperations();
+} else {
+   doB(); 
+   Out[...] = waveOperations(); 
+}
+```
+
+##### After Optimization
+```cpp
+if (non_uniform_cond) {
+   doA(); 
+} else {
+   doB(); 
+} 
+// Invalid transformation. 
+Out[...] = waveOperations(); 
+```
 
 This kind of optimization should be prevented. In DXC, spirv-opt is used to
 optimize when targeting Vulkan. It is aware of HLSL's
@@ -113,13 +131,13 @@ This is an [example](https://github.com/llvm/offload-test-suite/pull/685) of the
 test generator and the generated
 [tests](https://github.com/llvm/offload-test-suite/pull/620).
 
-#### 1. Random shaders
+#### 1. (Pseudo) Random shaders
 
 Random control flow will be produced by a fixed-seed RNG and hard-coded
 probabilities. For example, they will determine whether the next instruction
-will be a loop, if, switch, etc, and with what conditions. For the random number
-generator, we will port one from
-[llvm::RandomNumberGenerator](https://github.com/llvm/llvm-project/blob/8e335d533682b46289058958456c521df0c8fe32/llvm/include/llvm/Support/RandomNumberGenerator.h#L33C1-L38C42),
+will be a loop, if, switch, etc, and with what conditions. For the pseudo-random
+number generator, we will port one from
+[llvm::RandomNumberGenerator](https://github.com/llvm/llvm-project/blob/8e335d533682b46289058958456c521df0c8fe32/llvm/include/llvm/Support/RandomNumberGenerator.h#L33C1-L38C42), 
 which is deterministic and operating system independent.
 
 These random instructions are represented in a custom intermediate
@@ -178,9 +196,10 @@ pipeline.
 
 #### CMake Target 
 
-We will implement a cmake target `check-hlsl-{platform}-reconvergence`, similar
-to the existing targets. Running this will generate the physical tests and run
-them.
+We will implement cmake targets `check-hlsl-{platform}-reconvergence`, similar
+to the existing targets. Running this command will generate the physical tests
+and execute them. We will separate cmake targets for writing the tests so that
+the tests will not be regenerated every time the tests are run.
 
 #### Github Workflow
 
@@ -193,7 +212,7 @@ New steps will be added to the existing workflow at the end:
 - **Run Reconvergence Tests**
 
 This way, the execution of existing HLSL tests and the reconvergence tests are
-separated.
+separated, and it will be easiser to report and investigate issues.
 
 We don't plan to store the physical test files in the repo. Developers can still
 save, run, and inspect the tests locally by running the target in their machine.
@@ -205,7 +224,28 @@ We will segment the output buffer and verification into multiple buffers and
 checks or implment an environment variable to filter out some logs.
 
 If any test fails, it will fail the workflow, so it's noticeable in the badge.
-`XFail` instructions will be added appropriately to suppress failures.
+
+`XFail` instructions will be added appropriately to suppress failures. Since it
+is undesirable to change the code of the C++ random test generator every time
+failure happens, the test generator may read a structured text file that
+contains a list of failing tests and their environments. This way, only this
+single file will be updated upon any changes in the compilers, and the algorithm
+for generating the tests remains intact.
+
+*reconvergence-failing-tests.txt*
+```yaml
+reconvergence-test_2_16_7_13_3.test
+# Some comment
+# XFAIL: Clang && Vulkan
+
+# Some comment
+# XFAIL: ...
+
+reconvergence-test_5_32_7_13_1.test
+# Some comment
+# XFAIL: ...
+
+```
 
 ### Latency
 
