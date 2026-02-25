@@ -239,6 +239,41 @@ public:
 }
 ```
 
+#### Vector Specialization and Gather Return Types
+
+The `Gather` methods (and variants like `GatherRed`, `GatherCmp`, etc.) are
+unique because their return type is always a 4-element vector of the texture's
+underlying scalar element type, regardless of whether the texture's template
+parameter `T` is a scalar or a vector.
+
+To correctly implement the return type for these methods, we add a partial
+specialization of the texture type for vector types:
+
+```cpp
+template <typename ElementType, unsigned int Size>
+class Texture2D<vector<ElementType, Size>> {
+  // Same as the primary template, but Gather methods return vec<ElementType, 4>
+};
+```
+
+During the design phase, we evaluated alternatives for defining the `Gather`
+return type, but they were not viable:
+
+1. **Using `auto` return type:** We considered using `auto` for the return type
+   of the `Gather` functions and letting the compiler deduce it. However, `auto`
+   return type deduction is not a feature currently supported in HLSL, and we
+   did not want to partially enable it just for these methods.
+2. **Standalone class with a typedef and partial specialization:** We attempted
+   to create a standalone helper class to deduce the return type via a
+   `typedef`, which the `Texture2D` class could then use. However, this caused
+   Clang to assert when the template was instantiated in compiler-generated code
+   (due to an `Invalid SourceLocation`). Fixing this would require an unknown
+   and potentially pervasive change to how Clang handles source locations in
+   implicitly generated template code.
+
+Therefore, the partial specialization of the resource record type is the chosen
+approach to ensure the correct return type for `Gather` operations.
+
 #### Member functions
 
 The following sections describe the member functions and the texture types that
@@ -509,20 +544,20 @@ The LLVM intrinsics will be overloaded on the return type and the types of their
 arguments (e.g., coordinates, offsets, derivatives). This avoids the need for
 distinct intrinsic names for each texture dimension or type.
 
-| HLSL Builtin                                      | LLVM Intrinsic                              |
-| :------------------------------------------------ | :------------------------------------------ |
-| `__builtin_hlsl_resource_sample`                  | `llvm.<target>.resource.sample`             |
-| `__builtin_hlsl_resource_sample_bias`             | `llvm.<target>.resource.samplebias`         |
-| `__builtin_hlsl_resource_sample_grad`             | `llvm.<target>.resource.samplegrad`         |
-| `__builtin_hlsl_resource_sample_level`            | `llvm.<target>.resource.samplelevel`        |
-| `__builtin_hlsl_resource_sample_cmp`              | `llvm.<target>.resource.samplecmp`          |
-| `__builtin_hlsl_resource_sample_cmp_level_zero`   | `llvm.<target>.resource.samplecmplevelzero` |
-| `__builtin_hlsl_resource_load`                    | `llvm.<target>.resource.load.texture`       |
-| `__builtin_hlsl_resource_gather`                  | `llvm.<target>.resource.gather`             |
-| `__builtin_hlsl_resource_gather_cmp`              | `llvm.<target>.resource.gathercmp`          |
-| `__builtin_hlsl_resource_calculate_lod`           | `llvm.<target>.resource.calculatelod`       |
-| `__builtin_hlsl_resource_calculate_lod_unclamped` | `llvm.<target>.resource.calculatelod`       |
-| `__builtin_hlsl_resource_get_sample_position`     | `llvm.<target>.resource.texturesamplepos`   |
+| HLSL Builtin                                      | LLVM Intrinsic                                                                   |
+| :------------------------------------------------ | :------------------------------------------------------------------------------- |
+| `__builtin_hlsl_resource_sample`                  | `llvm.<target>.resource.sample`<br>`llvm.<target>.resource.sample.clamp`         |
+| `__builtin_hlsl_resource_sample_bias`             | `llvm.<target>.resource.samplebias`<br>`llvm.<target>.resource.samplebias.clamp` |
+| `__builtin_hlsl_resource_sample_grad`             | `llvm.<target>.resource.samplegrad`<br>`llvm.<target>.resource.samplegrad.clamp` |
+| `__builtin_hlsl_resource_sample_level`            | `llvm.<target>.resource.samplelevel`                                             |
+| `__builtin_hlsl_resource_sample_cmp`              | `llvm.<target>.resource.samplecmp`<br>`llvm.<target>.resource.samplecmp.clamp`   |
+| `__builtin_hlsl_resource_sample_cmp_level_zero`   | `llvm.<target>.resource.samplecmplevelzero`                                      |
+| `__builtin_hlsl_resource_load`                    | `llvm.<target>.resource.load.texture`                                            |
+| `__builtin_hlsl_resource_gather`                  | `llvm.<target>.resource.gather`                                                  |
+| `__builtin_hlsl_resource_gather_cmp`              | `llvm.<target>.resource.gathercmp`                                               |
+| `__builtin_hlsl_resource_calculate_lod`           | `llvm.<target>.resource.calculatelod`                                            |
+| `__builtin_hlsl_resource_calculate_lod_unclamped` | `llvm.<target>.resource.calculatelod`                                            |
+| `__builtin_hlsl_resource_get_sample_position`     | `llvm.<target>.resource.texturesamplepos`                                        |
 
 - **Front-end**: Clang emits `llvm.dx.*` or `llvm.spv.*` intrinsics based on the
   target. The `<target>` in the table above is replaced by `dx` or `spv`
@@ -536,38 +571,38 @@ distinct intrinsic names for each texture dimension or type.
 The following table shows the translation from the LLVM intrinsics to the DXIL
 operations.
 
-| LLVM Intrinsic                        | DXIL Op                                   |
-| :------------------------------------ | :---------------------------------------- |
-| `llvm.dx.resource.sample`             | `dx.op.sample` (60)                       |
-| `llvm.dx.resource.samplebias`         | `dx.op.sampleBias` (61)                   |
-| `llvm.dx.resource.samplegrad`         | `dx.op.sampleGrad` (63)                   |
-| `llvm.dx.resource.samplelevel`        | `dx.op.sampleLevel` (62)                  |
-| `llvm.dx.resource.samplecmp`          | `dx.op.sampleCmp` (64)                    |
-| `llvm.dx.resource.samplecmplevelzero` | `dx.op.sampleCmpLevelZero` (65)           |
-| `llvm.dx.resource.load.texture`       | `dx.op.textureLoad` (66)                  |
-| `llvm.dx.resource.gather`             | `dx.op.textureGather` (73)                |
-| `llvm.dx.resource.gathercmp`          | `dx.op.textureGatherCmp` (74)             |
-| `llvm.dx.resource.calculatelod`       | `dx.op.calculateLOD` (81)                 |
-| `llvm.dx.resource.texturesamplepos`   | `dx.op.texture2DMSGetSamplePosition` (75) |
+| LLVM Intrinsic                                                       | DXIL Op                                   |
+| :------------------------------------------------------------------- | :---------------------------------------- |
+| `llvm.dx.resource.sample`<br>`llvm.dx.resource.sample.clamp`         | `dx.op.sample` (60)                       |
+| `llvm.dx.resource.samplebias`<br>`llvm.dx.resource.samplebias.clamp` | `dx.op.sampleBias` (61)                   |
+| `llvm.dx.resource.samplegrad`<br>`llvm.dx.resource.samplegrad.clamp` | `dx.op.sampleGrad` (63)                   |
+| `llvm.dx.resource.samplelevel`                                       | `dx.op.sampleLevel` (62)                  |
+| `llvm.dx.resource.samplecmp`<br>`llvm.dx.resource.samplecmp.clamp`   | `dx.op.sampleCmp` (64)                    |
+| `llvm.dx.resource.samplecmplevelzero`                                | `dx.op.sampleCmpLevelZero` (65)           |
+| `llvm.dx.resource.load.texture`                                      | `dx.op.textureLoad` (66)                  |
+| `llvm.dx.resource.gather`                                            | `dx.op.textureGather` (73)                |
+| `llvm.dx.resource.gathercmp`                                         | `dx.op.textureGatherCmp` (74)             |
+| `llvm.dx.resource.calculatelod`                                      | `dx.op.calculateLOD` (81)                 |
+| `llvm.dx.resource.texturesamplepos`                                  | `dx.op.texture2DMSGetSamplePosition` (75) |
 
 #### SPIR-V Translation
 
 The following table shows the translation from the LLVM intrinsics to the SPIR-V
 instructions.
 
-| LLVM Intrinsic                         | SPIR-V Instruction                             |
-| :------------------------------------- | :--------------------------------------------- |
-| `llvm.spv.resource.sample`             | `OpImageSampleImplicitLod`                     |
-| `llvm.spv.resource.samplebias`         | `OpImageSampleImplicitLod` with `Bias` operand |
-| `llvm.spv.resource.samplegrad`         | `OpImageSampleExplicitLod` with `Grad` operand |
-| `llvm.spv.resource.samplelevel`        | `OpImageSampleExplicitLod` with `Lod` operand  |
-| `llvm.spv.resource.samplecmp`          | `OpImageSampleDrefImplicitLod`                 |
-| `llvm.spv.resource.samplecmplevelzero` | `OpImageSampleDrefExplicitLod` with `Lod` 0    |
-| `llvm.spv.resource.load.texture`       | `OpImageFetch`                                 |
-| `llvm.spv.resource.gather`             | `OpImageGather`                                |
-| `llvm.spv.resource.gathercmp`          | `OpImageDrefGather`                            |
-| `llvm.spv.resource.calculatelod`       | `OpImageQueryLod`                              |
-| `llvm.spv.resource.texturesamplepos`   | Emulated                                       |
+| LLVM Intrinsic                                                         | SPIR-V Instruction                                                                 |
+| :--------------------------------------------------------------------- | :--------------------------------------------------------------------------------- |
+| `llvm.spv.resource.sample`<br>`llvm.spv.resource.sample.clamp`         | `OpImageSampleImplicitLod`<br>with `MinLod` operand if clamped                     |
+| `llvm.spv.resource.samplebias`<br>`llvm.spv.resource.samplebias.clamp` | `OpImageSampleImplicitLod` with `Bias` operand<br>with `MinLod` operand if clamped |
+| `llvm.spv.resource.samplegrad`<br>`llvm.spv.resource.samplegrad.clamp` | `OpImageSampleExplicitLod` with `Grad` operand<br>with `MinLod` operand if clamped |
+| `llvm.spv.resource.samplelevel`                                        | `OpImageSampleExplicitLod` with `Lod` operand                                      |
+| `llvm.spv.resource.samplecmp`<br>`llvm.spv.resource.samplecmp.clamp`   | `OpImageSampleDrefImplicitLod`<br>with `MinLod` operand if clamped                 |
+| `llvm.spv.resource.samplecmplevelzero`                                 | `OpImageSampleDrefExplicitLod` with `Lod` 0                                        |
+| `llvm.spv.resource.load.texture`                                       | `OpImageFetch`                                                                     |
+| `llvm.spv.resource.gather`                                             | `OpImageGather`                                                                    |
+| `llvm.spv.resource.gathercmp`                                          | `OpImageDrefGather`                                                                |
+| `llvm.spv.resource.calculatelod`                                       | `OpImageQueryLod`                                                                  |
+| `llvm.spv.resource.texturesamplepos`                                   | Emulated                                                                           |
 
 The intrinsic `llvm.spv.resource.texturesamplepos` is not directly supported in
 Vulkan, but it is emulated by using a lookup table of standard sample positions.
