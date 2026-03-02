@@ -67,6 +67,8 @@ been designed:
   [0015 - Mapping Resource Attributes to DXIL and SPIR-V](0015-resource-attributes-in-dxil-and-spirv.md).
 - GetDimensions: See
   [0033 - Resource GetDimensions](0033-resources-get-dimensions.md).
+- Default Template Arguments and Shorthand: See
+  [NNNN - Texture Default Templates](NNNN-texture-default-templates.md).
 
 The detailed design in this proposal will fill in the details of the
 `HLSLAttributedResourceType` for these types. It should follow the design in
