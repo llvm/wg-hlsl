@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Texture Default Templates"
+title: "[0042] - Texture Default Templates"
 params:
   authors:
     - s-perron: Steven Perron
