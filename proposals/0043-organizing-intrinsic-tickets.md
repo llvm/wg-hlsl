@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Organizing Intrinsic Tickets"
+title: "[0043] - Organizing Intrinsic Tickets"
 params:
   authors:
     - kmpeng: Kaitlin Peng
@@ -64,24 +64,19 @@ llvm-project
    └─ ...
 ```
 
+Categories: pure math/logic, data conversion, synchronization, convergent pure,
+resource ops, shader I/O, raytracing  
+*(Intrinsics that don't fit under any of these categories will go under the main
+parent issue for now)*
+
 This grouping will be applied retroactively to all implementation tickets
 (including closed ones) to make room for new issues under the parent. Linking
 offload test issues to their corresponding implementation issues will only apply
-to open and newly created test issues.
+to open and newly created implementation/test issues.
 
-
-## Matrix Implementation Tickets
-
-For intrinsics that need matrix support, the approach depends on the current
-state of the implementation and test tickets:
-
-- If the implementation issue is closed or doesn't exist, create a new one in
-  `llvm-project` to track matrix implementation
-- If the implementation issue is open, update it with matrix requirements
-- If the test issue is closed or doesn't exist, create a new one in
-  `offload-test-suite` to track matrix testing completion
-- If the test issue is open, update it with matrix testing requirements
-- Always link the test issue as a sub-issue of the implementation issue
+If an implementation or test issue is currently parented to anything other than
+the `llvm-project` parent issue, it will not be reparented. It will instead be
+linked in the description of the relevant issue.
 
 
 ## Issue Descriptions
@@ -92,5 +87,24 @@ on the acceptance criteria, allowing contributors to determine the best approach
 for their specific intrinsic.
 
 
-## Questions
-1) What are the categories we can group the intrinsics into?
+## Matrix Issues
+
+For intrinsics that need matrix support, the approach to creating or updating
+issues depends on the current state of the implementation and test tickets:
+
+- If the implementation issue is closed, create a new one in `llvm-project` to
+  track matrix implementation
+- If the implementation issue is open, update it with matrix requirements
+- If the test issue is closed, create a new one in `offload-test-suite` to track
+  matrix testing completion
+- If the test issue is open, update the test issue with matrix testing
+  requirements
+- If the test issue doesn't exist, create one in `offload-test-suite` with both
+  matrix and non-matrix testing requirements
+- Link the test issues as sub-issues of the implementation issues
+
+Since we're still figuring out the requirements for matrix implementations and
+tests, each matrix implementation and test issue will link to a central
+requirements doc/issue in `wg-hlsl` rather than having requirements written out
+in each issue description. This way, we can update requirements in one place
+rather than across every individual issue.
