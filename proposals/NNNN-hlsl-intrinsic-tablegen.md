@@ -352,15 +352,23 @@ argument uses `VaryingElemType`, so it is always the scalar element
 type (e.g., `float`) regardless of the vector size. This produces
 overloads:
 
-```hlsl
-half refract(half, half, half);
-half2 refract(half2, half2, half);
-half3 refract(half3, half3, half);
-half4 refract(half4, half4, half);
-float refract(float, float, float);
-float2 refract(float2, float2, float);
-float3 refract(float3, float3, float);
-float4 refract(float4, float4, float);
+```c++
+_HLSL_16BIT_AVAILABILITY(shadermodel, 6.2)
+inline half refract(half p0, half p1, half p2) {
+  return __detail::refract_impl(p0, p1, p2);
+}
+_HLSL_16BIT_AVAILABILITY(shadermodel, 6.2)
+inline half2 refract(half2 p0, half2 p1, half p2) {
+  return __detail::refract_impl(p0, p1, p2);
+}
+// ... half3, half4 ...
+inline float refract(float p0, float p1, float p2) {
+  return __detail::refract_impl(p0, p1, p2);
+}
+inline float2 refract(float2 p0, float2 p1, float p2) {
+  return __detail::refract_impl(p0, p1, p2);
+}
+// ... float3, float4 ...
 ```
 
 ### Three generation modes
