@@ -463,7 +463,7 @@ For example, `dot4add_i8packed` requires shader model 6.4:
 def hlsl_dot4add_i8packed :
     HLSLBuiltin<"dot4add_i8packed", "__builtin_hlsl_dot4add_i8packed"> {
   let Args = [ScalarType<HLSLUInt>, ScalarType<HLSLUInt>, ScalarType<HLSLInt>];
-  let ReturnType = VaryingShape<HLSLInt>;
+  let ReturnType = ScalarType<HLSLInt>;
   let Availability = SM6_4;
 }
 ```
