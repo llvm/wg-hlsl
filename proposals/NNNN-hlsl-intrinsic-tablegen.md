@@ -118,12 +118,15 @@ Each intrinsic is defined as an `HLSLBuiltin` record that describes
 implementation. The TableGen emitter reads these records and
 generates the full set of explicit overloads.
 
-The `HLSLBuiltin` class has the following fields:
+The `HLSLBuiltin` class takes two positional parameters: `name` (the
+HLSL function name) and `builtin` (the Clang builtin to alias, which
+defaults to `""`). These populate the `Name` and `Builtin` fields
+respectively. The remaining fields are set via `let` overrides:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `Name` | `string` | *(required)* | The HLSL function name (e.g., `"clamp"`). |
-| `Builtin` | `string` | `""` | The Clang builtin to alias (e.g., `"__builtin_hlsl_elementwise_clamp"`). When set, overloads are emitted with `_HLSL_BUILTIN_ALIAS`. Mutually exclusive with `DetailFunc` and `Body`. |
+| `Name` | `string` | *(positional, required)* | The HLSL function name (e.g., `"clamp"`). Populated by the first parameter. |
+| `Builtin` | `string` | `""` *(positional)* | The Clang builtin to alias (e.g., `"__builtin_hlsl_elementwise_clamp"`). Populated by the second parameter. When set to a non-empty string, overloads are emitted with `_HLSL_BUILTIN_ALIAS`. Mutually exclusive with `DetailFunc` and `Body` if set to a non-empty string. |
 | `Doc` | `string` | `""` | Doxygen comment emitted before the overloads. |
 | `ReturnType` | `HLSLReturnType` | `Void` | How the return type is derived for each overload (see [Argument and return type descriptors](#argument-and-return-type-descriptors)). |
 | `Args` | `list<HLSLArg>` | `[]` | Argument list. Each entry is a type descriptor. The length determines the argument count. |
