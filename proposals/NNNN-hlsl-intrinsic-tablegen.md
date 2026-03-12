@@ -103,7 +103,7 @@ For instance, the `and` example in the motivation above becomes:
 
 ```tablegen
 def hlsl_and : HLSLTwoArgBuiltin<"and", "__builtin_hlsl_and"> {
-  let VaryingTypes = [HLSLBool];
+  let VaryingTypes = [BoolTy];
 }
 ```
 
@@ -181,17 +181,17 @@ controlling 16-bit availability behavior:
 
 | Record | HLSL type | `Is16Bit` | `IsConditionally16Bit` |
 |--------|-----------|-----------|------------------------|
-| `HLSLBool` | `bool` | | |
-| `HLSLHalf` | `half` | | ✓ |
-| `HLSLFloat` | `float` | | |
-| `HLSLDouble` | `double` | | |
-| `HLSLInt16` | `int16_t` | ✓ | |
-| `HLSLUInt16` | `uint16_t` | ✓ | |
-| `HLSLInt` | `int` | | |
-| `HLSLUInt` | `uint` | | |
-| `HLSLInt64` | `int64_t` | | |
-| `HLSLUInt64` | `uint64_t` | | |
-| `HLSLUInt32` | `uint32_t` | | |
+| `BoolTy` | `bool` | | |
+| `HalfTy` | `half` | | ✓ |
+| `FloatTy` | `float` | | |
+| `DoubleTy` | `double` | | |
+| `Int16Ty` | `int16_t` | ✓ | |
+| `UInt16Ty` | `uint16_t` | ✓ | |
+| `IntTy` | `int` | | |
+| `UIntTy` | `uint` | | |
+| `Int64Ty` | `int64_t` | | |
+| `UInt64Ty` | `uint64_t` | | |
+| `UInt32Ty` | `uint32_t` | | |
 
 Commonly-used groups of types are provided as lists:
 
@@ -333,15 +333,15 @@ relationships:
 - `VaryingShape<T>` — same shape as the varying type but with a
   fixed element type `T`. For example, `countbits` returns `uint3`
   for an `int3` input: `uint3 countbits(int3)`.
-- `ScalarType<T>`, `VectorType<T, N>` — fully fixed types that do
-  not change across overloads.
+- `T` (an `HLSLType` record, e.g. `FloatTy`), `VectorType<T, N>` —
+  fully fixed types that do not change across overloads.
 
 For example, `refract` is defined as:
 
 ```tablegen
 def hlsl_refract : HLSLBuiltin<"refract"> {
   let DetailFunc = "refract_impl";
-  let VaryingTypes = [HLSLHalf, HLSLFloat];
+  let VaryingTypes = [HalfTy, FloatTy];
   let Args = [Varying, Varying, VaryingElemType];
   let ReturnType = Varying;
   let ScalarVaryingType = 1;
@@ -384,7 +384,7 @@ An `HLSLBuiltin` generates code in one of three modes:
 
    ```tablegen
    def hlsl_ceil : HLSLOneArgBuiltin<"ceil", "__builtin_elementwise_ceil"> {
-     let VaryingTypes = [HLSLHalf, HLSLFloat];
+     let VaryingTypes = [HalfTy, FloatTy];
      let VaryingMatDims = [];
    }
    ```
@@ -410,7 +410,7 @@ An `HLSLBuiltin` generates code in one of three modes:
    ```tablegen
    def hlsl_fmod : HLSLTwoArgDetail<"fmod", "fmod_impl"> {
      let ParamNames = ["X", "Y"];
-     let VaryingTypes = [HLSLHalf, HLSLFloat];
+     let VaryingTypes = [HalfTy, FloatTy];
      let VaryingMatDims = [];
    }
    ```
@@ -465,8 +465,8 @@ For example, `dot4add_i8packed` requires shader model 6.4:
 ```tablegen
 def hlsl_dot4add_i8packed :
     HLSLBuiltin<"dot4add_i8packed", "__builtin_hlsl_dot4add_i8packed"> {
-  let Args = [ScalarType<HLSLUInt>, ScalarType<HLSLUInt>, ScalarType<HLSLInt>];
-  let ReturnType = ScalarType<HLSLInt>;
+  let Args = [UIntTy, UIntTy, IntTy];
+  let ReturnType = IntTy;
   let Availability = SM6_4;
 }
 ```
@@ -503,8 +503,8 @@ already implied.
 
 This ensures that 16-bit overloads are only visible when the
 target supports them, without the intrinsic author needing to
-handle it manually. For example, `ceil` uses `[HLSLHalf, HLSLFloat]`
-as its `VaryingTypes`. Since `HLSLHalf` has `IsConditionally16Bit`
+handle it manually. For example, `ceil` uses `[HalfTy, FloatTy]`
+as its `VaryingTypes`. Since `HalfTy` has `IsConditionally16Bit`
 set, the emitter automatically annotates the `half` overloads:
 
 ```hlsl
