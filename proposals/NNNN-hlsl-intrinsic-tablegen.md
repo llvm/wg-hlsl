@@ -131,9 +131,9 @@ respectively. The remaining fields are set via `let` overrides:
 | `ReturnType` | `HLSLReturnType` | `Void` | How the return type is derived for each overload (see [Argument and return type descriptors](#argument-and-return-type-descriptors)). |
 | `Args` | `list<HLSLArg>` | `[]` | Argument list. Each entry is a type descriptor. The length determines the argument count. |
 | `VaryingTypes` | `list<HLSLType>` | `[]` | Element types to expand over. One overload set (scalar + vectors + matrices) is generated per type. |
-| `ScalarVaryingType` | `bit` | `0` | Whether to generate scalar overloads. |
-| `VaryingVecSizes` | `list<int>` | `[]` | Vector sizes to generate (e.g., `[2, 3, 4]`). |
-| `VaryingMatDims` | `list<MatDim>` | `[]` | Matrix dimensions to generate (e.g., `AllMatDims`). Each `MatDim` has `Rows` and `Cols` fields. |
+| `VaryingScalar` | `bit` | `0` | Whether to generate scalar overloads for Varying-typed arguments. |
+| `VaryingVecSizes` | `list<int>` | `[]` | Vector sizes to generate (e.g., `[2, 3, 4]`) for Varying-typed arguments. |
+| `VaryingMatDims` | `list<MatDim>` | `[]` | Matrix dimensions to generate (e.g., `AllMatDims`, `[Mat4x4]`) for Varying-typed arguments. |
 | `DetailFunc` | `string` | `""` | When set, generates an inline function that forwards to `__detail::DetailFunc(args...)`. Mutually exclusive with `Builtin` and `Body`. |
 | `Body` | `string` | `""` | When set, generates an inline function with this literal body text. Mutually exclusive with `Builtin` and `DetailFunc`. |
 | `ParamNames` | `list<string>` | `[]` | Custom parameter names for the arguments. When empty, inline functions use `p0`, `p1`, ... |
@@ -213,7 +213,7 @@ types (`int`, `float`, `half`, ...) and many shapes (scalar, `vec2`,
 `vec3`, `vec4`, and matrices). Rather than listing every combination
 by hand, the definition uses `Varying` as a placeholder for the
 return type and arguments. `VaryingTypes` specifies which element
-types to expand over, and `ScalarVaryingType`, `VaryingVecSizes`,
+types to expand over, and `VaryingScalar`, `VaryingVecSizes`,
 and `VaryingMatDims` specify which shapes to generate. The emitter
 then substitutes `Varying` with each type × shape combination to
 produce the full set of overloads:
@@ -224,7 +224,7 @@ def hlsl_clamp : HLSLBuiltin<"clamp",
   let ReturnType = Varying;
   let Args = [Varying, Varying, Varying];
   let VaryingTypes = AllNumericTypes;
-  let ScalarVaryingType = 1;
+  let VaryingScalar = 1;
   let VaryingVecSizes = [2, 3, 4];
   let VaryingMatDims = AllMatDims;
 }
@@ -278,7 +278,7 @@ class HLSLThreeArgBuiltin<string name, string builtin>
     : HLSLBuiltin<name, builtin> {
   let Args = [Varying, Varying, Varying];
   let ReturnType = Varying;
-  let ScalarVaryingType = 1;
+  let VaryingScalar = 1;
   let VaryingVecSizes = [2, 3, 4];
   let VaryingMatDims = AllMatDims;
 }
@@ -294,7 +294,7 @@ class HLSLTwoArgDetail<string name, string detail> : HLSLBuiltin<name> {
   let DetailFunc = detail;
   let Args = [Varying, Varying];
   let ReturnType = Varying;
-  let ScalarVaryingType = 1;
+  let VaryingScalar = 1;
   let VaryingVecSizes = [2, 3, 4];
   let VaryingMatDims = AllMatDims;
 }
@@ -302,7 +302,7 @@ class HLSLTwoArgDetail<string name, string detail> : HLSLBuiltin<name> {
 class HLSLOneArgInlineBuiltin<string name> : HLSLBuiltin<name> {
   let Args = [Varying];
   let ReturnType = Varying;
-  let ScalarVaryingType = 1;
+  let VaryingScalar = 1;
   let VaryingVecSizes = [2, 3, 4];
   let VaryingMatDims = AllMatDims;
 }
@@ -344,7 +344,7 @@ def hlsl_refract : HLSLBuiltin<"refract"> {
   let VaryingTypes = [HalfTy, FloatTy];
   let Args = [Varying, Varying, VaryingElemType];
   let ReturnType = Varying;
-  let ScalarVaryingType = 1;
+  let VaryingScalar = 1;
   let VaryingVecSizes = [2, 3, 4];
 }
 ```
