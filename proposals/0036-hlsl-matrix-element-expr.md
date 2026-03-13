@@ -2,7 +2,7 @@
 title: 0036 - HLSL Matrix Element Expression
 params:
   authors:
-    farzonl: Farzon Lotfi
+    - farzonl: Farzon Lotfi
 status: Accepted
 ---
 
