@@ -1,7 +1,7 @@
 ---
 title: "[0010] - DXIL Data Scalarization"
 params:
-  status: Under Consideration
+  status: Accepted
   authors:
     - farzonl: Farzon Lotfi
   sponsors:
