@@ -101,11 +101,11 @@ And describes the extension to perform stateless validation:
    `SV_Position2` is not)?
 
 The parsing infrastructure for parsing semantic attributes already exists in
-Clang as it is shared between SPIR-V/DXIL. However, the semantic checks listed
-are not currently handled.
+Clang as it is shared between SPIR-V/DXIL. The last semantic check does not
+appear to be implemented (https://godbolt.org/z/zEYG8b1xE).
 
 The work for this part is to extend `HLSLSemanticAttr` with any missing
-system semantic definitions and extend Sema to the listed validations.
+system semantic definitions and extend Sema for all listed validations.
 
 **Question:** This does not account for packing qualifers (eg `noperspective`),
 should we incorperate that now? If so, we should update
@@ -218,10 +218,9 @@ should be updated to be consistent with the definitions in `DXContainer.h`.
 Compile a vertex + pixel shader pair that renders a textured cube. In practice,
 this part is complete when all features described in
 [Texture and Sampler Types](0037-texture-and-sampler-types.md) are supported
-for the DirectX backend. This means we should support texture sampling, texel
-loads, dimension queries, most texture types, basic comparison sampling,
-channel-specific gather operations and their comparison variants, and these can
-be verified using the offload test suite.
+for the DirectX backend. This means we should support texture sampling, helper
+queries, texel loads, texture/sampler types and these can be verified using the
+offload test suite.
 
 ### Texture/Sampler Types and Methods
 
