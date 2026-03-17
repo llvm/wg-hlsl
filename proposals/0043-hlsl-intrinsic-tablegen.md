@@ -1,9 +1,9 @@
 ---
-title: "[NNNN] - HLSL Intrinsic TableGen"
+title: "[0043] - HLSL Intrinsic TableGen"
 params:
   authors:
     - icohedron: Deric Cheung
-  status: Under Consideration
+  status: Approved
 ---
 
 ## Introduction
@@ -135,7 +135,7 @@ respectively. The remaining fields are set via `let` overrides:
 | `VaryingVecSizes` | `list<int>` | `[]` | Vector sizes to generate (e.g., `[2, 3, 4]`) for Varying-typed arguments. |
 | `VaryingMatDims` | `list<MatDim>` | `[]` | Matrix dimensions to generate (e.g., `AllMatDims`, `[Mat4x4]`) for Varying-typed arguments. |
 | `DetailFunc` | `string` | `""` | When set, generates an inline function that forwards to `__detail::DetailFunc(args...)`. Mutually exclusive with `Builtin` and `Body`. |
-| `Body` | `string` | `""` | When set, generates an inline function with this literal body text. Mutually exclusive with `Builtin` and `DetailFunc`. |
+| `Body` | `code` | `""` | When set, generates a single-line inline function with this literal body text. For multi-line implementations, use `DetailFunc` instead. Mutually exclusive with `Builtin` and `DetailFunc`. |
 | `ParamNames` | `list<string>` | `[]` | Custom parameter names for the arguments. When empty, inline functions use `p0`, `p1`, ... |
 | `IsConstexpr` | `bit` | `0` | Emits `constexpr` instead of `inline` for inline functions. |
 | `IsConvergent` | `bit` | `0` | Marks the function as convergent. |
@@ -432,9 +432,10 @@ An `HLSLBuiltin` generates code in one of three modes:
    // ... float2, float3, float4 ...
    ```
 
-3. **Inline body mode** (`Body` is set) — emits an inline function
-   with literal body text. Used for simple inline implementations
-   like the unsigned `abs` identity.
+3. **Inline body mode** (`Body` is set) — emits a single-line inline
+   function with literal body text. Intended for simple one-statement
+   implementations like the unsigned `abs` identity. For multi-line
+   logic, use `DetailFunc` to forward to a helper function instead.
 
    ```tablegen
    def hlsl_abs_unsigned : HLSLOneArgInlineBuiltin<"abs"> {
@@ -520,6 +521,38 @@ half2 ceil(half2);
 _HLSL_BUILTIN_ALIAS(__builtin_elementwise_ceil)
 float ceil(float);
 // ... float2, float3, float4 ...
+```
+
+### Documentation
+
+The `Doc` field attaches a Doxygen comment block to the generated
+overloads. Each line of the `Doc` text is emitted with a `/// `
+prefix, placed immediately before the first overload.
+
+For example, `abs` declares its documentation inline:
+
+```tablegen
+def hlsl_abs : HLSLOneArgBuiltin<"abs", "__builtin_elementwise_abs"> {
+  let Doc = [{
+\fn T abs(T Val)
+\brief Returns the absolute value of the input value, \a Val.
+\param Val The input value.
+}];
+  let VaryingTypes = SignedTypes;
+}
+```
+
+Generates:
+
+```hlsl
+/// \fn T abs(T Val)
+/// \brief Returns the absolute value of the input value, \a Val.
+/// \param Val The input value.
+// abs overloads
+_HLSL_16BIT_AVAILABILITY(shadermodel, 6.2)
+_HLSL_BUILTIN_ALIAS(__builtin_elementwise_abs)
+half abs(half);
+// ...
 ```
 
 ### Generated file structure
