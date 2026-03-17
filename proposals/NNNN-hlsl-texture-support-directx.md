@@ -27,11 +27,9 @@ Clang does not currently support either when targeting DirectX and there was
 not a previous document to concretely outline what features are missing and
 need to be implemented.
 
-## Detailed Outlines
+## Part 1: Hello Triangle
 
-### Part 1: Hello Triangle
-
-#### Goal
+### Goal
 
 Compile a minimal vertex shader + pixel shader pair that renders a triangle,
 generating correct DXIL output including signature metadata. Practically, this
@@ -39,7 +37,7 @@ means shader entry points with semantic-annotated parameters and return values
 will produce valid signature parts in the DXContainer, and the generated code
 will correctly load inputs from and store outputs to the pipeline.
 
-#### Semantics to Support
+### Semantics to Support
 
 The semantics to support are user semantics and all system value semantics
 that are confined to to vertex and pixel shader stages. This excludes
@@ -81,7 +79,7 @@ System Values:
 See [Semantics Overview](0040-semantics-overview.md#vertex-shader) for
 interpretation details.
 
-#### Parsing + Sema of Semantic Attr
+### Parsing + Sema of Semantic Attr
 
 Semantics are specified as attributes in the HLSL source, annotating entry
 point parameters, return values, and struct fields to describe how data maps
@@ -113,7 +111,7 @@ system semantic definitions and extend Sema to the listed validations.
 should we incorperate that now? If so, we should update
 [Semantics](0031-semantics.md) accordingly.
 
-#### Code Generation of Signature Loads and Stores
+### Code Generation of Signature Loads and Stores
 
 During code generation, entry point parameters and return values annotated with
 semantics will be lowered to either a builtin function call or a read/write of
@@ -146,7 +144,7 @@ consistent with the metadata schema described below.
 Further, the `loadInput` and `storeOutput` DXIL ops must be defined, and the
 intrinsics must be scalarized and lowered accordingly.
 
-#### Metadata Schema for Signature Information
+### Metadata Schema for Signature Information
 
 The input/output signature information must be retained so that it can be
 emitted as the appropriate parts in the output DXContainer. This information
@@ -213,9 +211,9 @@ should be updated to be consistent with the definitions in `DXContainer.h`.
    ensure they are being generated as expected. The 'Hello Triangle' is already
    added
 
-### Part 2: Textured Cube
+## Part 2: Textured Cube
 
-#### Goal
+### Goal
 
 Compile a vertex + pixel shader pair that renders a textured cube. In practice,
 this part is complete when all features described in
@@ -225,7 +223,7 @@ loads, dimension queries, most texture types, basic comparison sampling,
 channel-specific gather operations and their comparison variants, and these can
 be verified using the offload test suite.
 
-#### Texture/Sampler Types and Methods
+### Texture/Sampler Types and Methods
 
 Rather than restate much of the same, please refer to
 [Texture and Sampler Types](0037-texture-and-sampler-types.md)
@@ -255,20 +253,20 @@ and improved in Clang. For instance, a dedicated error message should be
 generated for using methods [invalid with a given shader
 stage](https://godbolt.org/z/sn7q1fKbf).
 
-#### Shader Flags
+### Shader Flags
 
 The `ShaderFlagsAnalysis` pass will need to be extended to set advanced texture
 usage flags when texture operations are present in the module, see
 [here](https://github.com/llvm/llvm-project/issues/116137).
 
-#### Offload Test Suite
+### Offload Test Suite
 
 The offload test suite only has sampler support implemented for Vulkan.
 DirectX equivalent support will be added. YAML parsing for sampler
 descriptors is already handled; the remaining work is wiring up the DirectX
 runtime to create sampler and SRV descriptors.
 
-#### Testing Considerations
+### Testing Considerations
 
  - Semantic diagnostics and intrinsic lowering can be tested through regular
    `lit` testing
