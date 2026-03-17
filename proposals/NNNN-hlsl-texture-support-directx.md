@@ -221,10 +221,9 @@ Compile a vertex + pixel shader pair that renders a textured cube. In practice,
 this part is complete when all features described in
 [Texture and Sampler Types](0037-texture-and-sampler-types.md) are supported
 for the DirectX backend. This means we should support texture sampling, texel
-loads, dimension queries, most texture types, comparison sampling
-(`SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad`), channel-specific gather
-operations (`GatherRed`, `GatherGreen`, `GatherBlue`, `GatherAlpha`) and their
-comparison variants, and these can be verified using the offload test suite.
+loads, dimension queries, most texture types, basic comparison sampling,
+channel-specific gather operations and their comparison variants, and these can
+be verified using the offload test suite.
 
 #### Texture/Sampler Types and Methods
 
@@ -237,6 +236,7 @@ method.
 Notably, this does not include:
 
  - `Store`: UAV texel write
+ - `SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad`: SM6.7+ comparison sampling
  - `.sample[index][pos]`: the multisampled texture subscript operator
  - `CheckAccessFullyMapped` / status parameter overloads
  - `Feedback` texture/samplers
@@ -284,6 +284,7 @@ The following are excluded from this proposal:
 
  - `FeedbackTexture2D`, `FeedbackTexture2DArray`: `WriteSamplerFeedback*`
    operations (SM6.5+)
+ - `SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad`: SM6.7+ comparison sampling
  - `Store`: UAV texel write
  - `.sample[index][pos]`: the multisampled texture subscript operator
  - `CheckAccessFullyMapped` / status parameter overloads
