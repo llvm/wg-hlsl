@@ -1,9 +1,9 @@
 ---
-title: "[NNNN] - HLSL Intrinsic TableGen"
+title: "[0043] - HLSL Intrinsic TableGen"
 params:
   authors:
     - icohedron: Deric Cheung
-  status: Under Consideration
+  status: Approved
 ---
 
 ## Introduction
