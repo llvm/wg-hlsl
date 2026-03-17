@@ -175,11 +175,11 @@ Register assignment will implement the complete
 [DXIL signature packing rules](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/DXIL.rst#signature-packing)
 (prefix-stable, first-fit) respecting constraints on dynamic indexing, type
 mixing, and interpolation modes, see
-[Packing Constraints](0040-semantics-overview.md#signature-packing-constrains) for
+[Packing Constraints](0040-semantics-overview.md#signature-packing-constraints) for
 further details.
 
 The schema description should be added to
-[DXIL Signature Metadata](0040-smenatics-overview.md#dxil-signature-metadata).
+[DXIL Signature Metadata](0040-semantics-overview.md#dxil-signature-metadata).
 
 #### Generate DXContainer Signature Parts
 
@@ -198,7 +198,7 @@ The work to emit the parts is already implemented. This also means that
 `obj2yaml` already supports all signature parts produced by DXC, so we have
 an existing mechanism to validate the generated parts.
 
-_Note_: The [Container Signature Parts](0040-smenatics-overview.md#dxildxbc-container-signature-parts)
+_Note_: The [Container Signature Parts](0040-semantics-overview.md#dxildxbc-container-signature-parts)
 should be updated to be consistent with the definitions in `DXContainer.h`.
 
 **Question:** RDAT and STAT parts are not currently supported?
