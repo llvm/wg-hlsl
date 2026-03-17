@@ -42,7 +42,7 @@ will correctly load inputs from and store outputs to the pipeline.
 The semantics to support are user semantics and all system value semantics
 that are confined to to vertex and pixel shader stages. This excludes
 semantics that are only applicable with other shader stages (eg.
-`SV_GSInstanceID`). In other words, system value semantics to support are all
+`SV_CullPrimitive`). In other words, system value semantics to support are all
 that are testable without any non-compute/pixel/vertex shader support.
 
 User Semantics:
@@ -54,27 +54,34 @@ System Values:
  - `SV_VertexID`
  - `SV_InstanceID`
  - `SV_Position`
- - `SV_RenderTargetArrayIndex`
- - `SV_ViewPortArrayIndex`
+ - `SV_PrimitiveID`
+ - `SV_IsFrontFace`
+ - `SV_Target`
  - `SV_ClipDistance`
  - `SV_CullDistance`
- - `SV_PrimitiveID`
- - `SV_SampleIndex`
- - `SV_IsFrontFace`
- - `SV_Coverage`
- - `SV_InnerCoverage`
- - `SV_Target`
- - `SV_Depth`
- - `SV_DepthLessEqual`
- - `SV_DepthGreaterEqual`
- - `SV_StencilRef`
- - `SV_ViewID`
  - `SV_Barycentrics`
- - `SV_ShadingRate`
- - `SV_StartVertexLocation`
- - `SV_StartInstanceLocation`
+ - `SV_StartVertexLocation`/`SV_StartInstanceLocation` (hardcoded)
+ - `SV_RenderTargetArrayIndex`, `SV_ViewPortArrayIndex`: render target arrays
+    are supported (required for `Texture*Array`s)
 
-**Question:** These are all testable using a RWBuffer in the shader?
+Requires additional offload test suite support:
+
+ - `SV_Depth, SV_Depth[Less|Greater]Equal, SV_StencilRef`: depth/stencil buffer
+ - `SV_SampleIndex`, `SV_Coverage`: MSAA render targets
+ - `SV_InnerCoverage`: polling/setting conservative rasterization
+
+ - `SV_ViewPortArrayIndex`: multiple viewports
+ - `SV_ViewID`: multi-view rendering
+
+ - `SV_ShadingRate`: variable rate shading
+ - `SV_CullPrimitive`: mesh shaders
+
+All of the above can be tested at the compiler IR level tests regardless of
+offload test suite support.
+
+**Question:** These should be testable using a RWBuffer in the shader. The
+question is which sub-set to include? How to prioritize how the
+offload-test-suite should be extended for these tests.
 
 See [Semantics Overview](0040-semantics-overview.md#vertex-shader) for
 interpretation details.
@@ -260,10 +267,12 @@ usage flags when texture operations are present in the module, see
 
 ### Offload Test Suite
 
-The offload test suite only has sampler support implemented for Vulkan.
-DirectX equivalent support will be added. YAML parsing for sampler
-descriptors is already handled; the remaining work is wiring up the DirectX
-runtime to create sampler and SRV descriptors.
+The offload test suite only has sampler support implemented for Vulkan and
+currently does not allow specifying `Texture*Arrays` for either backend.
+
+Currently YAML parsing for sampler descriptors is already handled; the
+remaining work is wiring up the DirectX runtime to create sampler and SRV
+descriptors.
 
 ### Testing Considerations
 
