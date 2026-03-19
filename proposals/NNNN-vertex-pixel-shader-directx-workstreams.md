@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - HLSL Texture Support for DirectX"
+title: "[NNNN] - Vertex + Pixel Shader Workstreams"
 params:
   authors:
     - inbelic: Finn Plummer
