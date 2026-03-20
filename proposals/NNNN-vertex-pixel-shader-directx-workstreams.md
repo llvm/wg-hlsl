@@ -9,41 +9,37 @@ params:
 
 ## Introduction
 
-This proposal outlines the work required to add core texture/sampler support to
-Clang when targeting DirectX/DXIL. It is broken down into two parts:
+This proposal outlines the work required to support vertex and pixel shaders in
+Clang. This includes semantic and signature support, texture/sampler types and
+their methods, and the extensions to the offload test suite required to
+validate them.
 
-1. Hello Triangle (Semantics and Signatures): Fills in the remaining
-gaps in semantic support, signature metadata generation, and DXContainer output
-so that a minimal vertex + pixel shader can run.
+The work is organized into six workstreams:
 
-2. Textured Cube (Core Texture/Sampler Operations): Defines the Texture/Sampler
-types and their methods, defines their lowering to DXIL and updates to allow
-for testing in the offload test suite.
+ 1. Vertex and Pixel Shader Test Infrastructure
+ 2. Semantics and Signatures
+ 3. Core Texture and Sampler Support
+ 4. Queries, Comparison Sampling, and Gather
+ 5. Tiled Resources
+ 6. Feedback Textures
 
 ## Motivation
 
-Texture resources and samplers are required for graphics programming in HLSL.
-Clang does not currently support either when targeting DirectX and there was
-not a previous document to concretely outline what features are missing and
-need to be implemented.
+Support for vertex/pixel shaders is required for graphics programming in HLSL.
+To support the majority of vertex and pixel shader use-cases it is required
+to support all applicable semantics, corresponding input/output signatures and
+Texture/Sampler support.
 
-## Part 1: Hello Triangle
+Clang does not currently fully support these when targeting either Vulkan or
+DirectX. There was not a previous document to survey and concretely outline
+what support is missing and needs to be implemented.
 
-### Goal
-
-Compile a minimal vertex shader + pixel shader pair that renders a triangle,
-generating correct DXIL output including signature metadata. Practically, this
-means shader entry points with semantic-annotated parameters and return values
-will produce valid signature parts in the DXContainer, and the generated code
-will correctly load inputs from and store outputs to the pipeline.
-
-### Semantics to Support
+## Semantics to Support
 
 The semantics to support are user semantics and all system value semantics
-that are confined to to vertex and pixel shader stages. This excludes
+that are confined to vertex and pixel shader stages. This excludes
 semantics that are only applicable with other shader stages (eg.
-`SV_CullPrimitive`). In other words, system value semantics to support are all
-that are testable without any non-compute/pixel/vertex shader support.
+`SV_CullPrimitive`).
 
 User Semantics:
  - Arbitrary user-defined names (e.g. `POSITION`, `COLOR`, `TEXCOORD`) used
@@ -57,34 +53,67 @@ System Values:
  - `SV_PrimitiveID`
  - `SV_IsFrontFace`
  - `SV_Target`
- - `SV_ClipDistance`
- - `SV_CullDistance`
+ - `SV_ClipDistance`/`SV_CullDistance`
  - `SV_Barycentrics`
- - `SV_StartVertexLocation`/`SV_StartInstanceLocation` (hardcoded)
- - `SV_RenderTargetArrayIndex`, `SV_ViewPortArrayIndex`: render target arrays
-    are supported (required for `Texture*Array`s)
+ - `SV_StartVertexLocation`/`SV_StartInstanceLocation`
+ - `SV_RenderTargetArrayIndex`/`SV_ViewPortArrayIndex`
+ - `SV_Depth`/`SV_DepthLessEqual`/`SV_DepthGreaterEqual`/`SV_StencilRef`
+ - `SV_SampleIndex`
+ - `SV_Coverage`/`SV_InnerCoverage`
+ - `SV_ViewID`
+ - `SV_ShadingRate`
 
-Requires additional offload test suite support:
-
- - `SV_Depth, SV_Depth[Less|Greater]Equal, SV_StencilRef`: depth/stencil buffer
- - `SV_SampleIndex`, `SV_Coverage`: MSAA render targets
- - `SV_InnerCoverage`: polling/setting conservative rasterization
-
- - `SV_ViewPortArrayIndex`: multiple viewports
- - `SV_ViewID`: multi-view rendering
-
- - `SV_ShadingRate`: variable rate shading
- - `SV_CullPrimitive`: mesh shaders
-
-All of the above can be tested at the compiler IR level tests regardless of
-offload test suite support.
-
-**Question:** These should be testable using a RWBuffer in the shader. The
-question is which sub-set to include? How to prioritize how the
-offload-test-suite should be extended for these tests.
+All can be tested at the compiler IR level; end-to-end testing of many
+semantics will require additional runtime features (depth/stencil, MSAA, etc.),
+this is addressed in Workstream 1.
 
 See [Semantics Overview](0040-semantics-overview.md#vertex-shader) for
 interpretation details.
+
+## Workstream 1: Vertex and Pixel Shader Test Infrastructure
+
+### Goal
+
+The offload test suite has infrastructure to write individual tests for
+semantics and texture/sampler methods. As noted below, there are a number of
+runtime features that are not supported in the offload test suite, which should
+all be added for completion of this workstream.
+
+### Missing Features
+
+The offload test suite requires the following runtime features:
+
+ - Sampler and SRV descriptor creation, to bind textures and samplers to
+   shader registers. Implemented for Vulkan but not DirectX.
+ - Comparison sampler descriptor creation, to create samplers with a
+   `ComparisonFunc` for `SampleCmp` and `GatherCmp` methods.
+ - `Texture*Array` type support, to test array texture types for both
+   backends.
+ - Depth/stencil buffer support, to test `SV_Depth`,
+   `SV_DepthLessEqual`, `SV_DepthGreaterEqual`, and `SV_StencilRef`.
+ - MSAA render target support, to test `SV_SampleIndex` and
+   `SV_Coverage`.
+ - Conservative rasterization, to test `SV_InnerCoverage`.
+ - Multiple viewport support, to test `SV_ViewPortArrayIndex`.
+ - Multi-view rendering, to test `SV_ViewID`.
+ - Variable rate shading, to test `SV_ShadingRate`.
+
+### Required Tests
+
+As the infrastructure to write tests becomes availabel, it is required to have
+an end-to-end offload test for each system value semantic and for each
+texture/sampler method. This workstream contains the work to write these
+individual test cases.
+
+## Workstream 2: Semantics and Signatures
+
+### Goal
+
+Compile a minimal vertex shader + pixel shader pair that renders a triangle,
+generating correct DXIL output including signature metadata. Practically, this
+means shader entry points with semantic-annotated parameters and return values
+will produce valid signature parts in the DXContainer, and the generated code
+will correctly load inputs from and store outputs to the pipeline.
 
 ### Parsing + Sema of Semantic Attr
 
@@ -92,31 +121,36 @@ Semantics are specified as attributes in the HLSL source, annotating entry
 point parameters, return values, and struct fields to describe how data maps
 to the pipeline's input/output signature registers.
 
-The `HLSLSemanticAttr` mechanism (described in
-[Semantics](0031-semantics.md#Parser)) handles:
+The [semantics proposal](0031-semantics.md) describes the approach for
+targeting both SPIR-V/DirectX targets.
+
+The `HLSLSemanticAttr` mechanism handles:
 
  - Parsing semantic annotations from HLSL syntax
  - Decomposing a semantic string into a case-insensitive name and optional
    index (e.g. `TEXCOORD3` → name=`TEXCOORD`, index=3)
  - Distinguishing system semantics (`SV_` prefix) from user semantics
 
-And describes the extension to perform stateless validation:
+And describes the stateless validation:
 
  - Is this system semantic valid for the target shader stage?
  - Is this system semantic compatible with the type it is applied to?
  - Is this system semantic indexable (e.g. `SV_Target0` is valid,
    `SV_Position2` is not)?
 
-The parsing infrastructure for parsing semantic attributes already exists in
-Clang as it is shared between SPIR-V/DXIL. The last semantic check does not
-appear to be implemented (https://godbolt.org/z/zEYG8b1xE).
+With exception to the last [semantic check](https://godbolt.org/z/zEYG8b1xE),
+parsing/sema is already implemented in Clang.
 
-The work for this part is to extend `HLSLSemanticAttr` with any missing
-system semantic definitions and extend Sema for all listed validations.
+However, the proposal does not account for
+[interpolation qualifiers](0040-semantics-overview.md#interpolation-modes)
+(`noperspective`, `nointerpolation`, etc.).
 
-**Question:** This does not account for packing qualifers (eg `noperspective`),
-should we incorperate that now? If so, we should update
-[Semantics](0031-semantics.md) accordingly.
+#### Work required
+
+ - Extend `HLSLSemanticAttr` with all missing system semantic definitions
+ - Implement the system semantic indexable validation
+ - Update the [semantics proposal](0031-semantics.md) to account for qualifiers
+ - Implement qualifier parsing/sema support on `HLSLSemanticAttr`
 
 ### Code Generation of Signature Loads and Stores
 
@@ -124,32 +158,25 @@ During code generation, entry point parameters and return values annotated with
 semantics will be lowered to either a builtin function call or a read/write of
 the pipeline's signature registers.
 
-The DirectX backend uses the `llvm.dx.load.input` and `llvm.dx.store.output`
-intrinsics. These take a signature element ID (indexing into the signature
-metadata) and component indices to identify which signature register row and
- mask to access. `CGHLSLRuntime::handleSemanticStore` and
-`CGHLSLRuntime::handleSemanticLoad` will need to be updated to:
-
- - Recursively traverse struct types to flatten semantic-annotated fields
- - Emit the correct intrinsic call for each scalar/vector component
- - Handle semantic index auto-incrementing for arrays and multi-row types
-
-The codegen follows the recursive approach outlined in
+Codegen follows a recursive approach outlined in
 [Semantics](0031-semantics.md#CodeGen): a shared traversal handles semantic
 inheritance and index collision detection, then dispatches to target-specific
 emission for the load/store intrinsic.
 
-Currently, Clang codegen has the general recursive algorithm implemented, as
-such, it handles the semantics that are lowered to a built-in but generates
-placeholder calls to `llvm.dx.load.input` and `llvm.dx.store.output` otherwise.
+Clang has this general algorithm implemented and the dispatch to SPIR-V
+emission supports existing semantics. When targeting DirectX it emits
+placeholder calls to `llvm.dx.load.input` and `llvm.dx.store.output`.
 
-The work here will be to correct how the intrinsic calls are created, assigning
+assigning
 a unique signature element ID per flattened semantic element and emitting the
 correct relative row and component indices. The signature element IDs must be
 consistent with the metadata schema described below.
 
-Further, the `loadInput` and `storeOutput` DXIL ops must be defined, and the
-intrinsics must be scalarized and lowered accordingly.
+#### Work Required
+
+ - Correct how intrinsic calls are called for DirectX
+ - Define the `loadInput` and `storeOutput` DXIL ops
+ - The `input/output` intrinsics must be scalarized and lowered accordingly.
 
 ### Metadata Schema for Signature Information
 
@@ -158,11 +185,10 @@ emitted as the appropriate parts in the output DXContainer. This information
 will be retained as module metadata that can be used to generate the `ISG1`,
 `OSG1` and `PSV` parts.
 
-There is currently no signature metadata representation defined for Clang.
-
-The work here is to define a metadata schema that retains all
-information required for the `ISG1`/`OSG1` signature parts and the signature
-elements within `PSV`. For each signature element, the metadata must record:
+There is currently no intermediate signature metadata representation defined
+for Clang. The schema must retain all information required for the
+`ISG1`/`OSG1` signature parts and the signature elements within `PSV`. For each
+signature element, the metadata must record:
 
  - Semantic name: the user or system semantic string
  - Semantic index: differentiates elements sharing the same name
@@ -183,81 +209,77 @@ mixing, and interpolation modes, see
 [Packing Constraints](0040-semantics-overview.md#signature-packing-constraints) for
 further details.
 
-The schema description should be added to
-[DXIL Signature Metadata](0040-semantics-overview.md#dxil-signature-metadata).
+#### Work Required
 
-#### Generate DXContainer Signature Parts
+ - Define an intermediate module metadata schema containing the above
+   information and describe it in a proposal
+ - Update CodeGeneration to generate the module metadata
+
+### Generate DXContainer Signature Parts
 
 The DXContainer format includes dedicated parts for input, output, and patch
 constant signatures. The `DXContainerGlobals` pass reads metadata and generates
 the global variables that are then written by `DXContainerObjectWriter`. The
-binary format been defined in [`BinaryFormat/DXContainer.h`](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/BinaryFormat/DXContainer.h).
-
-So, the work is to update the `DXContainerGlobals` pass to:
-
- - Parse signature module metadata from the LLVM module
- - Populate the defined structs in [`BinaryFormat/DXContainer.h`](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/BinaryFormat/DXContainer.h)
-   from the metadata
+binary format been defined in `BinaryFormat/DXContainer.h`.
 
 The work to emit the parts is already implemented. This also means that
 `obj2yaml` already supports all signature parts produced by DXC, so we have
 an existing mechanism to validate the generated parts.
 
-_Note_: The [Container Signature Parts](0040-semantics-overview.md#dxildxbc-container-signature-parts)
-should be updated to be consistent with the definitions in `DXContainer.h`.
+#### Work Required
 
-**Question:** RDAT and STAT parts are not currently supported?
+ - Parse signature module metadata from the LLVM module
+ - Populate the defined structs in `BinaryFormat/DXContainer.h` from the
+   metadata
+ - Ensure [Container Signature Parts](0040-semantics-overview.md#dxildxbc-container-signature-parts)
+   is consistent with the definitions in `DXContainer.h`.
 
-#### Testing Considerations
-
- - Semantic diagnostics, intrinsic lowering and packing algorithm can be tested
-   through regular `lit` testing
- - `obj2yaml` already supports emitting required parts so we can do round-trip
-   tests of signature parts and of `DXContainer` generation
- - The offload test suite needs to add tests for the system value semantics to
-   ensure they are being generated as expected. The 'Hello Triangle' is already
-   added
-
-## Part 2: Textured Cube
+## Workstream 3: Core Texture and Sampler Support
 
 ### Goal
 
-Compile a vertex + pixel shader pair that renders a textured cube. In practice,
-this part is complete when all features described in
-[Texture and Sampler Types](0037-texture-and-sampler-types.md) are supported
-for the DirectX backend. This means we should support texture sampling, helper
-queries, texel loads, texture/sampler types and these can be verified using the
-offload test suite.
+Support all texture and sampler type declarations, complete the DXIL backend
+lowering for the basic sampling methods, and implement texture load/store
+access + operators.
 
 ### Texture/Sampler Types and Methods
 
 Rather than restate much of the same, please refer to
 [Texture and Sampler Types](0037-texture-and-sampler-types.md)
 for the complete list of texture/sampler types and their methods that are to be
-supported. This details the work to be done for implementing each type and
-method.
+supported. The proposal details the work to be done for implementing each type
+and method.
 
-Notably, this does not include:
+Clang already has the frontend implemented for the `Texture2D` type, `Sampler`
+type and the listed `Sample` methods. These are implemented for SPIR-V but have
+similar placeholder `dx` intrinsics otherwise.
 
- - `Store`: UAV texel write
- - `SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad`: SM6.7+ comparison sampling
- - `.sample[index][pos]`: the multisampled texture subscript operator
- - `CheckAccessFullyMapped` / status parameter overloads
- - `Feedback` texture/samplers
+_Note:_ Sampler and texture are modelled as resources and so they should
+generate the appropriate `dx.resources` metadata. This means we are not
+required to update part generation for the `DXContainer`. Adding the
+corresponding tests is required though.
 
-**Question:** Should these be included? If so, the first step will be to update
-the above proposal.
+The proposal does not enumerate all the diagnostics that should be provided in
+Clang. For instance, a dedicated error message should be generated for using
+methods [invalid with a given shader stage](https://godbolt.org/z/sn7q1fKbf).
 
-_Note:_  Sampler and texture are modelled as resources and so they will generate
-the appropriate `dx.resources` metadata. This means we are not required to
-update part generation for the `DXContainer`. Adding the corresponding tests is
-required though.
+### Methods to Support
 
-Further, [Texture and Sampler Types](0037-texture-and-sampler-types.md) should
-be updated to describe all required diagnostics that should be brought forward
-and improved in Clang. For instance, a dedicated error message should be
-generated for using methods [invalid with a given shader
-stage](https://godbolt.org/z/sn7q1fKbf).
+ - `Load`/`Store`/`operator[]`
+ - `.mips[level][pos]`
+ - `.sample[index][pos]`
+ - `Sample`/`SampleBias`/`SampleGrad`/`SampleLevel`
+
+`Store` and `.sample[index][pos]` are not currently described in
+[Texture and Sampler Types](0037-texture-and-sampler-types.md).
+
+#### Work Required:
+
+ - Update proposal to describe semantic validations
+ - Update proposal to describe support for the `Store` method and `.sample`
+   operator
+ - Implement all Texture and Sampler types
+ - Add support for listed methods/operators
 
 ### Shader Flags
 
@@ -265,36 +287,69 @@ The `ShaderFlagsAnalysis` pass will need to be extended to set advanced texture
 usage flags when texture operations are present in the module, see
 [here](https://github.com/llvm/llvm-project/issues/116137).
 
-### Offload Test Suite
+## Workstreams 4-6: Method Extensions
 
-The offload test suite only has sampler support implemented for Vulkan and
-currently does not allow specifying `Texture*Arrays` for either backend.
+### Goal
 
-Currently YAML parsing for sampler descriptors is already handled; the
-remaining work is wiring up the DirectX runtime to create sampler and SRV
-descriptors.
+The remaining workstreams follow the same goal to implement a sub-set of the
+remaining methods. And have similar work required. When all these workstreams
+are complete, then all texture/sampler methods are implemented.
 
-### Testing Considerations
+#### Work Required
 
- - Semantic diagnostics and intrinsic lowering can be tested through regular
-   `lit` testing
- - `obj2yaml` supports testing of correct generation for resource PSV data
- - As mentioned, the offload test suite will require support for specifying
-   Samplers with DirectX. This can be used to validate that the compiler
-   selects the correct Sampler for each texture as described
-   [here](0037-texture-and-sampler-types.md#detailed-testing-example-samplelevel).
+ - Update the proposal to include support for missing methods
+ - Add missing functionality to the offload test suite
+ - Implement methods as described
+
+### Workstream 4: Query, Comparison Sampling and Gather Methods
+
+ - `GetDimensions`
+ - `CalculateLevelOfDetail`
+ - `CalculateLevelOfDetailUnclamped`
+
+ - `SampleCmp`
+ - `SampleCmpLevelZero`
+ - `SampleCmpBias`
+ - `SampleCmpLevel`
+ - `SampleCmpGrad`
+
+ - `GatherRed`, `GatherGreen`, `GatherBlue`, `GatherAlpha`
+ - `GatherCmpRed`, `GatherCmpGreen`, `GatherCmpBlue`, `GatherCmpAlpha`
+
+`SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad` are not currently
+described in [Texture and Sampler Types](0037-texture-and-sampler-types.md).
+
+### Workstream 5: Tiled Resource Methods
+
+Add status parameter overloads to `Load`, `Store`, `Sample*`, and `Gather*`
+methods that return a status value for `CheckAccessFullyMapped`.
+
+`CheckAccessFullyMapped` is not currently described in
+[Texture and Sampler Types](0037-texture-and-sampler-types.md).
+
+Testing tiled resources end-to-end requires creating reserved (sparse) textures
+with mapped/unmapped tiles in the offload test suite.
+
+## Workstream 6: Feedback Textures
+
+### Types and Methods
+
+ - `FeedbackTexture2D`, `FeedbackTexture2DArray`
+ - `WriteSamplerFeedback`
+ - `WriteSamplerFeedbackBias`
+ - `WriteSamplerFeedbackLevel`
+ - `WriteSamplerFeedbackGrad`
+
+These record which mip levels were accessed by a sampling operation, used for
+texture streaming systems.
+
+Testing requires creating feedback texture resources in the offload test suite.
 
 ### Out of Scope
 
 The following are excluded from this proposal:
 
- - `FeedbackTexture2D`, `FeedbackTexture2DArray`: `WriteSamplerFeedback*`
-   operations (SM6.5+)
- - `SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad`: SM6.7+ comparison sampling
- - `Store`: UAV texel write
- - `.sample[index][pos]`: the multisampled texture subscript operator
- - `CheckAccessFullyMapped` / status parameter overloads
- - PSV `UsedByAtomic64` and RDAT information
+ - PSV `UsedByAtomic64` and RDAT/STAT information
 
 ## Acknowledgments
 
