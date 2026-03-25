@@ -19,9 +19,7 @@ The work is organized into six workstreams:
  1. Vertex and Pixel Shader Test Infrastructure
  2. Semantics and Signatures
  3. Core Texture and Sampler Support
- 4. Queries, Comparison Sampling, and Gather Methods
- 5. Tiled Resources
- 6. Feedback Textures
+ 4. Advanced Texture Methods
 
 ## Motivation
 
@@ -74,36 +72,43 @@ interpretation details.
 
 ### Goal
 
-The offload test suite has infrastructure to write individual tests for
-semantics and texture/sampler methods. As noted below, there are a number of
-runtime features that are not supported in the offload test suite, which should
-all be added for completion of this workstream.
+The offload test suite has the infrastructure required to test all semantics
+and texture/sampler buffer useage, for both Vulkan and DirectX. As noted below,
+there are a number of runtime features that are not currently supported in the
+offload test suite and why they are required, each of these should be added for
+completion of this workstream.
 
 ### Missing Features
 
 The offload test suite requires the following runtime features:
 
+#### Semantics Related
+
+ - Depth/stencil buffer support, for `SV_Depth`, `SV_DepthLessEqual`,
+   `SV_DepthGreaterEqual`, and `SV_StencilRef`.
+ - MSAA render target support, for `SV_SampleIndex` and `SV_Coverage`.
+ - Conservative rasterization, for `SV_InnerCoverage`.
+ - Multiple viewport support, for `SV_ViewPortArrayIndex`.
+ - Multi-view rendering, for `SV_ViewID`.
+ - Variable rate shading, for `SV_ShadingRate`.
+
+#### Texture/Sampler Related
+
  - Sampler and SRV descriptor creation, to bind textures and samplers to
    shader registers. Implemented for Vulkan but not DirectX.
  - Comparison sampler descriptor creation, to create samplers with a
    `ComparisonFunc` for `SampleCmp` and `GatherCmp` methods.
- - `Texture*Array` type support, to test array texture types for both
-   backends.
- - Depth/stencil buffer support, to test `SV_Depth`,
-   `SV_DepthLessEqual`, `SV_DepthGreaterEqual`, and `SV_StencilRef`.
- - MSAA render target support, to test `SV_SampleIndex` and
-   `SV_Coverage`.
- - Conservative rasterization, to test `SV_InnerCoverage`.
- - Multiple viewport support, to test `SV_ViewPortArrayIndex`.
- - Multi-view rendering, to test `SV_ViewID`.
- - Variable rate shading, to test `SV_ShadingRate`.
+ - `Texture*Array` type support, for
+   [core texture types](#Texture-Sampler-Types-and-Methods)
+ - `FeedbackTexture` type support, for [feedback textures](#Feedback-Textures)
+ - Reserved (sparse) textures with mapped/unmapped tiles, for
+   [tiled resources](#Tiled-Resource-Methods)
 
-### Required Tests
+### Testing
 
-As the infrastructure to write tests becomes available, it is required to have
-an end-to-end offload test for each system value semantic and for each
-texture/sampler method. This workstream contains the work to write these
-individual test cases.
+Each of these features will require independent testing for each feature, in
+the sense that the testing is orthogonal to any testing of specific semantics or
+texture/sampler support.
 
 ## Workstream 2: Semantics and Signatures
 
@@ -233,6 +238,15 @@ an existing mechanism to validate the generated parts.
  - Ensure [Container Signature Parts](0040-semantics-overview.md#dxildxbc-container-signature-parts)
    is consistent with the definitions in `DXContainer.h`.
 
+### Offload Test Suite
+
+For each semantic listed in [Semantics to Support](#Semantics-to-Support),
+there must be an individual testcase implemented. The test should ensure that
+the system generated value of a semantic is correct, for both an input/output
+semantic. This can follow the style of simplying writing to the output buffer,
+or, using `VertexData`/`VertexAttributes` to define a render target to ensure
+it is correct per pixel.
+
 ## Workstream 3: Core Texture and Sampler Support
 
 ### Goal
@@ -286,21 +300,25 @@ The `ShaderFlagsAnalysis` pass will need to be extended to set advanced texture
 usage flags when texture operations are present in the module, see
 [here](https://github.com/llvm/llvm-project/issues/116137).
 
-## Workstreams 4-6: Method Extensions
+### Offload Test Suite
+
+For each of the listed methods and types, there must an individual test case
+added to the offload test suite. The style of these test-cases is described
+[here](#0037-texture-and-sampler-types.md#detailed-testing-example-samplelevel).
+
+## Workstreams 4: Advanced Texture Methods
 
 ### Goal
 
-The remaining workstreams follow the same goal to implement a sub-set of the
-remaining methods. And have similar work required. When all these workstreams
-are complete, then all texture/sampler methods are implemented.
-
-#### Work Required
+The final workstream results in all texture/sampler methods being implemented.
+This can be broken down into rougly three parts that will follow the same
+process to:
 
  - Update the proposal to include support for missing methods
  - Add missing functionality to the offload test suite
  - Implement methods as described
 
-### Workstream 4: Query, Comparison Sampling and Gather Methods
+### Query, Comparison Sampling and Gather Methods
 
  - `GetDimensions`
  - `CalculateLevelOfDetail`
@@ -318,7 +336,7 @@ are complete, then all texture/sampler methods are implemented.
 `SampleCmpBias`, `SampleCmpLevel`, `SampleCmpGrad` are not currently
 described in [Texture and Sampler Types](0037-texture-and-sampler-types.md).
 
-### Workstream 5: Tiled Resource Methods
+### Tiled Resource Methods
 
 Add status parameter overloads to `Load`, `Store`, `Sample*`, and `Gather*`
 methods that return a status value for `CheckAccessFullyMapped`.
@@ -329,9 +347,7 @@ methods that return a status value for `CheckAccessFullyMapped`.
 Testing tiled resources end-to-end requires creating reserved (sparse) textures
 with mapped/unmapped tiles in the offload test suite.
 
-## Workstream 6: Feedback Textures
-
-### Types and Methods
+### Feedback Textures
 
  - `FeedbackTexture2D`, `FeedbackTexture2DArray`
  - `WriteSamplerFeedback`
@@ -344,7 +360,13 @@ texture streaming systems.
 
 Testing requires creating feedback texture resources in the offload test suite.
 
-### Out of Scope
+### Offload Test Suite
+
+For each of the listed methods and types, there must an individual test case
+added to the offload test suite. The style of these test-cases is described
+[here](#0037-texture-and-sampler-types.md#detailed-testing-example-samplelevel).
+
+## Out of Scope
 
 The following are excluded from this proposal:
 
