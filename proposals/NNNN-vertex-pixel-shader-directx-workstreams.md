@@ -19,7 +19,7 @@ The work is organized into six workstreams:
  1. Vertex and Pixel Shader Test Infrastructure
  2. Semantics and Signatures
  3. Core Texture and Sampler Support
- 4. Queries, Comparison Sampling, and Gather
+ 4. Queries, Comparison Sampling, and Gather Methods
  5. Tiled Resources
  6. Feedback Textures
 
@@ -100,7 +100,7 @@ The offload test suite requires the following runtime features:
 
 ### Required Tests
 
-As the infrastructure to write tests becomes availabel, it is required to have
+As the infrastructure to write tests becomes available, it is required to have
 an end-to-end offload test for each system value semantic and for each
 texture/sampler method. This workstream contains the work to write these
 individual test cases.
@@ -166,11 +166,9 @@ emission for the load/store intrinsic.
 Clang has this general algorithm implemented and the dispatch to SPIR-V
 emission supports existing semantics. When targeting DirectX it emits
 placeholder calls to `llvm.dx.load.input` and `llvm.dx.store.output`.
-
-assigning
-a unique signature element ID per flattened semantic element and emitting the
-correct relative row and component indices. The signature element IDs must be
-consistent with the metadata schema described below.
+assigning a unique signature element ID per flattened semantic element and
+emitting the correct relative row and component indices. The signature element
+IDs must be consistent with the metadata schema described below.
 
 #### Work Required
 
@@ -213,7 +211,7 @@ further details.
 
  - Define an intermediate module metadata schema containing the above
    information and describe it in a proposal
- - Update CodeGeneration to generate the module metadata
+ - Update `CGHLSLCodeGen` to generate the module metadata
 
 ### Generate DXContainer Signature Parts
 
