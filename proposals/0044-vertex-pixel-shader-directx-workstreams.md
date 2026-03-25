@@ -14,7 +14,7 @@ Clang. This includes semantic and signature support, texture/sampler types and
 their methods, and the extensions to the offload test suite required to
 validate them.
 
-The work is organized into six workstreams:
+The work is organized into four workstreams:
 
  1. Vertex and Pixel Shader Test Infrastructure
  2. Semantics and Signatures
