@@ -212,6 +212,7 @@ further details.
  - Define an intermediate module metadata schema containing the above
    information and describe it in a proposal
  - Update `CGHLSLCodeGen` to generate the module metadata
+ - Add appropriate shader flag analysis: https://github.com/llvm/llvm-project/issues/116200
 
 ### Generate DXContainer Signature Parts
 
