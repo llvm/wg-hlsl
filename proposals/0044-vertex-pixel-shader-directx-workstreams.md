@@ -1,9 +1,9 @@
 ---
-title: "[NNNN] - Vertex + Pixel Shader Workstreams"
+title: "[0044] - Vertex + Pixel Shader Workstreams"
 params:
   authors:
     - inbelic: Finn Plummer
-  status: Under Consideration
+  status: Approved
   sponsors:
 ---
 
