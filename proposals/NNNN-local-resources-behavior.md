@@ -247,18 +247,22 @@ tests that are fully clean.
 
 ### Tests added
 
-The **55 tests** that produce a compiled output from Clang are placed
-directly in `test/Feature/LocalResources/`. This includes the 45 tests
-that are fully clean on both compilers, as well as 10 tests where Clang
-emits `-Whlsl-explicit-binding` warnings but still produces compiled
+The **55 tests** that produce a compiled output from both compilers are
+placed directly in `test/Feature/LocalResources/`. This includes the 45
+tests that are fully clean on both compilers, as well as 10 tests where
+Clang emits `-Whlsl-explicit-binding` warnings but still produces compiled
 output (reassignment patterns across control flow, switches, and loops).
 
-Two additional subdirectories capture tests that compile on only one
-compiler:
+Three subdirectories capture tests that compile on only one compiler:
 
 - **`ClangPass/`** (4 tests) — Clang produces compiled output, but DXC
-  errors or ICEs. These include conditional init, default-init store,
-  static local resources, and ternary lvalue assignment.
+  errors or ICEs at sema. These include conditional init, default-init
+  store, static local resources, and ternary lvalue assignment.
+- **`ClangPass/DXCFailsCodegen/`** (10 tests) — Clang produces compiled
+  output, but DXC fails during its `DxilCondenseResources` codegen pass.
+  These include ternary conditional assignment, phi merges, wave-conditional
+  reassignment, break/continue reassignment, multiple return paths, and
+  groupshared struct usage.
 - **`DXCPass/`** (1 test) — DXC produces compiled output, but Clang
   fails to compile. Currently only `local_resource_volatile.hlsl`, where
   DXC silently accepts `volatile` on resources but Clang errors because
@@ -269,11 +273,12 @@ compiler:
 | Location | Count | Contents |
 |----------|-------|----------|
 | `SemaHLSL/Resources/Local-Resources/` | 15 | Fail to compile on **both** compilers (invalid type ops, bad declarations) |
-| `CodeGenHLSL/resources/Local-Resources/` | 11 | Codegen-stage tests (DXC codegen failures, groupshared) |
+| `CodeGenHLSL/resources/Local-Resources/` | 11 | Codegen-stage tests (DXC codegen failures, groupshared). Duplicated in `ClangPass/DXCFailsCodegen/` below. |
 | `offload-test-suite/test/Feature/LocalResources/` | 55 | Produce compiled output on **both** compilers (clean, or Clang warns) |
-| `offload-test-suite/test/Feature/LocalResources/ClangPass/` | 4 | Clang compiles, DXC fails (ICE or codegen error) |
+| `offload-test-suite/test/Feature/LocalResources/ClangPass/` | 4 | Clang compiles, DXC fails at sema (ICE or error) |
+| `offload-test-suite/test/Feature/LocalResources/ClangPass/DXCFailsCodegen/` | 10 | Clang compiles, DXC fails at codegen. Copy of `CodeGenHLSL/resources/Local-Resources/` (minus `use_groupshared.hlsl` which fails Clang sema). |
 | `offload-test-suite/test/Feature/LocalResources/DXCPass/` | 1 | DXC compiles, Clang fails to compile |
-| **Total** | **86** | |
+| **Total** | **96** | |
 
 Tests that produce errors on **both** compilers (invalid type operations,
 bad declarations) are not included in the offload test suite since neither
