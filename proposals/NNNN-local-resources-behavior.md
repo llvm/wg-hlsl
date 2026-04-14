@@ -247,20 +247,33 @@ tests that are fully clean.
 
 ### Tests added
 
-The **45 tests** that compile cleanly on both DXC and Clang are placed
-directly in `test/Feature/LocalResources/`. These cover basic aliasing,
-copies, parameter passing, structs, arrays, control flow, loops, bindless
-access, function forwarding, and alternative resource types.
+The **55 tests** that produce a compiled output from Clang are placed
+directly in `test/Feature/LocalResources/`. This includes the 45 tests
+that are fully clean on both compilers, as well as 10 tests where Clang
+emits `-Whlsl-explicit-binding` warnings but still produces compiled
+output (reassignment patterns across control flow, switches, and loops).
 
-Two additional subdirectories capture tests that compile cleanly on only
-one compiler:
+Two additional subdirectories capture tests that compile on only one
+compiler:
 
-- **`ClangPass/`** (4 tests) — clean on Clang, but DXC errors or ICEs.
-  These include conditional init, default-init store, static local
-  resources, and ternary lvalue assignment.
-- **`DXCPass/`** (11 tests) — clean on DXC, but Clang emits
-  `-Whlsl-explicit-binding` warnings or errors. These include reassignment
-  patterns across control flow, switches, loops, and `volatile` resources.
+- **`ClangPass/`** (4 tests) — Clang produces compiled output, but DXC
+  errors or ICEs. These include conditional init, default-init store,
+  static local resources, and ternary lvalue assignment.
+- **`DXCPass/`** (1 test) — DXC produces compiled output, but Clang
+  fails to compile. Currently only `local_resource_volatile.hlsl`, where
+  DXC silently accepts `volatile` on resources but Clang errors because
+  the methods are not `volatile`-qualified.
+
+### Test distribution
+
+| Location | Count | Contents |
+|----------|-------|----------|
+| `SemaHLSL/Resources/Local-Resources/` | 15 | Fail to compile on **both** compilers (invalid type ops, bad declarations) |
+| `CodeGenHLSL/resources/Local-Resources/` | 11 | Codegen-stage tests (DXC codegen failures, groupshared) |
+| `offload-test-suite/test/Feature/LocalResources/` | 55 | Produce compiled output on **both** compilers (clean, or Clang warns) |
+| `offload-test-suite/test/Feature/LocalResources/ClangPass/` | 4 | Clang compiles, DXC fails (ICE or codegen error) |
+| `offload-test-suite/test/Feature/LocalResources/DXCPass/` | 1 | DXC compiles, Clang fails to compile |
+| **Total** | **86** | |
 
 Tests that produce errors on **both** compilers (invalid type operations,
 bad declarations) are not included in the offload test suite since neither
