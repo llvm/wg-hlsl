@@ -28,9 +28,12 @@ standard, and it is used.
 ## Proposed solution
 
 We propose implementing `ConstantBuffer<T>` as a built-in template class that
-provides an implicit conversion to `T &`. To ensure a seamless developer
-experience, `Sema` will be modified to automatically inject this conversion when
-accessing members of a `ConstantBuffer`.
+provides an implicit conversion to `const hlsl_constant T &`. To ensure a
+seamless developer experience, `Sema` will be modified to automatically inject
+this conversion when accessing members of a `ConstantBuffer`.
+
+Places with HLSL specific handling for aggregates will also be updated to
+convert the `ConstantBuffer<T>` to `T` when necessary.
 
 ### Frontend (Clang AST/Sema)
 
@@ -39,51 +42,42 @@ accessing members of a `ConstantBuffer`.
     `__hlsl_resource_t` member (the handle). The handle's contained type is
     exactly `T`.
 2.  **Implicit Conversion Operator:** Define an implicit conversion operator
-    `operator const T &() const` within the `ConstantBuffer<T>` template.
+    `operator const hlsl_constant T &() const` within the `ConstantBuffer<T>`
+    template.
 3.  **Sema Member Lookup Interception:** Modify `Sema::LookupMemberExpr` (in
     `SemaExprMember.cpp`) to detect member accesses on `ConstantBuffer<T>`. If
     detected, Sema will inject a call to the implicit conversion operator,
-    effectively transforming `cb.field` into `((const T &)cb).field`.
+    effectively transforming `cb.field` into
+    `((const hlsl_constant T &)cb).field`.
 4.  **Sema Constraints:** Enforce that `T` must be a user-defined struct or
     class, and reject primitive types, vectors, arrays, or matrices as `T`.
-5.  **Copy Semantics:** Define a custom copy constructor and copy assignment
-    operator that strictly copies the `__hlsl_resource_t` handle. This ensures
-    the `ConstantBuffer` remains a lightweight reference to the underlying
-    resource.
 
 ### CodeGen (Clang)
 
 1.  **Handle Types:** Emit instances of `ConstantBuffer<T>` using the
-    `target("dx.CBuffer", T)` extension type.
+    appropriate target types.
 2.  **Conversion Operator Implementation:** The conversion operator is
-    implemented using a new HLSL-specific builtin
-    `__builtin_hlsl_resource_getpointer`.
-3.  **Intrinsic Redirection:** In CodeGen, this builtin lowers to a new overload
-    of the `llvm.dx.resource.getpointer` intrinsic. Unlike the version used for
-    buffers, this overload does not take an offset index, as `ConstantBuffer`
-    always represents a single instance of `T` at the start of the buffer.
-    - `ptr addrspace(2) @llvm.dx.resource.getpointer(target("dx.CBuffer", T) %handle)`
+    implemented using a new overload of `__builtin_hlsl_resource_getpointer`
+    that does not take an index.
+3.  **Intrinsic Redirection:** In CodeGen, this builtin lowers to a new target
+    intrinsic `llvm.[dx|spv].resource.getbasepointer` intrinsic. Unlike the
+    version used for buffers, this overload does not take an offset index, as
+    `ConstantBuffer` always represents a single instance of `T` at the start of
+    the buffer.
 4.  **Pointer Address Space:** The resulting pointer targets the appropriate
     constant/uniform address space (`addrspace(2)` for DXIL, `addrspace(12)` for
-    SPIR-V). Standard CodeGen then applies `getelementptr` for field access.
+    SPIR-V).
 
 ### Backend (LLVM)
 
-**New Intrinsic Overload:** This implementation requires a new overload for the
-resource pointer intrinsics:
-
-- `llvm.dx.resource.getpointer`
-- `llvm.spv.resource.getpointer`
-
-Previously, these intrinsics required an index parameter (used for
-arrays/buffers). The new overload takes _only_ the resource handle, representing
-an access to the base of the resource, which aligns perfectly with
-`ConstantBuffer` semantics.
-
-The LLVM backend will translate this new `getpointer` overload and the
+**New Intrinsic:** The new intrinsic `llvm.[dx|spv].resource.getbasepointer`
+will have to be implemented in the DirectX and SPIR-V backends. This intrinsic
+will be the same as `llvm.[dx|spv].resource.getpointer` except it does not have
+to index into the struct contained in the resource. For SPIR-V, this will simply
+return the result of the `OpVariable` instruction that defines the resource. For
+DirectX, the backend will translate this new `getbasepointer` intrinsic and the
 subsequent `getelementptr` and `load` operations into the appropriate
-`dx.op.cbufferLoadLegacy` or `dx.op.cbufferLoad` operations in DirectX, or the
-equivalent `OpAccessChain` and `OpLoad` operations in SPIR-V.
+`dx.op.cbufferLoadLegacy` or `dx.op.cbufferLoad` operations.
 
 ## Detailed design
 
@@ -100,8 +94,8 @@ class ConstantBuffer {
 
 public:
   // Implicit conversion to const reference of type T
-  operator const T&() const {
-    return (const T&)__builtin_hlsl_resource_getpointer(__handle);
+  operator const hlsl_constant T&() const {
+    return (const hlsl_constant T&)__builtin_hlsl_resource_getpointer(__handle);
   }
 
   // Copy operations copy the handle, not the underlying data
@@ -136,13 +130,17 @@ float main() {
 
 ```text
 `-MemberExpr 'float' lvalue .a
-  `-CXXMemberCallExpr 'S' lvalue
-    `-MemberExpr '<bound member function type>' .operator S &
+  `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
+    `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
       `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
         `-DeclRefExpr 'cb'
 ```
 
 #### 2. Local Assignment
+
+TODO: This needs to be updated based on the implementation in
+https://github.com/llvm/llvm-project/pull/190089. That PR will disable implicit
+conversions.
 
 Assigning a `ConstantBuffer<T>` to a local variable of type `T` triggers the
 implicit conversion operator, followed by `T`'s standard copy constructor.
@@ -157,13 +155,17 @@ S local = cb;
 `-CXXConstructExpr 'S' 'void (const S &)'
   `-ImplicitCastExpr 'const S' lvalue <NoOp>
     `-ImplicitCastExpr 'S' lvalue <UserDefinedConversion>
-      `-CXXMemberCallExpr 'S' lvalue
-        `-MemberExpr '<bound member function type>' .operator S &
+      `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
+        `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
           `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
             `-DeclRefExpr 'cb'
 ```
 
 #### 3. Function Parameters
+
+TODO: This needs to be updated based on the implementation in
+https://github.com/llvm/llvm-project/pull/190089. That PR will disable implicit
+conversions.
 
 Passing a `ConstantBuffer<T>` to a function expecting `T` invokes the implicit
 conversion. Passing it to a function expecting `ConstantBuffer<T>` invokes the
@@ -174,7 +176,7 @@ void takes_s(S s) {}
 void takes_cb(ConstantBuffer<S> c) {}
 
 void test() {
-  takes_s(cb);  // Calls operator S&() and copies data into argument
+  takes_s(cb);  // Calls operator const hlsl_constant S&() and copies data into argument
   takes_cb(cb); // Calls ConstantBuffer(const ConstantBuffer&) and copies handle
 }
 ```
@@ -182,7 +184,9 @@ void test() {
 #### 4. Array Indexing
 
 For arrays of `ConstantBuffer`, the subscript operator first resolves the
-handle, and then the implicit conversion occurs on the indexed element.
+handle, and then the implicit conversion occurs on the indexed element. This
+code will be handled the same way that other resource arrays are handled. No
+specific code changes are necessary.
 
 ```hlsl
 ConstantBuffer<S> cb_arr[2];
@@ -219,13 +223,13 @@ instantiation mechanism rebuilds the member expression. Since the type of `t` is
 now known to be `ConstantBuffer<S>`, the standard member lookup logic in
 `Sema::LookupMemberExpr` is triggered. Our interception logic then identifies
 `ConstantBuffer<S>` and injects the call to the implicit conversion operator
-`operator S&()`, resulting in the same AST structure as non-templated member
-access:
+`operator const hlsl_constant S&()`, resulting in the same AST structure as
+non-templated member access:
 
 ```text
 `-MemberExpr 'float' lvalue .a
-  `-CXXMemberCallExpr 'S' lvalue
-    `-MemberExpr '<bound member function type>' .operator S &
+  `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
+    `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
       `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
         `-DeclRefExpr 't' 'hlsl::ConstantBuffer<S>'
 ```
@@ -236,9 +240,10 @@ instantiation.
 
 ### CodeGen and LLVM IR
 
-When Clang emits LLVM IR for the `operator T&()` conversion, it utilizes the
-`llvm.dx.resource.getpointer` (or `llvm.spv.resource.getpointer`) intrinsic to
-retrieve an address space qualified pointer.
+When Clang emits LLVM IR for the `operator const hlsl_constant T&()` conversion,
+it utilizes the `llvm.dx.resource.getbasepointer` (or
+`llvm.spv.resource.getbasepointer`) intrinsic to retrieve an address space
+qualified pointer.
 
 #### DXIL Example
 
@@ -249,9 +254,9 @@ constant address space).
 ; The handle type
 %"class.hlsl::ConstantBuffer" = type { target("dx.CBuffer", %struct.S) }
 
-; 1. The implicit conversion resolves to the getpointer intrinsic
+; 1. The implicit conversion resolves to the getbasepointer intrinsic
 %handle = load target("dx.CBuffer", %struct.S), ptr %cb, align 4
-%base_ptr = call ptr addrspace(2) @llvm.dx.resource.getpointer.p2.tdx.CBuffer_s_Sst(target("dx.CBuffer", %struct.S) %handle)
+%base_ptr = call ptr addrspace(2) @llvm.dx.resource.getbasepointer.p2.tdx.CBuffer_s_Sst(target("dx.CBuffer", %struct.S) %handle)
 
 ; 2. The MemberExpr applies a GEP
 %gep = getelementptr inbounds %struct.S, ptr addrspace(2) %base_ptr, i32 0, i32 0
@@ -271,7 +276,7 @@ pointer is in `addrspace(12)`.
 
 ; 1. Pointer acquisition
 %handle = load target("spirv.VulkanBuffer", %struct.S, 2, 0), ptr %cb, align 8
-%base_ptr = call ptr addrspace(12) @llvm.spv.resource.getpointer.p12.tspirv.VulkanBuffer_s_Sst(target("spirv.VulkanBuffer", %struct.S, 2, 0) %handle)
+%base_ptr = call ptr addrspace(12) @llvm.spv.resource.getbasepointer.p12.tspirv.VulkanBuffer_s_Sst(target("spirv.VulkanBuffer", %struct.S, 2, 0) %handle)
 
 ; 2. GEP and load
 %gep = getelementptr inbounds %struct.S, ptr addrspace(12) %base_ptr, i32 0, i32 0
