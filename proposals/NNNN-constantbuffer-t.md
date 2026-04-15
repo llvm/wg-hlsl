@@ -17,7 +17,7 @@ behaves as a standard type, supporting instantiation, arrays, function
 parameters, and assignments. The `ConstantBuffer<T>` type acts more like other
 resource type than it does a `cbuffer`. The unique aspect of the
 `ConstantBuffer<T>` type is that it can be used as a drop in replacement for
-`T`, as if ConstantBuffer<T> inherited from `T`. However, it is not really
+`T`, as if `ConstantBuffer<T>` inherited from `T`. However, it is not really
 inheritance.
 
 ## Motivation
@@ -50,7 +50,14 @@ convert the `ConstantBuffer<T>` to `T` when necessary.
     effectively transforming `cb.field` into
     `((const hlsl_constant T &)cb).field`.
 4.  **Sema Constraints:** Enforce that `T` must be a user-defined struct or
-    class, and reject primitive types, vectors, arrays, or matrices as `T`.
+    class, and reject primitive types, vectors, arrays, or matrices as `T`. This
+    is implemented using a C++20 concept constraint named
+    `__is_constant_buffer_element_compatible` applied to the `ConstantBuffer`
+    template declaration in `HLSLExternalSemaSource.cpp`. This concept evaluates
+    a new built-in type trait
+    `__builtin_hlsl_is_constant_buffer_element_compatible` to verify that `T` is
+    a complete struct/class (not a union) and does not contain any intangible
+    types.
 
 ### CodeGen (Clang)
 
@@ -140,7 +147,7 @@ float main() {
 
 TODO: This needs to be updated based on the implementation in
 https://github.com/llvm/llvm-project/pull/190089. That PR will disable implicit
-conversions.
+copy constructors.
 
 Assigning a `ConstantBuffer<T>` to a local variable of type `T` triggers the
 implicit conversion operator, followed by `T`'s standard copy constructor.
@@ -165,7 +172,7 @@ S local = cb;
 
 TODO: This needs to be updated based on the implementation in
 https://github.com/llvm/llvm-project/pull/190089. That PR will disable implicit
-conversions.
+copy constructors.
 
 Passing a `ConstantBuffer<T>` to a function expecting `T` invokes the implicit
 conversion. Passing it to a function expecting `ConstantBuffer<T>` invokes the
@@ -284,6 +291,19 @@ pointer is in `addrspace(12)`.
 ```
 
 ## Alternatives considered
+
+### Reusing `getpointer` with index 0
+
+We considered reusing the existing `llvm.[dx|spv].resource.getpointer` intrinsic
+with an index of `0`. However, for this to work semantically in SPIR-V, we would
+have to wrap `T` in another struct when defining the `Vulkan.buffer` type
+because the `0` has a meaning to index into the type. We believe this cannot be
+cleanly implemented. Attempting to wrap T when adding the handle to the
+`ConstantBuffer` quickly turned into having many special cases. It couldn't be
+done when lowering the type of the handle to the SPIR-V target extension type
+because we cannot distinguish between a `cbuffer` and `ConstantBuffer` at that
+point, and we should be wrapping only one of them. The cleanest solution is to
+avoid using an index entirely.
 
 ### Reusing the Legacy `cbuffer` Model
 
