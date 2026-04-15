@@ -280,9 +280,6 @@ suite based on the following rules:
 
 - **`SemaHLSL/Resources/Local-Resources/`** — Tests that emit a warning
   or error in Clang at the sema stage, regardless of DXC behavior.
-- **`CodeGenHLSL/resources/Local-Resources/`** — Tests that fail in Clang
-  at the codegen stage. Currently empty; no local resource tests trigger
-  Clang codegen failures.
 - **`offload-test-suite/test/Feature/LocalResources/`** — Tests where
   both compilers produce a compiled output (warnings are acceptable).
 - **`offload-test-suite/.../ClangPass-DXCSemaError/`** — Tests where
@@ -300,13 +297,12 @@ exist in both the clang repo (SemaHLSL) and the offload test suite.
 | Location | Count | Contents |
 |----------|-------|----------|
 | `SemaHLSL/Resources/Local-Resources/` | 35 | Clang emits sema warning or error (regardless of DXC) |
-| `CodeGenHLSL/resources/Local-Resources/` | 0 | Clang codegen failures (none currently) |
 | `offload-test-suite/test/Feature/LocalResources/` | 56 | Both compilers produce compiled output (clean, or Clang warns) |
 | `offload-test-suite/.../ClangPass-DXCSemaError/` | 1 | Clang compiles, DXC fails at sema |
 | `offload-test-suite/.../ClangPass-DXCCodegenError/` | 14 | Clang compiles, DXC fails at codegen |
 | `offload-test-suite/.../DXCPass-ClangError/` | 1 | DXC compiles, Clang fails to compile |
 
-21 tests exist in both the clang repo and the offload test suite because
+20 tests exist in both the clang repo and the offload test suite because
 they emit Clang sema diagnostics (qualifying for SemaHLSL) while also
 producing compiled output from at least one compiler (qualifying for
 the offload test suite).
@@ -335,7 +331,6 @@ the offload test suite).
 | `local_resource_volatile.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/DXCPass-ClangError/` |
 | `local_resource_wave_uniform.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
 | `ternary_initialization.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `use_groupshared.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
 
 Tests that produce errors on **both** compilers (invalid type operations,
 bad declarations) are not included in the offload test suite since neither
