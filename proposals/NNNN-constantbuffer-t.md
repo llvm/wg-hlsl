@@ -28,9 +28,16 @@ standard, and it is used.
 ## Proposed solution
 
 We propose implementing `ConstantBuffer<T>` as a built-in template class that
-provides an implicit conversion to `const hlsl_constant T &`. To ensure a
-seamless developer experience, `Sema` will be modified to automatically inject
-this conversion when accessing members of a `ConstantBuffer`.
+provides an implicit conversion to a reference of type `T` in the
+`hlsl_constant` address space. To maintain compatibility with DXC, which allowed
+calling non-const member functions on `ConstantBuffer` objects, the conversion
+operator will return a non-const reference (`hlsl_constant T &`) in HLSL 202x.
+Starting with HLSL 202y, the operator will return a const reference
+(`const hlsl_constant T &`) to enforce proper const-correctness. Developers can
+use `clang-tidy` to identify and mark member functions as `const` to prepare for
+this transition. To ensure a seamless developer experience, `Sema` will be
+modified to automatically inject this conversion when accessing members of a
+`ConstantBuffer`.
 
 Places with HLSL specific handling for aggregates will also be updated to
 convert the `ConstantBuffer<T>` to `T` when necessary.
@@ -42,13 +49,13 @@ convert the `ConstantBuffer<T>` to `T` when necessary.
     `__hlsl_resource_t` member (the handle). The handle's contained type is
     exactly `T`.
 2.  **Implicit Conversion Operator:** Define an implicit conversion operator
-    `operator const hlsl_constant T &() const` within the `ConstantBuffer<T>`
+    `operator hlsl_constant T &() const` within the `ConstantBuffer<T>`
     template.
 3.  **Sema Member Lookup Interception:** Modify `Sema::LookupMemberExpr` (in
     `SemaExprMember.cpp`) to detect member accesses on `ConstantBuffer<T>`. If
     detected, Sema will inject a call to the implicit conversion operator,
     effectively transforming `cb.field` into
-    `((const hlsl_constant T &)cb).field`.
+    `((hlsl_constant T &)cb).field`.
 4.  **Sema Constraints:** Enforce that `T` must be a user-defined struct or
     class, and reject primitive types, vectors, arrays, or matrices as `T`. This
     is implemented using a C++20 concept constraint named
@@ -100,9 +107,9 @@ class ConstantBuffer {
   __hlsl_resource_t [[hlsl::resource_class(CBuffer)]] [[hlsl::contained_type(T)]] __handle;
 
 public:
-  // Implicit conversion to const reference of type T
-  operator const hlsl_constant T&() const {
-    return (const hlsl_constant T&)__builtin_hlsl_resource_getpointer(__handle);
+  // Implicit conversion to reference of type T (non-const for HLSL 202x)
+  operator hlsl_constant T&() const {
+    return *__builtin_hlsl_resource_getpointer(__handle);
   }
 
   // Copy operations copy the handle, not the underlying data
@@ -137,8 +144,8 @@ float main() {
 
 ```text
 `-MemberExpr 'float' lvalue .a
-  `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
-    `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
+  `-CXXMemberCallExpr 'hlsl_constant S' lvalue
+    `-MemberExpr '<bound member function type>' .operator hlsl_constant S &
       `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
         `-DeclRefExpr 'cb'
 ```
@@ -162,8 +169,8 @@ S local = cb;
 `-CXXConstructExpr 'S' 'void (const S &)'
   `-ImplicitCastExpr 'const S' lvalue <NoOp>
     `-ImplicitCastExpr 'S' lvalue <UserDefinedConversion>
-      `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
-        `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
+      `-CXXMemberCallExpr 'hlsl_constant S' lvalue
+        `-MemberExpr '<bound member function type>' .operator hlsl_constant S &
           `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
             `-DeclRefExpr 'cb'
 ```
@@ -183,7 +190,7 @@ void takes_s(S s) {}
 void takes_cb(ConstantBuffer<S> c) {}
 
 void test() {
-  takes_s(cb);  // Calls operator const hlsl_constant S&() and copies data into argument
+  takes_s(cb);  // Calls operator hlsl_constant S&() and copies data into argument
   takes_cb(cb); // Calls ConstantBuffer(const ConstantBuffer&) and copies handle
 }
 ```
@@ -230,13 +237,13 @@ instantiation mechanism rebuilds the member expression. Since the type of `t` is
 now known to be `ConstantBuffer<S>`, the standard member lookup logic in
 `Sema::LookupMemberExpr` is triggered. Our interception logic then identifies
 `ConstantBuffer<S>` and injects the call to the implicit conversion operator
-`operator const hlsl_constant S&()`, resulting in the same AST structure as
+`operator hlsl_constant S&()`, resulting in the same AST structure as
 non-templated member access:
 
 ```text
 `-MemberExpr 'float' lvalue .a
-  `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
-    `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
+  `-CXXMemberCallExpr 'hlsl_constant S' lvalue
+    `-MemberExpr '<bound member function type>' .operator hlsl_constant S &
       `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
         `-DeclRefExpr 't' 'hlsl::ConstantBuffer<S>'
 ```
@@ -247,7 +254,7 @@ instantiation.
 
 ### CodeGen and LLVM IR
 
-When Clang emits LLVM IR for the `operator const hlsl_constant T&()` conversion,
+When Clang emits LLVM IR for the `operator hlsl_constant T&()` conversion,
 it utilizes the `llvm.dx.resource.getbasepointer` (or
 `llvm.spv.resource.getbasepointer`) intrinsic to retrieve an address space
 qualified pointer.
