@@ -247,6 +247,20 @@ non-templated member access:
         `-DeclRefExpr 't' 'hlsl::ConstantBuffer<S>'
 ```
 
+#### 6. Unsupported Types
+
+`ConstantBuffer<T>` enforces the `__is_constant_buffer_element_compatible`
+constraint. This constraint ensures that `T` is a valid struct or class and does
+not contain any intangible types, such as other resource handles. Attempting to
+instantiate a `ConstantBuffer` with a type that contains a resource (e.g.,
+`RWBuffer`, `StructuredBuffer`) will result in a compile-time error.
+
+```hlsl
+struct S { RWBuffer<float> buf; };
+// Error: constraints not satisfied for class template 'ConstantBuffer'
+ConstantBuffer<S> cb;
+```
+
 This ensures that `ConstantBuffer<T>` remains a "drop-in" replacement for `T`
 even in generic code, as the transformation happens seamlessly during template
 instantiation.
@@ -381,6 +395,13 @@ allow member functions to be called on objects in any address space. See
    smoother transition. We should discuss whether the benefits of enforcing
    const-correctness earlier justify the potential for increased migration
    effort.
+
+4. **ConstantBuffer<T> where T contains a resource:** Should we support nesting
+   `ConstantBuffer` types or other resources? DXC has limited support for
+   defining a resource in a type `T` and using it in a `ConstantBuffer`, but it
+   fails when the `ConstantBuffer` is in an array and has never been supported
+   for SPIR-V. The current proposal does not allow this, as discussed in
+   [Unsupported Types](#6-unsupported-types).
 
 ## Acknowledgments
 
