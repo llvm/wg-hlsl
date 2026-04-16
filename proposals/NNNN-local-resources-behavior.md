@@ -56,8 +56,8 @@ both DXC and Clang.
 | Parenthesized ternary expression init | Clean | Clean |
 | Aggregate init of struct with resource | Clean | Clean |
 | Two resources in a single declaration | Clean | Clean |
-| Use of uninitialized local resource | Clean | Clean |
-| Default-init store (unbound handle) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | **Clean** |
+| Use of uninitialized local resource | Clean | Clean (sema), **Error (codegen)**: DXIL Op Lowering assertion on uninitialized resource Store |
+| Default-init store (unbound handle) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean (sema), **Error (codegen)**: DXIL Op Lowering assertion on unbound handle |
 | Conditional init (`if(cond) buf = g;`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | **Clean** |
 | Comma expression init (`(gBuf0, gBuf1)`) | **Clean** | Warning: *"left operand of comma operator has no effect"* |
 
@@ -67,7 +67,7 @@ both DXC and Clang.
 |---------|-----|-------|
 | Resource as `out` parameter | Clean | Clean |
 | Resource as `inout` parameter | Clean | Clean |
-| Resource as `const` parameter | Clean | Clean |
+| Resource as `const` parameter | **Clean** | Error: *"no matching member function"* (`Load`/`Store` not `const`-qualified) |
 
 ### Struct and Array Patterns
 
@@ -80,8 +80,8 @@ both DXC and Clang.
 | Deeply composed struct layers with resource | Clean | Clean |
 | Plain local array of resources | Clean | Clean |
 | Copy of local resource arrays | Clean | Clean |
-| Dynamic index into a local resource array | Clean | Clean |
-| Partially initialized resource array | Clean | Clean |
+| Dynamic index into a local resource array | Clean | Clean (sema), **Error (codegen)**: DXIL Legalizer assertion on dynamically-indexed local resource arrays |
+| Partially initialized resource array | Clean | Clean (sema), **Error (codegen)**: same DXIL Legalizer assertion |
 | Size-one resource array (edge case) | Clean | Clean |
 | Reassign a struct's resource member | Clean | Clean |
 | Function returning a struct with a resource | Clean | Clean |
@@ -110,6 +110,8 @@ both DXC and Clang.
 | Resource from array in nested loops | Clean | Clean |
 | Loop-carried reassignment from array | **Clean** | Warning (`-Whlsl-explicit-binding`) |
 | Reassignment inside a do-while loop | **Clean** | Warning (`-Whlsl-explicit-binding`) |
+| Reassignment before `break` in loop | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Error (codegen): DXIL Op Lowering assertion |
+| Reassignment before `continue` in loop | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
 
 ### Reassignment and Phi/Merge
 
@@ -248,9 +250,9 @@ compiler fails (sema vs codegen).
 
 ### Tests added
 
-The **56 tests** that produce a compiled output from both compilers are
-placed directly in `test/Feature/LocalResources/`. This includes the 45
-tests that are fully clean on both compilers, 10 tests where Clang
+The **51 tests** that produce a compiled output from both compilers are
+placed directly in `test/Feature/LocalResources/`. This includes tests
+that are fully clean on both compilers, tests where Clang
 emits `-Whlsl-explicit-binding` warnings but still produces compiled
 output (reassignment patterns across control flow, switches, and loops),
 and 1 test (`local_resource_comma_init.hlsl`) where Clang warns about a
@@ -258,20 +260,21 @@ discarded comma operand but both compilers produce output.
 
 Three subdirectories capture tests that compile on only one compiler:
 
-- **`ClangPass-DXCSemaError/`** (1 test) — Clang produces compiled output
-  (with a warning), but DXC fails at sema with a hard error. Currently
-  only `local_resource_array_oob.hlsl`, where Clang warns about an
-  out-of-bounds index but DXC emits a hard sema error.
-- **`ClangPass-DXCCodegenError/`** (14 tests) — Clang produces compiled
+- **`ClangPass-DXCCodegenError/`** (2 tests) — Clang produces compiled
   output, but DXC fails to produce output due to a codegen-stage error
-  or ICE. This includes ternary conditional assignments, phi merges,
-  wave-conditional reassignment, break/continue reassignment, multiple
-  return paths, conditional/default-init patterns, static local resources,
-  ternary lvalue assignment, and groupshared struct usage.
-- **`DXCPass-ClangError/`** (1 test) — DXC produces compiled output, but
-  Clang fails to compile. Currently only `local_resource_volatile.hlsl`,
-  where DXC silently accepts `volatile` on resources but Clang errors
-  because the methods are not `volatile`-qualified.
+  or ICE. Currently `local_resource_conditional_init` and
+  `local_resource_continue_reassign`.
+- **`DXCPass-ClangSemaError/`** (2 tests) — DXC produces compiled output,
+  but Clang fails at sema. Currently `local_resource_volatile` (DXC
+  silently accepts `volatile` on resources but Clang errors because the
+  methods are not `volatile`-qualified) and `local_resource_const_param`
+  (Clang does not mark `Load`/`Store` as `const`-qualified).
+- **`DXCPass-ClangCodegenError/`** (3 tests) — DXC produces compiled
+  output, but Clang crashes during DXIL codegen. Currently
+  `local_resource_array_dynamic_index` and `local_resource_array_partial_init`
+  (DXIL Legalizer assertion on dynamically-indexed local resource arrays)
+  and `use_local_resource_uninitialized` (DXIL Op Lowering assertion on
+  store through uninitialized resource handle).
 
 ### Test distribution
 
@@ -282,27 +285,26 @@ suite based on the following rules:
   or error in Clang at the sema stage, regardless of DXC behavior.
 - **`offload-test-suite/test/Feature/LocalResources/`** — Tests where
   both compilers produce a compiled output (warnings are acceptable).
-- **`offload-test-suite/.../ClangPass-DXCSemaError/`** — Tests where
-  Clang produces a compiled output but DXC fails to produce output due
-  to a non-codegen (sema) diagnostic.
 - **`offload-test-suite/.../ClangPass-DXCCodegenError/`** — Tests where
   Clang produces a compiled output but DXC fails to produce output due
   to a codegen-stage error or ICE.
-- **`offload-test-suite/.../DXCPass-ClangError/`** — Tests where DXC
-  produces a compiled output but Clang fails to compile.
+- **`offload-test-suite/.../DXCPass-ClangSemaError/`** — Tests where DXC
+  produces a compiled output but Clang fails at sema.
+- **`offload-test-suite/.../DXCPass-ClangCodegenError/`** — Tests where DXC
+  produces a compiled output but Clang crashes during DXIL codegen.
 
 Tests that emit Clang sema diagnostics and also produce compiled output
 exist in both the clang repo (SemaHLSL) and the offload test suite.
 
 | Location | Count | Contents |
 |----------|-------|----------|
-| `SemaHLSL/Resources/Local-Resources/` | 35 | Clang emits sema warning or error (regardless of DXC) |
-| `offload-test-suite/test/Feature/LocalResources/` | 56 | Both compilers produce compiled output (clean, or Clang warns) |
-| `offload-test-suite/.../ClangPass-DXCSemaError/` | 1 | Clang compiles, DXC fails at sema |
-| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 14 | Clang compiles, DXC fails at codegen |
-| `offload-test-suite/.../DXCPass-ClangError/` | 1 | DXC compiles, Clang fails to compile |
+| `SemaHLSL/Resources/Local-Resources/` | 40 | Clang emits sema warning or error (regardless of DXC) |
+| `offload-test-suite/test/Feature/LocalResources/` | 51 | Both compilers produce compiled output (clean, or Clang warns) |
+| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 2 | Clang compiles, DXC fails at codegen |
+| `offload-test-suite/.../DXCPass-ClangSemaError/` | 2 | DXC compiles, Clang fails at sema |
+| `offload-test-suite/.../DXCPass-ClangCodegenError/` | 3 | DXC compiles, Clang crashes during DXIL codegen |
 
-20 tests exist in both the clang repo and the offload test suite because
+13 tests exist in both the clang repo and the offload test suite because
 they emit Clang sema diagnostics (qualifying for SemaHLSL) while also
 producing compiled output from at least one compiler (qualifying for
 the offload test suite).
@@ -311,31 +313,26 @@ the offload test suite).
 
 | Test | Locations |
 |------|-----------|
-| `local_resource_array_oob.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCSemaError/` |
-| `local_resource_break_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `local_resource_comma_init.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
+| `local_resource_comma_init.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_continue_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
 | `local_resource_deep_phi.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_do_while_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_early_return_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_loop_carried.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_multiple_returns.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `local_resource_nested_blocks_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_nested_ternary.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `local_resource_phi_merge_ternary.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `local_resource_reassign_different_global.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
+| `local_resource_nested_blocks_reassign.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
+| `local_resource_reassign_different_global.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_switch_default.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_switch_fallthrough.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_switch_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_unreachable_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_volatile.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/DXCPass-ClangError/` |
-| `local_resource_wave_uniform.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `ternary_initialization.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
+| `local_resource_volatile.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/DXCPass-ClangSemaError/` |
 
-Tests that produce errors on **both** compilers (invalid type operations,
-bad declarations) are not included in the offload test suite since neither
-compiler produces a compiled output for them. These 15 tests exist only
-in SemaHLSL.
+The remaining 27 tests in SemaHLSL have no offload test suite counterpart.
+These include tests that produce errors on both compilers (invalid type
+operations, bad declarations), tests where neither compiler produces a
+runnable output (codegen crashes on both sides), and tests whose sema
+behavior is fully covered by the llvm repo's `-verify` or `FileCheck`
+testing without needing runtime execution.
 
 ## Alternatives considered
 
