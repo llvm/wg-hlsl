@@ -54,8 +54,7 @@ convert the `ConstantBuffer<T>` to `T` when necessary.
 3.  **Sema Member Lookup Interception:** Modify `Sema::LookupMemberExpr` (in
     `SemaExprMember.cpp`) to detect member accesses on `ConstantBuffer<T>`. If
     detected, Sema will inject a call to the implicit conversion operator,
-    effectively transforming `cb.field` into
-    `((hlsl_constant T &)cb).field`.
+    effectively transforming `cb.field` into `((hlsl_constant T &)cb).field`.
 4.  **Sema Constraints:** Enforce that `T` must be a user-defined struct or
     class, and reject primitive types, vectors, arrays, or matrices as `T`. This
     is implemented using a C++20 concept constraint named
@@ -254,8 +253,8 @@ instantiation.
 
 ### CodeGen and LLVM IR
 
-When Clang emits LLVM IR for the `operator hlsl_constant T&()` conversion,
-it utilizes the `llvm.dx.resource.getbasepointer` (or
+When Clang emits LLVM IR for the `operator hlsl_constant T&()` conversion, it
+utilizes the `llvm.dx.resource.getbasepointer` (or
 `llvm.spv.resource.getbasepointer`) intrinsic to retrieve an address space
 qualified pointer.
 
@@ -372,6 +371,16 @@ reasons:
 subspace of the `hlsl_generic` address space. This is the same mechanism used to
 allow member functions to be called on objects in any address space. See
 [0021 - Allowing multiple address spaces for the `this` pointer](0021-this-address-space.md).
+
+3. **Const correctness:** Should the conversion operator return a `const`
+   reference for HLSL 202x? Returning a `const` reference would provide earlier,
+   clearer error messages when attempting to write to a `ConstantBuffer`.
+   However, this could require significant code refactoring for existing
+   projects. If we delay this change until HLSL 202y, developers can leverage
+   `clang-tidy` to identify and mark member functions as `const`, facilitating a
+   smoother transition. We should discuss whether the benefits of enforcing
+   const-correctness earlier justify the potential for increased migration
+   effort.
 
 ## Acknowledgments
 
