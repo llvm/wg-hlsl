@@ -361,6 +361,11 @@ reasons:
     implicit conversions? Will we need multiple conversion operators to handle
     different target address spaces or cv-qualifiers?
 
+**Solution:** All HLSL address spaces, including `hlsl_constant`, will be made a
+subspace of the `hlsl_generic` address space. This is the same mechanism used to
+allow member functions to be called on objects in any address space. See
+[0021 - Allowing multiple address spaces for the `this` pointer](0021-this-address-space.md).
+
 ## Acknowledgments
 
 Special thanks to the HLSL working group for examining the limitations of the
