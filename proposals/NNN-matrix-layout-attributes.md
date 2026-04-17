@@ -1,10 +1,10 @@
 
 ---
-title: "[NNNN] - Matrix Layout Attributes"
+title: "[0045] - Matrix Layout Attributes"
 params:
   authors:
     - farzonl: Farzon Lotfi
-  status: Under Consideration
+  status: Accepted
   sponsors:
 ---
 
