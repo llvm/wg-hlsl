@@ -47,7 +47,7 @@ Tests we need:
 - Verifies row_major/column_major are not keywords in C++ mode.
 
 ### 7. Update All global layout check to check attribute first.
- The curent behavior checks `getLangOpts().getDefaultMatrixMemoryLayout()`. This need to be updated to first check for an `HLSLMatrixLayoutAttr` on the relevant declaration before falling back to the global default. A helper function like `isMatrixRowMajor(const Expr *E)` would centralize this logic.
+ The curent behavior checks `getLangOpts().getDefaultMatrixMemoryLayout()`. This needs to be updated to first check for an `HLSLMatrixLayoutAttr` on the relevant declaration before falling back to the global default. A helper function like `isMatrixRowMajor(const Expr *E)` would centralize this logic.
 
 #### Codegen Files (where layout affects IR)
 
@@ -92,7 +92,7 @@ Below are the areas in Codgen that needed to be updated.
 
 #### Sema Files (semantic checks)
 
-Below are the areas in Sema that needed to be updated.
+Below are the areas in Sema that need to be updated.
 
 | File:Line                   | Purpose                          |
 |-----------------------------|----------------------------------|
@@ -103,4 +103,4 @@ Below are the areas in Sema that needed to be updated.
 [SemaChecking.cpp:17102]: https://github.com/llvm/llvm-project/blob/5f62bae5666c3cad5439587fa0f330b92467241a/clang/lib/Sema/SemaChecking.cpp#L17102
 
 ### 8. Tests (Codgen and Init Order)
-We need tests that match the stated purposes int the above two tables.
+We need tests that match the stated purposes in the above two tables.
