@@ -45,6 +45,8 @@ both DXC and Clang.
 
 ### Basic Local Resource Operations
 
+> **Clean** means compilation with 0 warnings and 0 errors.
+
 | Pattern | DXC | Clang |
 |---------|-----|-------|
 | Alias from global (`buf = gBuf0`) | Clean | Clean |
@@ -56,10 +58,10 @@ both DXC and Clang.
 | Parenthesized ternary expression init | Clean | Clean |
 | Aggregate init of struct with resource | Clean | Clean |
 | Two resources in a single declaration | Clean | Clean |
-| Use of uninitialized local resource | Clean | Clean (sema), **Error (codegen)**: DXIL Op Lowering assertion on uninitialized resource Store |
-| Default-init store (unbound handle) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean (sema), **Error (codegen)**: DXIL Op Lowering assertion on unbound handle |
-| Conditional init (`if(cond) buf = g;`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | **Clean** |
-| Comma expression init (`(gBuf0, gBuf1)`) | **Clean** | Warning: *"left operand of comma operator has no effect"* |
+| Use of uninitialized local resource | Clean | Clean (sema), Error (codegen): DXIL Op Lowering assertion on uninitialized resource Store |
+| Default-init store (unbound handle) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean (sema), Error (codegen): DXIL Op Lowering assertion on unbound handle |
+| Conditional init (`if(cond) buf = g;`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
+| Comma expression init (`(gBuf0, gBuf1)`) | Clean | Warning: *"left operand of comma operator has no effect"* |
 
 ### Parameter Passing
 
@@ -67,7 +69,7 @@ both DXC and Clang.
 |---------|-----|-------|
 | Resource as `out` parameter | Clean | Clean |
 | Resource as `inout` parameter | Clean | Clean |
-| Resource as `const` parameter | **Clean** | Error: *"no matching member function"* (`Load`/`Store` not `const`-qualified) |
+| Resource as `const` parameter | Clean | Error: *"no matching member function"* (`Load`/`Store` not `const`-qualified) |
 
 ### Struct and Array Patterns
 
@@ -80,8 +82,8 @@ both DXC and Clang.
 | Deeply composed struct layers with resource | Clean | Clean |
 | Plain local array of resources | Clean | Clean |
 | Copy of local resource arrays | Clean | Clean |
-| Dynamic index into a local resource array | Clean | Clean (sema), **Error (codegen)**: DXIL Legalizer assertion on dynamically-indexed local resource arrays |
-| Partially initialized resource array | Clean | Clean (sema), **Error (codegen)**: same DXIL Legalizer assertion |
+| Dynamic index into a local resource array | Clean | Clean (sema), Error (codegen): DXIL Legalizer assertion on dynamically-indexed local resource arrays |
+| Partially initialized resource array | Clean | Clean (sema), Error (codegen): same DXIL Legalizer assertion |
 | Size-one resource array (edge case) | Clean | Clean |
 | Reassign a struct's resource member | Clean | Clean |
 | Function returning a struct with a resource | Clean | Clean |
@@ -94,12 +96,12 @@ both DXC and Clang.
 |---------|-----|-------|
 | Shadowed resource in inner block | Clean | Clean |
 | Assigned in inner block, used in outer scope | Clean | Clean |
-| Reassign across nested blocks | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Reassign after early return path | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Reassign in unreachable code | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Reassign in switch cases | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Switch with fallthrough reassignment | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Switch with explicit default reassignment | **Clean** | Warning (`-Whlsl-explicit-binding`) |
+| Reassign across nested blocks | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Reassign after early return path | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Reassign in unreachable code | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Reassign in switch cases | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Switch with fallthrough reassignment | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Switch with explicit default reassignment | Clean | Warning (`-Whlsl-explicit-binding`) |
 
 ### Loop Patterns
 
@@ -108,8 +110,8 @@ both DXC and Clang.
 | Resource as a for-loop variable | Clean | Clean |
 | Resource from array inside a loop | Clean | Clean |
 | Resource from array in nested loops | Clean | Clean |
-| Loop-carried reassignment from array | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Reassignment inside a do-while loop | **Clean** | Warning (`-Whlsl-explicit-binding`) |
+| Loop-carried reassignment from array | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Reassignment inside a do-while loop | Clean | Warning (`-Whlsl-explicit-binding`) |
 | Reassignment before `break` in loop | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Error (codegen): DXIL Op Lowering assertion |
 | Reassignment before `continue` in loop | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
 
@@ -117,9 +119,9 @@ both DXC and Clang.
 
 | Pattern | DXC | Clang |
 |---------|-----|-------|
-| Reassign to a different global | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Nested if/else with ternary (deep phi) | **Clean** | Warning (`-Whlsl-explicit-binding`) |
-| Ternary expression as lvalue | **ICE** (internal compiler error) | Clean |
+| Reassign to a different global | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Nested if/else with ternary (deep phi) | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Ternary expression as lvalue | ICE (internal compiler error) | Clean |
 | Swap two locals through a temporary | Clean | Clean |
 
 ### Bindless
@@ -145,8 +147,8 @@ both DXC and Clang.
 
 | Pattern | DXC | Clang |
 |---------|-----|-------|
-| Static local `RWByteAddressBuffer` | **ICE**: `llvm::cast<X>()` incompatible type | Clean |
-| Static local `Texture2D` | **ICE** | N/A (not yet supported) |
+| Static local `RWByteAddressBuffer` | ICE: `llvm::cast<X>()` incompatible type | Clean |
+| Static local `Texture2D` | ICE | N/A (not yet supported) |
 
 ### Type Mixing and Alternative Resource Types
 
@@ -168,17 +170,17 @@ both DXC and Clang.
 | Cast `SamplerState` to `RWByteAddressBuffer` | Error: type mismatch | Error: *"no matching conversion"* |
 | Assign wrong type | Error: type mismatch | Error: *"no viable overloaded '='"* |
 | `const` reassignment | Error: *"cannot assign to const"* | Error: *"cannot assign to variable with const-qualified type"* |
-| `volatile` resource method call | **Clean** (silently accepts `volatile`) | Error: *"no matching member function"* |
-| `static const` resource method call | **ICE** | Error: `Load`/`Store` not `const`-qualified |
+| `volatile` resource method call | Clean (silently accepts `volatile`) | Error: *"no matching member function"* |
+| `static const` resource method call | ICE | Error: `Load`/`Store` not `const`-qualified |
 
 ### Invalid Declarations
 
 | Pattern | DXC | Clang |
 |---------|-----|-------|
-| Resource param with default, followed by param without | Error | Error |
-| Resource type as `RWStructuredBuffer` element (intangible) | Error | Error |
+| Resource param with default, followed by param without | Error: *"missing default argument on parameter"* | Error: *"missing default argument on parameter"* |
+| Resource type as `RWStructuredBuffer` element (intangible) | Error: *"is an object and cannot be used as a type parameter"* | Error: *"constraints not satisfied for class template"* |
 | Brace (zero) init `= {}` | Error: empty initializer list | Error: empty initializer list |
-| Compile-time out-of-bounds array index | **Error** (hard error) | Warning (`-Warray-bounds`) |
+| Compile-time out-of-bounds array index | Error: *"array index N is out of bounds"* | Warning (`-Warray-bounds`) |
 
 ### Ternary Conditional Resource Assignment (CodeGen)
 
@@ -189,10 +191,10 @@ accepts these patterns, emitting a warning in most cases.
 | Pattern | DXC | Clang |
 |---------|-----|-------|
 | Ternary init (`buf = cond ? g0 : g1`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Ternary assignment post-declaration | Error (codegen) | Warning (`-Whlsl-explicit-binding`) |
-| Ternary phi merge | Error (codegen) | Warning (`-Whlsl-explicit-binding`) |
-| Ternary resource as function argument | Error (codegen) | **Clean** |
-| Nested ternary (`c1 ? g0 : (c2 ? g1 : g2)`) | Error (codegen, 2 errors) | Warning (`-Whlsl-explicit-binding`) |
+| Ternary assignment post-declaration | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Ternary phi merge | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Ternary resource as function argument | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
+| Nested ternary (`c1 ? g0 : (c2 ? g1 : g2)`) | Error (codegen, 2 errors): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
 
 ### Wave-Conditional Reassignment (CodeGen)
 
@@ -250,7 +252,7 @@ compiler fails (sema vs codegen).
 
 ### Tests added
 
-The **51 tests** that produce a compiled output from both compilers are
+The **52 tests** that produce a compiled output from both compilers are
 placed directly in `test/Feature/LocalResources/`. This includes tests
 that are fully clean on both compilers, tests where Clang
 emits `-Whlsl-explicit-binding` warnings but still produces compiled
@@ -260,21 +262,18 @@ discarded comma operand but both compilers produce output.
 
 Three subdirectories capture tests that compile on only one compiler:
 
-- **`ClangPass-DXCCodegenError/`** (2 tests) — Clang produces compiled
+- **`ClangPass-DXCCodegenError/`** (1 test) — Clang produces compiled
   output, but DXC fails to produce output due to a codegen-stage error
-  or ICE. Currently `local_resource_conditional_init` and
-  `local_resource_continue_reassign`.
+  or ICE. Currently `local_resource_conditional_init`.
 - **`DXCPass-ClangSemaError/`** (2 tests) — DXC produces compiled output,
   but Clang fails at sema. Currently `local_resource_volatile` (DXC
   silently accepts `volatile` on resources but Clang errors because the
   methods are not `volatile`-qualified) and `local_resource_const_param`
   (Clang does not mark `Load`/`Store` as `const`-qualified).
-- **`DXCPass-ClangCodegenError/`** (3 tests) — DXC produces compiled
+- **`DXCPass-ClangCodegenError/`** (2 tests) — DXC produces compiled
   output, but Clang crashes during DXIL codegen. Currently
   `local_resource_array_dynamic_index` and `local_resource_array_partial_init`
-  (DXIL Legalizer assertion on dynamically-indexed local resource arrays)
-  and `use_local_resource_uninitialized` (DXIL Op Lowering assertion on
-  store through uninitialized resource handle).
+  (DXIL Legalizer assertion on dynamically-indexed local resource arrays).
 
 ### Test distribution
 
@@ -299,10 +298,10 @@ exist in both the clang repo (SemaHLSL) and the offload test suite.
 | Location | Count | Contents |
 |----------|-------|----------|
 | `SemaHLSL/Resources/Local-Resources/` | 40 | Clang emits sema warning or error (regardless of DXC) |
-| `offload-test-suite/test/Feature/LocalResources/` | 51 | Both compilers produce compiled output (clean, or Clang warns) |
-| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 2 | Clang compiles, DXC fails at codegen |
+| `offload-test-suite/test/Feature/LocalResources/` | 52 | Both compilers produce compiled output (clean, or Clang warns) |
+| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 1 | Clang compiles, DXC fails at codegen |
 | `offload-test-suite/.../DXCPass-ClangSemaError/` | 2 | DXC compiles, Clang fails at sema |
-| `offload-test-suite/.../DXCPass-ClangCodegenError/` | 3 | DXC compiles, Clang crashes during DXIL codegen |
+| `offload-test-suite/.../DXCPass-ClangCodegenError/` | 2 | DXC compiles, Clang crashes during DXIL codegen |
 
 13 tests exist in both the clang repo and the offload test suite because
 they emit Clang sema diagnostics (qualifying for SemaHLSL) while also
@@ -314,7 +313,7 @@ the offload test suite).
 | Test | Locations |
 |------|-----------|
 | `local_resource_comma_init.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_continue_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
+| `local_resource_continue_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_deep_phi.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_do_while_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_early_return_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
