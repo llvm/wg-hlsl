@@ -8,6 +8,8 @@ params:
     - github_username: s-perron
 ---
 
+* PRs: [#193237](https://github.com/llvm/llvm-project/pull/193237)
+
 ## Introduction
 
 This proposal details the implementation of the `ConstantBuffer<T>` resource
