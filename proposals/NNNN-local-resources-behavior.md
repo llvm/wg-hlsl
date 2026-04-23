@@ -37,6 +37,13 @@ This proposal aims to:
 3. **Enable regression testing** so that future compiler changes can be
    validated against well-defined expectations.
 
+> **Note:** Two pre-existing multi-function test files directly under the
+> SemaHLSL directory (`local_resource_bindings.hlsl` and
+> `local_resource_bindings_errs.hlsl`, landed via PR #182101) were consumed
+> by this work. Their individual test functions were extracted into isolated
+> per-pattern files under `Resources/Local-Resources/`, and the originals
+> were deleted.
+
 ## Proposed solution
 
 The observed behavior for local resource variables is documented below,
@@ -53,6 +60,8 @@ both DXC and Clang.
 | Alias chain (`a = g; b = a; c = b`) | Clean | Clean |
 | Copy between locals (`a = g; b = a`) | Clean | Clean |
 | Self-assignment (`buf = buf`) | Clean | Clean |
+| Self-assignment of uninitialized resource (`Out = Out`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
+| Reassign to same global in conditional branch | Clean | Clean |
 | Return initialized local | Clean | Clean |
 | Return uninitialized local | Clean | Clean |
 | Parenthesized ternary expression init | Clean | Clean |
@@ -195,6 +204,12 @@ accepts these patterns, emitting a warning in most cases.
 | Ternary phi merge | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
 | Ternary resource as function argument | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
 | Nested ternary (`c1 ? g0 : (c2 ? g1 : g2)`) | Error (codegen, 2 errors): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Conditional reassign to different global (`if(cond) out = g1`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Conditional reassign from unbounded array element | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Static resource ternary assign (lib target) | Error (codegen): *"non const static global resource use is disallowed"* + *"local resource not guaranteed..."* | Warning (`-Whlsl-explicit-binding`) |
+| Ternary between same-array indices (`cond ? arr[0] : arr[1]`) | Clean | Clean |
+| If/else assigning different array elements | Clean | Clean |
+| Ternary both branches same (`cond ? g0 : g0`) | Clean | Clean |
 
 ### Wave-Conditional Reassignment (CodeGen)
 
@@ -228,8 +243,8 @@ resources. These are compiler bugs, not intentional behavior.
 
 ### Texture2D vs RWByteAddressBuffer
 
-Some behaviors differ between resource types. DXC ICEs with
-`static Texture2D` but accepts `static RWByteAddressBuffer`. The test suite
+Some behaviors differ between resource types. DXC ICEs with both
+`static Texture2D` and `static RWByteAddressBuffer`. The test suite
 uses `RWByteAddressBuffer` because Clang does not yet support `Texture2D`.
 
 ## Offload Test Suite
@@ -252,7 +267,7 @@ compiler fails (sema vs codegen).
 
 ### Tests added
 
-The **52 tests** that produce a compiled output from both compilers are
+The **57 tests** that produce a compiled output from both compilers are
 placed directly in `test/Feature/LocalResources/`. This includes tests
 that are fully clean on both compilers, tests where Clang
 emits `-Whlsl-explicit-binding` warnings but still produces compiled
@@ -262,9 +277,12 @@ discarded comma operand but both compilers produce output.
 
 Three subdirectories capture tests that compile on only one compiler:
 
-- **`ClangPass-DXCCodegenError/`** (1 test) — Clang produces compiled
+- **`ClangPass-DXCCodegenError/`** (4 tests) — Clang produces compiled
   output, but DXC fails to produce output due to a codegen-stage error
-  or ICE. Currently `local_resource_conditional_init`.
+  or ICE. Includes `local_resource_conditional_single_path_assign`,
+  `local_resource_conditional_reassign_different_global`,
+  `local_resource_conditional_reassign_from_array`, and
+  `local_resource_self_assign_uninitialized`.
 - **`DXCPass-ClangSemaError/`** (2 tests) — DXC produces compiled output,
   but Clang fails at sema. Currently `local_resource_volatile` (DXC
   silently accepts `volatile` on resources but Clang errors because the
@@ -297,13 +315,13 @@ exist in both the clang repo (SemaHLSL) and the offload test suite.
 
 | Location | Count | Contents |
 |----------|-------|----------|
-| `SemaHLSL/Resources/Local-Resources/` | 40 | Clang emits sema warning or error (regardless of DXC) |
-| `offload-test-suite/test/Feature/LocalResources/` | 52 | Both compilers produce compiled output (clean, or Clang warns) |
-| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 1 | Clang compiles, DXC fails at codegen |
+| `SemaHLSL/Resources/Local-Resources/` | 41 | Clang emits sema warning or error (regardless of DXC) |
+| `offload-test-suite/test/Feature/LocalResources/` | 57 | Both compilers produce compiled output (clean, or Clang warns) |
+| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 4 | Clang compiles, DXC fails at codegen |
 | `offload-test-suite/.../DXCPass-ClangSemaError/` | 2 | DXC compiles, Clang fails at sema |
 | `offload-test-suite/.../DXCPass-ClangCodegenError/` | 2 | DXC compiles, Clang crashes during DXIL codegen |
 
-13 tests exist in both the clang repo and the offload test suite because
+16 tests exist in both the clang repo and the offload test suite because
 they emit Clang sema diagnostics (qualifying for SemaHLSL) while also
 producing compiled output from at least one compiler (qualifying for
 the offload test suite).
@@ -325,8 +343,11 @@ the offload test suite).
 | `local_resource_switch_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_unreachable_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 | `local_resource_volatile.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/DXCPass-ClangSemaError/` |
+| `local_resource_conditional_reassign_different_global.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
+| `local_resource_conditional_reassign_from_array.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
+| `local_resource_static_ternary_assign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
 
-The remaining 27 tests in SemaHLSL have no offload test suite counterpart.
+The remaining 25 tests in SemaHLSL have no offload test suite counterpart.
 These include tests that produce errors on both compilers (invalid type
 operations, bad declarations), tests where neither compiler produces a
 runnable output (codegen crashes on both sides), and tests whose sema
