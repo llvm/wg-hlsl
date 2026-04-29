@@ -1,11 +1,11 @@
 ---
 title: "[NNNN] - HLSL ConstantBuffer<T> Implementation"
 params:
-  authors: Steven Perron
-    - github_username: s-perron
+  authors:
+    - s-perron: Steven Perron
   status: Under Consideration
-  sponsors: Steven Perron
-    - github_username: s-perron
+  sponsors:
+    - s-perron: Steven Perron
 ---
 
 * PRs: [#193237](https://github.com/llvm/llvm-project/pull/193237)
