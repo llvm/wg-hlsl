@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - HLSL ConstantBuffer<T> Implementation"
+title: "[0046] - HLSL ConstantBuffer<T> Implementation"
 params:
   authors:
     - s-perron: Steven Perron
