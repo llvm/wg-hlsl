@@ -176,7 +176,7 @@ public:
 
   // Load / Access
   T Load(int3 location) {
-    return __builtin_hlsl_resource_load(Handle, location.xy, location.z);
+    return __builtin_hlsl_resource_load_level(Handle, location.xy, location.z);
   }
   // ... other Load overloads ...
 
@@ -190,7 +190,7 @@ public:
     __hlsl_resource_t Handle;
     uint MipLevel;
     T operator[](int2 Loc) {
-      return __builtin_hlsl_resource_load(Handle, Loc, MipLevel);
+      return __builtin_hlsl_resource_load_level(Handle, Loc, MipLevel);
     }
   };
 
@@ -368,7 +368,7 @@ support them.
 ##### `Load`
 
 - **Description**: Reads texture data directly (texel fetch) without a sampler.
-- **Implementation**: Implemented using the `__builtin_hlsl_resource_load`
+- **Implementation**: Implemented using the `__builtin_hlsl_resource_load_level`
   builtin.
 - **Supported Types**:
   - [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/texture1d-load)
@@ -387,7 +387,7 @@ support them.
 ##### `mips.Operator[][]`
 
 - **Description**: Accesses a texel at a specific mip level and location.
-- **Implementation**: Implemented using the `__builtin_hlsl_resource_load`
+- **Implementation**: Implemented using the `__builtin_hlsl_resource_load_level`
   builtin.
 - **Supported Types**:
   - [Texture1D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1d-mipsoperatorindex)
@@ -520,7 +520,7 @@ used.
 - `T __builtin_hlsl_resource_sample_level(Handle, Sampler, Coord, float LOD, int2 Offset = 0)`
 - `float __builtin_hlsl_resource_sample_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
 - `float __builtin_hlsl_resource_sample_cmp_level_zero(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
-- `T __builtin_hlsl_resource_load(Handle, Coord, int MipLevelOrSampleIndex = 0, int2 Offset = 0)`
+- `T __builtin_hlsl_resource_load_level(Handle, int3 CoordWithMip, int2 Offset = 0)`
 - `float4 __builtin_hlsl_resource_gather(Handle, Sampler, Coord, int Component, int2 Offset = 0)`
 - `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, Coord, float CompareValue, int Component, int2 Offset = 0)`
 - `float __builtin_hlsl_resource_calculate_lod(Handle, Sampler, Coord)`
@@ -554,7 +554,7 @@ distinct intrinsic names for each texture dimension or type.
 | `__builtin_hlsl_resource_sample_level`            | `llvm.<target>.resource.samplelevel`                                             |
 | `__builtin_hlsl_resource_sample_cmp`              | `llvm.<target>.resource.samplecmp`<br>`llvm.<target>.resource.samplecmp.clamp`   |
 | `__builtin_hlsl_resource_sample_cmp_level_zero`   | `llvm.<target>.resource.samplecmplevelzero`                                      |
-| `__builtin_hlsl_resource_load`                    | `llvm.<target>.resource.load.texture`                                            |
+| `__builtin_hlsl_resource_load_level`              | `llvm.<target>.resource.load.level`                                              |
 | `__builtin_hlsl_resource_gather`                  | `llvm.<target>.resource.gather`                                                  |
 | `__builtin_hlsl_resource_gather_cmp`              | `llvm.<target>.resource.gathercmp`                                               |
 | `__builtin_hlsl_resource_calculate_lod`           | `llvm.<target>.resource.calculatelod`                                            |
@@ -581,7 +581,7 @@ operations.
 | `llvm.dx.resource.samplelevel`                                       | `dx.op.sampleLevel` (62)                  |
 | `llvm.dx.resource.samplecmp`<br>`llvm.dx.resource.samplecmp.clamp`   | `dx.op.sampleCmp` (64)                    |
 | `llvm.dx.resource.samplecmplevelzero`                                | `dx.op.sampleCmpLevelZero` (65)           |
-| `llvm.dx.resource.load.texture`                                      | `dx.op.textureLoad` (66)                  |
+| `llvm.dx.resource.load.level`                                        | `dx.op.textureLoad` (66)                  |
 | `llvm.dx.resource.gather`                                            | `dx.op.textureGather` (73)                |
 | `llvm.dx.resource.gathercmp`                                         | `dx.op.textureGatherCmp` (74)             |
 | `llvm.dx.resource.calculatelod`                                      | `dx.op.calculateLOD` (81)                 |
@@ -600,7 +600,7 @@ instructions.
 | `llvm.spv.resource.samplelevel`                                        | `OpImageSampleExplicitLod` with `Lod` operand                                      |
 | `llvm.spv.resource.samplecmp`<br>`llvm.spv.resource.samplecmp.clamp`   | `OpImageSampleDrefImplicitLod`<br>with `MinLod` operand if clamped                 |
 | `llvm.spv.resource.samplecmplevelzero`                                 | `OpImageSampleDrefExplicitLod` with `Lod` 0                                        |
-| `llvm.spv.resource.load.texture`                                       | `OpImageFetch`                                                                     |
+| `llvm.spv.resource.load.level`                                         | `OpImageFetch`                                                                     |
 | `llvm.spv.resource.gather`                                             | `OpImageGather`                                                                    |
 | `llvm.spv.resource.gathercmp`                                          | `OpImageDrefGather`                                                                |
 | `llvm.spv.resource.calculatelod`                                       | `OpImageQueryLod`                                                                  |
