@@ -398,8 +398,10 @@ support them.
 
 ##### `sample.operator[][]`
 
-- **Description**: Accesses a single sample.
-- **Implementation**: TODO
+- **Description**: Accesses a single sample at a given position in a
+  multisampled texture.
+- **Implementation**: Implemented using the `__builtin_hlsl_resource_load_ms`
+  builtin.
 - **Supported Types**:
   - [Texture2DMS](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dms-sampleoperatorindex)
   - [Texture2DMSArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dmsarray-sampleoperatorindex)
@@ -521,6 +523,7 @@ used.
 - `float __builtin_hlsl_resource_sample_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
 - `float __builtin_hlsl_resource_sample_cmp_level_zero(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
 - `T __builtin_hlsl_resource_load_level(Handle, int3 CoordWithMip, int2 Offset = 0)`
+- `T __builtin_hlsl_resource_load_ms(Handle, Coord, int SampleIndex, int2 Offset = 0)`
 - `float4 __builtin_hlsl_resource_gather(Handle, Sampler, Coord, int Component, int2 Offset = 0)`
 - `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, Coord, float CompareValue, int Component, int2 Offset = 0)`
 - `float __builtin_hlsl_resource_calculate_lod(Handle, Sampler, Coord)`
@@ -537,10 +540,11 @@ The HLSL builtins used in the record type implementation are lowered to
 target-specific LLVM intrinsics in Clang codegen. The naming convention follows
 [0014 - Consistent Naming for DX Intrinsics](0014-consistent-naming-for-dx-intrinsics.md).
 
-The `__builtin_hlsl_resource_load` builtin will support default values for
-optional operands. Specifically, `SampleIndex` will default to 0 for
-non-multisampled textures, and `Offset` will default to 0 if not provided. This
-allows a single builtin to handle the various `Load` overloads.
+The `__builtin_hlsl_resource_load_level` builtin handles non-multisampled
+texture loads. The mip level is packed into the coordinate vector (e.g., `int3`
+for a 2D texture = xy + mip), and `Offset` defaults to 0 if not provided. For
+multisampled textures, the `__builtin_hlsl_resource_load_ms` builtin is used,
+which takes an explicit sample index as a separate parameter.
 
 The LLVM intrinsics will be overloaded on the return type and the types of their
 arguments (e.g., coordinates, offsets, derivatives). This avoids the need for
@@ -555,6 +559,7 @@ distinct intrinsic names for each texture dimension or type.
 | `__builtin_hlsl_resource_sample_cmp`              | `llvm.<target>.resource.samplecmp`<br>`llvm.<target>.resource.samplecmp.clamp`   |
 | `__builtin_hlsl_resource_sample_cmp_level_zero`   | `llvm.<target>.resource.samplecmplevelzero`                                      |
 | `__builtin_hlsl_resource_load_level`              | `llvm.<target>.resource.load.level`                                              |
+| `__builtin_hlsl_resource_load_ms`                 | `llvm.<target>.resource.load.ms`                                                 |
 | `__builtin_hlsl_resource_gather`                  | `llvm.<target>.resource.gather`                                                  |
 | `__builtin_hlsl_resource_gather_cmp`              | `llvm.<target>.resource.gathercmp`                                               |
 | `__builtin_hlsl_resource_calculate_lod`           | `llvm.<target>.resource.calculatelod`                                            |
@@ -582,6 +587,7 @@ operations.
 | `llvm.dx.resource.samplecmp`<br>`llvm.dx.resource.samplecmp.clamp`   | `dx.op.sampleCmp` (64)                    |
 | `llvm.dx.resource.samplecmplevelzero`                                | `dx.op.sampleCmpLevelZero` (65)           |
 | `llvm.dx.resource.load.level`                                        | `dx.op.textureLoad` (66)                  |
+| `llvm.dx.resource.load.ms`                                           | `dx.op.textureLoad` (66)                  |
 | `llvm.dx.resource.gather`                                            | `dx.op.textureGather` (73)                |
 | `llvm.dx.resource.gathercmp`                                         | `dx.op.textureGatherCmp` (74)             |
 | `llvm.dx.resource.calculatelod`                                      | `dx.op.calculateLOD` (81)                 |
@@ -601,6 +607,7 @@ instructions.
 | `llvm.spv.resource.samplecmp`<br>`llvm.spv.resource.samplecmp.clamp`   | `OpImageSampleDrefImplicitLod`<br>with `MinLod` operand if clamped                 |
 | `llvm.spv.resource.samplecmplevelzero`                                 | `OpImageSampleDrefExplicitLod` with `Lod` 0                                        |
 | `llvm.spv.resource.load.level`                                         | `OpImageFetch`                                                                     |
+| `llvm.spv.resource.load.ms`                                            | `OpImageFetch` with `Sample` image operand                                         |
 | `llvm.spv.resource.gather`                                             | `OpImageGather`                                                                    |
 | `llvm.spv.resource.gathercmp`                                          | `OpImageDrefGather`                                                                |
 | `llvm.spv.resource.calculatelod`                                       | `OpImageQueryLod`                                                                  |
