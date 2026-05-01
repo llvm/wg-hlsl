@@ -176,7 +176,7 @@ public:
 
   // Load / Access
   T Load(int3 location) {
-    return __builtin_hlsl_resource_load_level(Handle, location.xy, location.z);
+    return __builtin_hlsl_resource_load_level(Handle, location);
   }
   // ... other Load overloads ...
 
@@ -190,7 +190,7 @@ public:
     __hlsl_resource_t Handle;
     uint MipLevel;
     T operator[](int2 Loc) {
-      return __builtin_hlsl_resource_load_level(Handle, Loc, MipLevel);
+      return __builtin_hlsl_resource_load_level(Handle, uint3(Loc, MipLevel));
     }
   };
 
@@ -542,7 +542,7 @@ target-specific LLVM intrinsics in Clang codegen. The naming convention follows
 
 The `__builtin_hlsl_resource_load_level` builtin handles non-multisampled
 texture loads. The mip level is packed into the coordinate vector (e.g., `int3`
-for a 2D texture = xy + mip), and `Offset` defaults to 0 if not provided. For
+for a 2D texture `(x, y, mip)`), and `Offset` defaults to 0 if not provided. For
 multisampled textures, the `__builtin_hlsl_resource_load_ms` builtin is used,
 which takes an explicit sample index as a separate parameter.
 
