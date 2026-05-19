@@ -3,6 +3,7 @@ title: "[0037] - Texture and Sampler Types"
 params:
   authors:
     - s-perron: Steven Perron
+    - icohedron: Deric Cheung
   status: Under Consideration
   sponsors:
 ---
@@ -510,24 +511,122 @@ support them.
   - [RWTexture2DArray](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwtexture2darray-operatorindex)
   - [RWTexture3D](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwtexture3d-operatorindex)
 
+#### Sema Diagnostics
+
+The builtins underlying each member function perform semantic validation of
+their arguments. The following sections describe the diagnostics that apply
+to texture and sampler types.
+
+##### Template Parameter Validation
+
+Texture template parameters are constrained using the same
+[`__is_typed_resource_element_compatible` concept](0011-resource-element-type-validation.md)
+as `Buffer` and `RWBuffer`. Valid element types are scalars and vectors of
+numeric types (excluding `bool` and enums) that fit in four 32-bit quantities
+(16 bytes). Structs, arrays, matrices, and resource types are rejected.
+`double` and `double2` satisfy this constraint (8 and 16 bytes respectively), so
+additional validation at the point of use is needed for operations that do not
+support 64-bit element types.
+
+##### Sampling Element Type Validation
+
+The `Sample`, `SampleBias`, `SampleGrad`, `SampleLevel`, `SampleCmp`,
+`SampleCmpLevelZero`, and `Gather` methods validate that the resource's
+contained element type is compatible with the operation:
+
+- `double` element types are always rejected for sample and gather methods.
+- Integer element types (`int`, `uint`, `int16_t`, `uint16_t`) are rejected for
+  `Sample`, `SampleBias`, `SampleGrad`, and `SampleLevel` when the target is
+  below SM 6.7 (see [HLSL Advanced Texture Operations - Integer Sampling](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_7_Advanced_Texture_Ops.html#integer-sampling)).
+- `SampleCmp`, `SampleCmpLevelZero`, and `SampleCmpLevel` require the element
+  type to be floating-point, regardless of shader model version.
+
+These restrictions match [DXC's validation](https://github.com/microsoft/DirectXShaderCompiler/blob/7284bb1809613fb12d61cc0426afa4057afb0265/tools/clang/lib/Sema/SemaHLSL.cpp#L6908-L6948)
+behavior.
+
+##### Coordinate and Argument Validation
+
+Coordinate vectors must match the resource's dimensionality. The expected
+dimensions per type are:
+
+| Texture Type       | Sample Coord | Load Coord            | `operator[]` Index | Offset |
+|--------------------|--------------|-----------------------|--------------------|--------|
+| `Texture1D`        | `float`      | `int2` (x + mip)      | `uint`             | `int`  |
+| `Texture1DArray`   | `float2`     | `int3`                | `uint2`            | `int`  |
+| `Texture2D`        | `float2`     | `int3` (xy + mip)     | `uint2`            | `int2` |
+| `Texture2DArray`   | `float3`     | `int4`                | `uint3`            | `int2` |
+| `Texture3D`        | `float3`     | `int4` (xyz + mip)    | `uint3`            | `int3` |
+| `TextureCube`      | `float3`     | -                     | -                  | -      |
+| `TextureCubeArray` | `float4`     | -                     | -                  | -      |
+| `Texture2DMS`      | -            | `int2` + `int` sample | `uint2`            | `int2` |
+| `Texture2DMSArray` | -            | `int3` + `int` sample | `uint3`            | -      |
+| `RWTexture1D`      | -            | `int`                 | `uint`             | -      |
+| `RWTexture1DArray` | -            | `int2`                | `uint2`            | -      |
+| `RWTexture2D`      | -            | `int2`                | `uint2`            | -      |
+| `RWTexture2DArray` | -            | `int3`                | `uint3`            | -      |
+| `RWTexture3D`      | -            | `int3`                | `uint3`            | -      |
+
+A dash indicates the method is not available on that type.
+
+Scalar arguments (bias, LOD, compare value, clamp) must be `float`. The DDX and
+DDY arguments to `SampleGrad` and `SampleCmpGrad` are float vectors matching the
+resource's coordinate dimensionality (e.g., `float2` for `Texture2D`, `float3`
+for `Texture3D`).
+
+##### GatherCmp Component Restriction (Vulkan / SPIR-V)
+
+On the Vulkan target, `GatherCmp` operations only support component 0 (Red).
+`GatherCmpGreen`, `GatherCmpBlue`, and `GatherCmpAlpha` are rejected.
+This is because SPIR-V's [OpImageDrefGather](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpImageDrefGather)
+does not have a Component operand and always gathers component 0.
+
+##### Shader Stage and Shader Model Requirements
+
+Some texture operations are only valid in certain shader stages or require a
+minimum shader model version. Operations that compute implicit LOD require
+hardware derivative support, which is not available in all stages.
+
+The following methods require derivative support: `Sample`, `SampleBias`,
+`SampleCmp`, `SampleCmpBias`, `CalculateLevelOfDetail`, and
+`CalculateLevelOfDetailUnclamped`. They are not valid in vertex, hull, domain,
+geometry, or ray tracing shader stages. In compute, mesh, and amplification
+shaders they require [SM 6.6 or greater](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_6.html#derivatives).
+Methods that take an explicit LOD or explicit gradients (`SampleLevel`,
+`SampleGrad`, `SampleCmpLevelZero`, `SampleCmpLevel`, `SampleCmpGrad`) do not
+require derivatives.
+
+Clang will diagnose use of derivative-requiring methods in unsupported shader
+stages at the sema level using [availability attributes](0001-availability-diagnostics.md)).
+This differs from DXC which defers the rejection of `Sample`, `SampleBias`,
+`SampleCmp`, and `SampleCmpBias` in unsupported shaders to the DXIL validator
+via [`ValidateDerivativeOp`](https://github.com/microsoft/DirectXShaderCompiler/blob/1e4181c0f4cede851b9fa67a017717135849ba3d/lib/DxilValidation/DxilValidation.cpp#L402-L412).
+
+Some texture methods require later shader models. `SampleCmpLevel` and
+`GatherRaw` require SM 6.7 ([`AdvancedTextureOps`](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_7_Advanced_Texture_Ops.html)).
+`SampleCmpBias`, `SampleCmpGrad`, and the use of `CalculateLevelOfDetail` with a
+`SamplerComparisonState` require SM 6.8 ([`SampleCmpGradientOrBias`](https://microsoft.github.io/hlsl-specs/proposals/0014-expanded-comparison-sampling/)).
+All other texture methods are available from SM 6.0.
+
 ### HLSL Builtin Interface
 
-This section details the parameters for the clang builtins. Optional parameters
-are indicated. If an optional parameter is not provided, a default value of 0 is
-used.
+This section details the parameters for the Clang builtins. The `Coord`,
+`Offset`, `DDX`, and `DDY` parameter types vary by resource dimensionality as
+described in the [Coordinate and Argument Validation](#coordinate-and-argument-validation)
+section. Optional parameters are indicated. If an optional parameter is not
+provided, a default value of 0 is used.
 
-- `T __builtin_hlsl_resource_sample(Handle, Sampler, Coord, int2 Offset = 0)`
-- `T __builtin_hlsl_resource_sample_bias(Handle, Sampler, Coord, float Bias, int2 Offset = 0)`
-- `T __builtin_hlsl_resource_sample_grad(Handle, Sampler, Coord, float2 DDX, float2 DDY, int2 Offset = 0)`
-- `T __builtin_hlsl_resource_sample_level(Handle, Sampler, Coord, float LOD, int2 Offset = 0)`
-- `float __builtin_hlsl_resource_sample_cmp(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
-- `float __builtin_hlsl_resource_sample_cmp_level_zero(Handle, Sampler, Coord, float CompareValue, int2 Offset = 0)`
-- `T __builtin_hlsl_resource_load_level(Handle, int3 CoordWithMip, int2 Offset = 0)`
-- `T __builtin_hlsl_resource_load_ms(Handle, Coord, int SampleIndex, int2 Offset = 0)`
-- `float4 __builtin_hlsl_resource_gather(Handle, Sampler, Coord, int Component, int2 Offset = 0)`
-- `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, Coord, float CompareValue, int Component, int2 Offset = 0)`
-- `float __builtin_hlsl_resource_calculate_lod(Handle, Sampler, Coord)`
-- `float __builtin_hlsl_resource_calculate_lod_unclamped(Handle, Sampler, Coord)`
+- `T __builtin_hlsl_resource_sample(Handle, Sampler, floatN Coord, intN Offset = 0)`
+- `T __builtin_hlsl_resource_sample_bias(Handle, Sampler, floatN Coord, float Bias, intN Offset = 0)`
+- `T __builtin_hlsl_resource_sample_grad(Handle, Sampler, floatN Coord, floatN DDX, floatN DDY, intN Offset = 0)`
+- `T __builtin_hlsl_resource_sample_level(Handle, Sampler, floatN Coord, float LOD, intN Offset = 0)`
+- `float __builtin_hlsl_resource_sample_cmp(Handle, Sampler, floatN Coord, float CompareValue, intN Offset = 0)`
+- `float __builtin_hlsl_resource_sample_cmp_level_zero(Handle, Sampler, floatN Coord, float CompareValue, intN Offset = 0)`
+- `T __builtin_hlsl_resource_load_level(Handle, intN+1 CoordWithMip, intN Offset = 0)`
+- `T __builtin_hlsl_resource_load_ms(Handle, intN Coord, int SampleIndex, intN Offset = 0)`
+- `float4 __builtin_hlsl_resource_gather(Handle, Sampler, floatN Coord, int Component, intN Offset = 0)`
+- `float4 __builtin_hlsl_resource_gather_cmp(Handle, Sampler, floatN Coord, float CompareValue, int Component, intN Offset = 0)`
+- `float __builtin_hlsl_resource_calculate_lod(Handle, Sampler, floatN Coord)`
+- `float __builtin_hlsl_resource_calculate_lod_unclamped(Handle, Sampler, floatN Coord)`
 - `float2 __builtin_hlsl_resource_get_sample_position(Handle, uint SampleIndex)`
 - For `GetDimensions` intrinsics, see
   [0033 - Resource GetDimensions](0033-resources-get-dimensions.md).
@@ -541,10 +640,11 @@ target-specific LLVM intrinsics in Clang codegen. The naming convention follows
 [0014 - Consistent Naming for DX Intrinsics](0014-consistent-naming-for-dx-intrinsics.md).
 
 The `__builtin_hlsl_resource_load_level` builtin handles non-multisampled
-texture loads. The mip level is packed into the coordinate vector (e.g., `int3`
-for a 2D texture `(x, y, mip)`), and `Offset` defaults to 0 if not provided. For
-multisampled textures, the `__builtin_hlsl_resource_load_ms` builtin is used,
-which takes an explicit sample index as a separate parameter.
+texture loads. The mip level is packed into the last component of the coordinate
+vector (e.g., `int2` for a 1D texture `(x, mip)`, `int3` for 2D `(x, y, mip)`,
+`int4` for 3D `(x, y, z, mip)`), and `Offset` defaults to 0 if not provided.
+For multisampled textures, the `__builtin_hlsl_resource_load_ms` builtin is
+used, which takes the sample index as a separate parameter.
 
 The LLVM intrinsics will be overloaded on the return type and the types of their
 arguments (e.g., coordinates, offsets, derivatives). This avoids the need for
