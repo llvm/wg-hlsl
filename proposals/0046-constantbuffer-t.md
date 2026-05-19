@@ -8,7 +8,7 @@ params:
     - s-perron: Steven Perron
 ---
 
-* PRs: [#193237](https://github.com/llvm/llvm-project/pull/193237)
+- PRs: [#193237](https://github.com/llvm/llvm-project/pull/193237)
 
 ## Introduction
 
@@ -17,8 +17,8 @@ type in Clang and LLVM for HLSL. Unlike the legacy `cbuffer` keyword, where each
 member of the `cbuffer` becomes its own global variable, `ConstantBuffer<T>`
 behaves as a standard type, supporting instantiation, arrays, function
 parameters, and assignments. The `ConstantBuffer<T>` type acts more like other
-resource type than it does a `cbuffer`. The unique aspect of the
-`ConstantBuffer<T>` type is that it can be used as a drop in replacement for
+resource types than it does a `cbuffer`. The unique aspect of the
+`ConstantBuffer<T>` type is that it can be used as a drop-in replacement for
 `T`, as if `ConstantBuffer<T>` inherited from `T`. However, it is not really
 inheritance.
 
@@ -31,17 +31,12 @@ standard, and it is used.
 
 We propose implementing `ConstantBuffer<T>` as a built-in template class that
 provides an implicit conversion to a reference of type `T` in the
-`hlsl_constant` address space. To maintain compatibility with DXC, which allowed
-calling non-const member functions on `ConstantBuffer` objects, the conversion
-operator will return a non-const reference (`hlsl_constant T &`) in HLSL 202x.
-Starting with HLSL 202y, the operator will return a const reference
-(`const hlsl_constant T &`) to enforce proper const-correctness. Developers can
-use `clang-tidy` to identify and mark member functions as `const` to prepare for
-this transition. To ensure a seamless developer experience, `Sema` will be
-modified to automatically inject this conversion when accessing members of a
-`ConstantBuffer`.
+`hlsl_constant` address space. The operator will return a const reference
+(`const hlsl_constant T &`) to enforce proper const-correctness. To ensure a
+seamless developer experience, `Sema` will be modified to automatically inject
+this conversion when accessing members of a `ConstantBuffer`.
 
-Places with HLSL specific handling for aggregates will also be updated to
+Places with HLSL-specific handling for aggregates will also be updated to
 convert the `ConstantBuffer<T>` to `T` when necessary.
 
 ### Frontend (Clang AST/Sema)
@@ -51,12 +46,13 @@ convert the `ConstantBuffer<T>` to `T` when necessary.
     `__hlsl_resource_t` member (the handle). The handle's contained type is
     exactly `T`.
 2.  **Implicit Conversion Operator:** Define an implicit conversion operator
-    `operator hlsl_constant T &() const` within the `ConstantBuffer<T>`
+    `operator const hlsl_constant T &() const` within the `ConstantBuffer<T>`
     template.
 3.  **Sema Member Lookup Interception:** Modify `Sema::LookupMemberExpr` (in
     `SemaExprMember.cpp`) to detect member accesses on `ConstantBuffer<T>`. If
     detected, Sema will inject a call to the implicit conversion operator,
-    effectively transforming `cb.field` into `((hlsl_constant T &)cb).field`.
+    effectively transforming `cb.field` into
+    `((const hlsl_constant T &)cb).field`.
 4.  **Sema Constraints:** Enforce that `T` must be a user-defined struct or
     class, and reject primitive types, vectors, arrays, or matrices as `T`. This
     is implemented using a C++20 concept constraint named
@@ -108,8 +104,8 @@ class ConstantBuffer {
   __hlsl_resource_t [[hlsl::resource_class(CBuffer)]] [[hlsl::contained_type(T)]] __handle;
 
 public:
-  // Implicit conversion to reference of type T (non-const for HLSL 202x)
-  operator hlsl_constant T&() const {
+  // Implicit conversion to const reference of type T
+  operator const hlsl_constant T&() const {
     return *__builtin_hlsl_resource_getpointer(__handle);
   }
 
@@ -145,8 +141,8 @@ float main() {
 
 ```text
 `-MemberExpr 'float' lvalue .a
-  `-CXXMemberCallExpr 'hlsl_constant S' lvalue
-    `-MemberExpr '<bound member function type>' .operator hlsl_constant S &
+  `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
+    `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
       `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
         `-DeclRefExpr 'cb'
 ```
@@ -170,8 +166,8 @@ S local = cb;
 `-CXXConstructExpr 'S' 'void (const S &)'
   `-ImplicitCastExpr 'const S' lvalue <NoOp>
     `-ImplicitCastExpr 'S' lvalue <UserDefinedConversion>
-      `-CXXMemberCallExpr 'hlsl_constant S' lvalue
-        `-MemberExpr '<bound member function type>' .operator hlsl_constant S &
+      `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
+        `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
           `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
             `-DeclRefExpr 'cb'
 ```
@@ -191,7 +187,7 @@ void takes_s(S s) {}
 void takes_cb(ConstantBuffer<S> c) {}
 
 void test() {
-  takes_s(cb);  // Calls operator hlsl_constant S&() and copies data into argument
+  takes_s(cb);  // Calls operator const hlsl_constant S&() and copies data into argument
   takes_cb(cb); // Calls ConstantBuffer(const ConstantBuffer&) and copies handle
 }
 ```
@@ -238,13 +234,13 @@ instantiation mechanism rebuilds the member expression. Since the type of `t` is
 now known to be `ConstantBuffer<S>`, the standard member lookup logic in
 `Sema::LookupMemberExpr` is triggered. Our interception logic then identifies
 `ConstantBuffer<S>` and injects the call to the implicit conversion operator
-`operator hlsl_constant S&()`, resulting in the same AST structure as
+`operator const hlsl_constant S&()`, resulting in the same AST structure as
 non-templated member access:
 
 ```text
 `-MemberExpr 'float' lvalue .a
-  `-CXXMemberCallExpr 'hlsl_constant S' lvalue
-    `-MemberExpr '<bound member function type>' .operator hlsl_constant S &
+  `-CXXMemberCallExpr 'const hlsl_constant S' lvalue
+    `-MemberExpr '<bound member function type>' .operator const hlsl_constant S &
       `-ImplicitCastExpr 'const hlsl::ConstantBuffer<S>' lvalue <NoOp>
         `-DeclRefExpr 't' 'hlsl::ConstantBuffer<S>'
 ```
@@ -269,8 +265,8 @@ instantiation.
 
 ### CodeGen and LLVM IR
 
-When Clang emits LLVM IR for the `operator hlsl_constant T&()` conversion, it
-utilizes the `llvm.dx.resource.getbasepointer` (or
+When Clang emits LLVM IR for the `operator const hlsl_constant T&()` conversion,
+it utilizes the `llvm.dx.resource.getbasepointer` (or
 `llvm.spv.resource.getbasepointer`) intrinsic to retrieve an address space
 qualified pointer.
 
@@ -379,34 +375,44 @@ reasons:
 1.  **Layout Consistency:** What needs to be done to ensure that the struct `T`
     used in `ConstantBuffer<T>` is laid out correctly? It must match the layout
     rules of the legacy `cbuffer`.
-2.  **Address Space Conversions:** How will different address spaces affect the
-    implicit conversions? Will we need multiple conversion operators to handle
-    different target address spaces or cv-qualifiers?
 
-**Solution:** All HLSL address spaces, including `hlsl_constant`, will be made a
-subspace of the `hlsl_generic` address space. This is the same mechanism used to
-allow member functions to be called on objects in any address space. See
-[0021 - Allowing multiple address spaces for the `this` pointer](0021-this-address-space.md).
+**Solution**: No extra changes are needed for this. The layout rules are
+triggered by the hlsl_constant address and type of the handle in the resource.
+
+2.  **Calls to member functions:** The `this` pointer in member functions
+    expects a pointer to the default address space. The members of a
+    ConstantBuffer are in an incompatible address space. How will we call member
+    functions on members of a ConstantBuffer? The same applies for CBuffers.
+
+**No solution:** The solution in
+[0021 - Allowing multiple address spaces for the `this` pointer](0021-this-address-space.md)
+does not work because the layout for a struct in the hlsl_constant address space
+is different than if it is in another address space.
 
 3. **Const correctness:** Should the conversion operator return a `const`
-   reference for HLSL 202x? Returning a `const` reference would provide earlier,
-   clearer error messages when attempting to write to a `ConstantBuffer`.
-   However, this could require significant code refactoring for existing
-   projects. If we delay this change until HLSL 202y, developers can leverage
-   `clang-tidy` to identify and mark member functions as `const`, facilitating a
-   smoother transition. We should discuss whether the benefits of enforcing
-   const-correctness earlier justify the potential for increased migration
-   effort.
+   reference for HLSL 202x?
+
+**Solution**: The conversion operator will return a const reference. This will
+allow errors from directly writing to a member of a ConstantBuffer to be emitted
+during Sema without additional changes.
 
 4. **ConstantBuffer<T> where T contains a resource:** Should we support nesting
-   `ConstantBuffer` types or other resources? DXC has limited support for
-   defining a resource in a type `T` and using it in a `ConstantBuffer`, but it
-   fails when the `ConstantBuffer` is in an array and has never been supported
-   for SPIR-V. The current proposal does not allow this, as discussed in
-   [Unsupported Types](#6-unsupported-types).
+   `ConstantBuffer` types or other resources?
+
+**Solution**: ConstantBuffer<T> was never supposed to have contained resources.
+Enabling it in limited situations was an oversight. DXC supports defining a
+resource in a type `T` and using it in a `ConstantBuffer` only when the
+ConstantBuffer is a scalar in DXIL. It does not work when:
+
+1. The ConstantBuffer is in a struct: https://godbolt.org/z/cxnd9zaoa
+2. The ConstantBuffer is in an array: https://godbolt.org/z/zo34998h1
+3. When targeting SPIR-V: https://godbolt.org/z/j78oPPnax
+
+Given the limited possible uses, we don't expect that using resources in
+ConstantBuffers is common. We believe we can disallow it without causing too
+many problems.
 
 ## Acknowledgments
 
-Special thanks to the HLSL working group for examining the limitations of the
-legacy cbuffer design and refining the inheritance and pointer-based codegen
-model.
+Special thanks to the HLSL working group for examining the ideas in this
+proposal and suggesting alternatives.
