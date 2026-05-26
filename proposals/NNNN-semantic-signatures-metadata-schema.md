@@ -3,7 +3,7 @@ title: "[NNNN] - Semantic Signature Metadata"
 params:
   authors:
     - inbelic: Finn Plummer
-  status: Under Consideration
+  status: Accepted
 ---
 
 ## Introduction
@@ -66,7 +66,7 @@ serialize into `ISG1`, `OSG1` and `PSV0`.
 |----|-----------------|-------------|
 |  0 | i32             | dense 0-based index within the entry function signature list; matches the operand of `llvm.dx.load.input` / `llvm.dx.store.output` |
 |  1 | metadata string | the semantic name (e.g. `!"TEXCOORD"`, `!"SV_Position"`) |
-|  2 | i32             | component type; see [`llvm::dxil::ElementType`](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/Support/DXILABI.h). Equivalent to DXC's [`DXIL::ComponentType`](https://github.com/microsoft/DirectXShaderCompiler/blob/main/include/dxc/DXIL/DxilConstants.h); the two enums share value assignments through `PackedU8x32 = 18`. The SM 6.9 additions (`I8`, `U8`, `F8_E4M3FN`, `F8_E5M2`) will need to be mirrored into `ElementType`. |
+|  2 | i32             | component type; see [`llvm::dxil::ElementType`](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/Support/DXILABI.h). |
 |  3 | i32             | semantic kind; `Arbitrary` (0) for user-defined semantics, the corresponding `SV_*` value otherwise. See [`SEMANTIC_KIND`](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/BinaryFormat/DXContainerConstants.def) |
 |  4 | metadata node   | reference to a [semantic indices](#semantic-indices) node |
 |  5 | i32             | interpolation mode; see [`INTERPOLATION_MODE`](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/BinaryFormat/DXContainerConstants.def) |
@@ -188,7 +188,7 @@ the metadata representation and the packing algorithm will is defined here.
 
 ### Accumulate `SemanticSignatureElement`s
 
-`emitEntryFunction` will then have a a vector of `SemanticSignatureElement`s for
+`emitEntryFunction` will then have a vector of `SemanticSignatureElement`s for
 both input and output signatures. The existing traversal visits each leaf
 semantic in declaration order as it generates `llvm.dx.load.input` /
 `llvm.dx.store.output` calls. At each leaf:
@@ -236,8 +236,8 @@ Note that:
 At the end of `emitEntryFunction`, with the two vectors fully populated and
 packed, the metadata is materialized in one pass:
 
-1. For each `SemanticSignatureElement`, build the operand-4 semantic-indices
-   node (`!{ i32 ... }`) and the 13-operand element node described in
+1. For each `SemanticSignatureElement`, build the semantic-indices
+   node (`!{ i32 ... }`) and the signature element node described in
    [Signature Element](#signature-element).
 2. Build the input and output element-list nodes referencing those element
    nodes (or `null` if the corresponding vector is empty).
