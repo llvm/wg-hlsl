@@ -17,9 +17,11 @@ Local resource variables — resource handles declared within function scope
 rather than at global scope — are a common pattern in HLSL shaders. Despite
 their widespread use, the semantics around initialization, assignment,
 aliasing, and control flow have historically been under-documented and
-inconsistently handled across compilers. This proposal documents the observed
-behavior when handling local resource variables and identifies key
-behavioral differences between DXC and Clang.
+inconsistently handled across compilers. This proposal establishes, for each
+local-resource pattern, what the HLSL specification ought to require (the
+"ought" claim) and compares Clang's and DXC's current behavior against
+that claim. Patterns whose specified behavior is not yet settled are
+flagged as TBD so the relevant HLSL spec issues can be filed.
 
 ## Motivation
 
@@ -30,12 +32,15 @@ from bugs, and users cannot predict which patterns are safe to rely on.
 
 This proposal aims to:
 
-1. **Establish a reference** for how DXC handles each local resource pattern.
-2. **Document behavioral differences** between DXC and Clang, particularly
-   where DXC issues hard errors for patterns that Clang treats as warnings
-   or accepts silently.
+1. **Establish expected behavior** for each local-resource pattern,
+   grounded in the HLSL specification rather than in any one compiler's
+   current behavior.
+2. **Compare Clang's and DXC's current behavior** against the expected
+   behavior so that compiler-side bugs (in either compiler) and spec
+   gaps can be told apart and tracked separately.
 3. **Enable regression testing** so that future compiler changes can be
-   validated against well-defined expectations.
+   validated against the expected behavior, and so that XFAILed tests
+   point back to the appropriate compiler bug or spec issue.
 
 > **Note:** Two pre-existing multi-function test files directly under the
 > SemaHLSL directory (`local_resource_bindings.hlsl` and
@@ -46,195 +51,222 @@ This proposal aims to:
 
 ## Proposed solution
 
-The observed behavior for local resource variables is documented below,
-organized by category. Each pattern includes the observed behavior for
-both DXC and Clang.
+Each local-resource pattern is documented below in a per-category
+"ought" table with the following columns:
+
+- **Test** — the test file name (without the `.hlsl` extension) that
+  exercises the pattern.
+- **Behavior** — a concise description of the pattern, unique among all
+  rows.
+- **Ought Compile** — what the HLSL specification ought to require at
+  compile time: `Clean`, `Warning`, `Error`, or `TBD / unspecified` when
+  the spec has not yet decided. A `†` after the value indicates the
+  claim is reasoned from analogous language rules but not yet pinned to
+  a written HLSL spec proposal (i.e. maybe should be TBD); it is a
+  candidate to be relaxed to `TBD / unspecified` if the spec working
+  group disagrees.
+- **Ought Runtime** — what the shader ought to do at runtime if it
+  compiles, or `N/A` when a compile error is expected. A `†` here has
+  the same meaning as on Ought Compile.
+- **Clang** / **DXC** — ✅ if the compiler's current behavior matches the
+  ought claim; ❌ followed by the actual behavior otherwise. A ❌ marks
+  either a compiler bug or, when the ought claim is itself uncertain, a
+  spec issue that needs to be resolved.
 
 ### Basic Local Resource Operations
 
-> **Clean** means compilation with 0 warnings and 0 errors.
+> ✅ = currently matches the "ought" claim. ❌ = does not match (actual
+> behavior in parentheses).
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Alias from global (`buf = gBuf0`) | Clean | Clean |
-| Alias chain (`a = g; b = a; c = b`) | Clean | Clean |
-| Copy between locals (`a = g; b = a`) | Clean | Clean |
-| Self-assignment (`buf = buf`) | Clean | Clean |
-| Self-assignment of uninitialized resource (`Out = Out`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
-| Reassign to same global in conditional branch | Clean | Clean |
-| Return initialized local | Clean | Clean |
-| Return uninitialized local | Clean | Clean |
-| Parenthesized ternary expression init | Clean | Clean |
-| Aggregate init of struct with resource | Clean | Clean |
-| Two resources in a single declaration | Clean | Clean |
-| Use of uninitialized local resource | Clean | Clean (sema), Error (codegen): DXIL Op Lowering assertion on uninitialized resource Store |
-| Default-init store (unbound handle) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean (sema), Error (codegen): DXIL Op Lowering assertion on unbound handle |
-| Conditional init (`if(cond) buf = g;`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
-| Comma expression init (`(gBuf0, gBuf1)`) | Clean | Warning: *"left operand of comma operator has no effect"* |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_alias_global` | Initialize a local from a single global, then Store through the local | Clean | Store reaches the global's binding | ✅ | ✅ |
+| `local_resource_alias_chain` | Chain `a=g; b=a; c=b` then use `c` | Clean | Store reaches the global's binding | ✅ | ✅ |
+| `local_resource_copy_between_locals` | `a=g; b=a` then use `b` | Clean | Store reaches the global's binding | ✅ | ✅ |
+| `local_resource_self_assign` | `buf = buf` on an initialized local (no-op) | Clean | No state change beyond explicit operations | ✅ | ✅ |
+| `local_resource_self_assign_uninitialized` | `Out = Out` where `Out` is an uninitialized `out` parameter | Error † (use of uninitialized resource handle) | N/A | ❌ Clean (no diagnostic) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_reassign_same_global` | `if(c) buf=g; else buf=g;` (both branches assign the same global) | Clean | Store reaches `g` | ✅ | ✅ |
+| `return_local_resource_initialized` | Return a local that aliases a global | Clean | Caller observes the global | ✅ | ✅ |
+| `return_local_resource_uninitialized` | Return an uninitialized local | Error † (use of uninitialized resource handle) | N/A | ❌ Clean | ❌ Clean |
+| `expression_init` | Initialize via a parenthesized ternary whose branches resolve to a single global | Clean | Store reaches the global | ✅ | ✅ |
+| `local_resource_aggregate_init` | Aggregate-initialize a struct whose resource member is a global | Clean | Store reaches the global | ✅ | ✅ |
+| `local_resource_multi_decl` | `RWByteAddressBuffer a=g0, b=g1` (two decls in one statement) | Clean | Stores reach the respective globals | ✅ | ✅ |
+| `local_resource_default_init_store` | `RWByteAddressBuffer buf; buf.Store(...)` (no initializer, unbound handle) | Error † (use of uninitialized resource handle) | N/A | ❌ Clean (sema); DXIL Op Lowering assertion at codegen | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_conditional_single_path_assign` | `if(c) buf=g;` then `buf.Store(...)` (uninitialized on the else path) | Error † (possibly-uninitialized use) | N/A | ❌ Clean | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_comma_init` | `buf = (g0, g1)` — comma expression initializer | Warning † (left operand discarded) | Store reaches `g1` | ✅ Warning: *"left operand of comma operator has no effect"* | ✅ Warning: *"comma expression used where a constructor list may have been intended"* |
 
 ### Parameter Passing
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Resource as `out` parameter | Clean | Clean |
-| Resource as `inout` parameter | Clean | Clean |
-| Resource as `const` parameter | Clean | Error: *"no matching member function"* (`Load`/`Store` not `const`-qualified) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_out_param` | Resource passed as `out` parameter, assigned in callee, read by caller | Clean | Caller observes the assigned resource | ✅ | ✅ |
+| `local_resource_inout_param` | Resource passed as `inout` parameter; mutation in callee is visible to caller | Clean | Caller observes mutated state | ✅ | ✅ |
+| `local_resource_const_param` | Resource passed as `const` parameter; `Store` invoked inside callee | Error † (Store mutates state through a `const`-qualified handle) | N/A | ✅ Error: *"no matching member function"* (`Store` not `const`-qualified) | ❌ Clean (silently accepts Store on a `const` resource) |
 
 ### Struct and Array Patterns
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Struct with a resource member | Clean | Clean |
-| Array of structs each containing a resource | Clean | Clean |
-| Struct containing an array of resources | Clean | Clean |
-| Nested struct with resource | Clean | Clean |
-| Deeply composed struct layers with resource | Clean | Clean |
-| Plain local array of resources | Clean | Clean |
-| Copy of local resource arrays | Clean | Clean |
-| Dynamic index into a local resource array | Clean | Clean (sema), Error (codegen): DXIL Legalizer assertion on dynamically-indexed local resource arrays |
-| Partially initialized resource array | Clean | Clean (sema), Error (codegen): same DXIL Legalizer assertion |
-| Size-one resource array (edge case) | Clean | Clean |
-| Reassign a struct's resource member | Clean | Clean |
-| Function returning a struct with a resource | Clean | Clean |
-| Struct with resource + scalar member | Clean | Clean |
-| Struct with member function using a resource | Clean | Clean |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_struct_resource_member` | Use a resource that is a struct member | Clean | Store reaches the global | ✅ | ✅ |
+| `struct_array_with_resource_member` | Array of structs, each containing a resource member | Clean | Store reaches the indexed global | ✅ | ✅ |
+| `struct_with_resource_array_member` | Struct containing an array of resources | Clean | Store reaches the indexed global | ✅ | ✅ |
+| `nested_struct_resource_member` | Inner/outer nested struct with a resource | Clean | Store reaches the global | ✅ | ✅ |
+| `local_resource_array` | Plain local array of resources initialized from globals | Clean | Store reaches the indexed global | ✅ | ✅ |
+| `local_resource_array_copy` | Copy one local resource array to another, then Store through the copy | Clean | Stores reach the original globals | ✅ | ✅ |
+| `local_resource_array_dynamic_index` | Dynamic (runtime) index into a local resource array | Clean | Store reaches the dynamically-indexed global | ❌ Clean (sema); DXIL Legalizer assertion at codegen | ✅ |
+| `local_resource_array_partial_init` | `{g0}` for a 2-element resource array (second element default-initialized) | Error † (every array element must be bound to a global) | N/A | ❌ Clean (sema); DXIL Legalizer assertion at codegen | ❌ Clean |
+| `local_resource_array_size_one` | Resource array of size 1 | Clean | Store reaches the global | ✅ | ✅ |
+| `struct_resource_member_reassign` | Reassign a struct's resource member to a different global | Warning † (binding-ambiguous reassignment) | Store reaches the most-recently-assigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean (no diagnostic) |
+| `local_resource_struct_return` | Function returns a struct containing a resource | Clean | Caller observes the returned resource | ✅ | ✅ |
+| `local_resource_mixed_struct` | Struct with both a resource member and a scalar member | Clean | Operations reach both members independently | ✅ | ✅ |
+| `local_resource_struct_method` | Struct with a member function that operates on a resource member | Clean | Store reaches the global via the member function | ✅ | ✅ |
 
 ### Control Flow
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Shadowed resource in inner block | Clean | Clean |
-| Assigned in inner block, used in outer scope | Clean | Clean |
-| Reassign across nested blocks | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Reassign after early return path | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Reassign in unreachable code | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Reassign in switch cases | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Switch with fallthrough reassignment | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Switch with explicit default reassignment | Clean | Warning (`-Whlsl-explicit-binding`) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_shadow_inner_scope` | Local resource shadowed by another local in an inner block | Clean | Inner-scope Store reaches inner global; outer Store reaches outer global | ✅ | ✅ |
+| `local_resource_block_lifetime` | Resource assigned in inner block, used in outer scope | Clean | Store reaches the assigned global | ✅ | ✅ |
+| `local_resource_nested_blocks_reassign` | Reassigned to a different global across nested blocks | Warning † (binding-ambiguous reassignment) | Store reaches the most-recently-assigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_early_return_reassign` | Reassigned to a different global on an early-return path | Warning † (binding-ambiguous reassignment) | Store reaches the assigned global per taken path | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_unreachable_reassign` | Reassigned in provably unreachable code | Warning † (binding-ambiguous reassignment; possibly also dead-code warning) | Store reaches the original global (unreachable code does not execute) | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_switch_reassign` | Reassigned to a different global inside switch cases | Warning † (binding-ambiguous reassignment) | Store reaches the per-case-assigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_switch_fallthrough` | Switch with case fallthrough reassigning the resource | Warning † (binding-ambiguous reassignment) | Store reaches the global from the last assignment along the taken path | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_switch_default` | Switch with explicit `default:` case reassigning the resource | Warning † (binding-ambiguous reassignment) | Store reaches the per-case-assigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
 
 ### Loop Patterns
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Resource as a for-loop variable | Clean | Clean |
-| Resource from array inside a loop | Clean | Clean |
-| Resource from array in nested loops | Clean | Clean |
-| Loop-carried reassignment from array | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Reassignment inside a do-while loop | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Reassignment before `break` in loop | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Error (codegen): DXIL Op Lowering assertion |
-| Reassignment before `continue` in loop | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `loop_var` | Resource declared in a for-loop initializer | Clean | Per-iteration Store reaches the same global | ✅ | ✅ |
+| `local_resource_loop_array_index` | Pick resource from a global array inside a loop using loop index | Clean | Per-iteration Store reaches the indexed global | ✅ | ✅ |
+| `local_resource_nested_loops` | Pick resource from a global array inside nested loops | Clean | Per-iteration Store reaches the indexed global | ✅ | ✅ |
+| `local_resource_loop_carried` | Loop-carried local reassigned from array each iteration | Warning † (binding-ambiguous reassignment) | Store reaches per-iteration indexed global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_do_while_reassign` | Reassign local to a different global inside a `do-while` body | Warning † (binding-ambiguous reassignment) | Store reaches the assigned global per iteration | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_break_reassign` | Reassign local to a different global immediately before `break` | Warning † (binding-ambiguous reassignment) | Store after the loop reaches the global assigned at break | ✅ Warning (`-Whlsl-explicit-binding`); DXIL Op Lowering assertion at codegen | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_continue_reassign` | Reassign local to a different global immediately before `continue` | Warning † (binding-ambiguous reassignment) | Subsequent iterations observe the reassigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
 
 ### Reassignment and Phi/Merge
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Reassign to a different global | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Nested if/else with ternary (deep phi) | Clean | Warning (`-Whlsl-explicit-binding`) |
-| Ternary expression as lvalue | ICE (internal compiler error) | Clean |
-| Swap two locals through a temporary | Clean | Clean |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_reassign_different_global` | Plain reassignment of a local to a different global | Warning † (binding-ambiguous reassignment) | Store reaches the most-recently-assigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_deep_phi` | Nested if/else with ternary that merges multiple globals (deep phi) | Warning † (binding-ambiguous reassignment) | Store reaches the path-selected global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
+| `local_resource_ternary_lvalue` | Ternary expression used as an lvalue (`cond ? a : b = g`) | TBD / unspecified | TBD / unspecified | ✅ Clean | ❌ ICE (internal compiler error) |
+| `local_resource_swap` | Swap two locals through a temporary | Clean | Each local ends up holding the other's original global | ✅ | ✅ |
 
 ### Bindless
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Dynamic index into global resource array | Clean | Clean |
-| Multiple dynamic array selections | Clean | Clean |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_bindless_array` | Dynamic (runtime) index into a global resource array | Clean | Store reaches the dynamically-indexed global | ✅ | ✅ |
+| `local_resource_bindless_selection` | Multiple dynamic indices into a global resource array | Clean | Each Store reaches its dynamically-indexed global | ✅ | ✅ |
 
 ### Function Forwarding and Multiple Uses
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Resource passed through a call chain | Clean | Clean |
-| Resource used alongside wave intrinsics | Clean | Clean |
-| Same local resource passed to multiple helpers | Clean | Clean |
-| Local resource initialized from function return | Clean | Clean |
-| Template function taking a resource parameter | Clean | Clean |
-| Method on function return value (`GetBuf().Store(...)`) | Clean | Clean |
-| Function overloading by resource type | Clean | Clean |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_forward_through_functions` | Resource forwarded through a chain of helper function calls | Clean | Store at the chain's leaf reaches the original global | ✅ | ✅ |
+| `local_resource_with_wave_intrinsic` | Local resource used alongside wave intrinsics (e.g. `WaveActiveSum`) | Clean | Store reaches the global, wave intrinsics return expected values | ✅ | ✅ |
+| `local_resource_multiple_uses` | Same local resource passed to multiple helpers in one entry point | Clean | Each helper's Store reaches the global | ✅ | ✅ |
+| `local_resource_from_function_return` | Local initialized from a function that returns a single global | Clean | Store reaches the returned global | ✅ | ✅ |
+| `local_resource_multiple_returns` | Helper reassigns local then returns it across two `return` statements | Warning † (binding-ambiguous reassignment inside helper) | Caller observes the helper's per-path global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_multi_return_paths` | Helper has two `return` statements that return distinct globals; caller initializes a local from the helper's return value | Warning † (call expression yields a binding-ambiguous result) | Caller observes one of the two globals per call | ❌ Clean (no warning fires: initializer is a call expression, not a global reference) | ❌ Codegen error at the first `return` inside the helper |
+| `local_resource_template_function` | Template function deducing the resource type from the argument | Clean | Store inside template reaches the global | ✅ | ✅ |
+| `local_resource_chained_call` | Method invoked directly on a function's return value (`GetBuf().Store(...)`) | Clean | Store reaches the returned global | ✅ | ✅ |
+| `local_resource_overload` | Function overloaded by resource type; correct overload selected for the local | Clean | Selected overload's Store reaches the global | ✅ | ✅ |
 
 ### Static and Storage
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Static local `RWByteAddressBuffer` | ICE: `llvm::cast<X>()` incompatible type | Clean |
-| Static local `Texture2D` | ICE | N/A (not yet supported) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_static_local` | `static RWByteAddressBuffer buf = g;` inside a function | Clean | Store reaches the global; the binding persists across calls | ✅ | ❌ ICE: `llvm::cast<X>()` argument of incompatible type |
 
 ### Type Mixing and Alternative Resource Types
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Two different resource types in same function | Clean | Clean |
-| Read-only `ByteAddressBuffer` as local | Clean | Clean |
-| `RWStructuredBuffer<uint>` with subscript access | Clean | Clean |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_different_types` | Two different resource types (`RWByteAddressBuffer` + `RWStructuredBuffer`) coexist in the same function | Clean | Each resource's operation reaches its respective global | ✅ | ✅ |
+| `local_resource_read_only` | Local `ByteAddressBuffer` (read-only SRV) initialized from a global, Loaded from | Clean | Load returns the bound global's contents | ✅ | ✅ |
+| `local_resource_structured_buffer` | Local `RWStructuredBuffer<uint>` with subscript-store access | Clean | Subscript-store reaches the global at the given index | ✅ | ✅ |
 
 ### Invalid Type Operations
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Arithmetic (`buf + 1`) | Error: *"scalar, vector, or matrix expected"* | Error: *"invalid operands to binary expression"* |
-| Addition (`buf + buf`) | Error: *"scalar, vector, or matrix expected"* | Error: *"invalid operands to binary expression"* |
-| Equality comparison (`a == b`) | Error: *"scalar, vector, or matrix expected"* | Error: *"invalid operands to binary expression"* |
-| Implicit conversion to `bool` | Error: *"cannot convert"* | Error: *"no viable conversion"* |
-| C-style cast to `uint` | Error: *"cannot convert"* | Error: *"cannot convert"* |
-| Cast `SamplerState` to `RWByteAddressBuffer` | Error: type mismatch | Error: *"no matching conversion"* |
-| Assign wrong type | Error: type mismatch | Error: *"no viable overloaded '='"* |
-| `const` reassignment | Error: *"cannot assign to const"* | Error: *"cannot assign to variable with const-qualified type"* |
-| `volatile` resource method call | Clean (silently accepts `volatile`) | Error: *"no matching member function"* |
-| `static const` resource method call | ICE | Error: `Load`/`Store` not `const`-qualified |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_arithmetic` | Arithmetic on a resource handle (`buf + 1`) | Error (no arithmetic on resources) | N/A | ✅ Error: *"invalid operands to binary expression"* | ✅ Error: *"scalar, vector, or matrix expected"* |
+| `local_resource_addition` | Add two resource handles (`buf + buf`) | Error (no arithmetic on resources) | N/A | ✅ Error: *"invalid operands to binary expression"* | ✅ Error: *"scalar, vector, or matrix expected"* |
+| `local_resource_compare` | Equality comparison between two resources (`a == b`) | Error (no equality on resources) | N/A | ✅ Error: *"invalid operands to binary expression"* | ✅ Error: *"scalar, vector, or matrix expected"* |
+| `local_resource_to_bool` | Implicit conversion of a resource to `bool` | Error (no conversion to bool) | N/A | ✅ Error: *"no viable conversion"* | ✅ Error: *"cannot convert"* |
+| `local_resource_cast_to_uint` | C-style cast of a resource to `uint` | Error (no conversion to scalar) | N/A | ✅ Error: *"cannot convert"* | ✅ Error: *"cannot convert"* |
+| `local_resource_cast_sampler_to_buffer` | C-style cast from `SamplerState` to `RWByteAddressBuffer` | Error (incompatible resource types) | N/A | ✅ Error: *"no matching conversion"* | ✅ Error: type mismatch |
+| `local_resource_assign_wrong_type` | Assign `RWStructuredBuffer` to `RWByteAddressBuffer` | Error (incompatible resource types) | N/A | ✅ Error: *"no viable overloaded '='"* | ✅ Error: type mismatch |
+| `local_resource_const_reassign` | Reassign a `const`-qualified local resource | Error (cannot assign to `const`) | N/A | ✅ Error: *"cannot assign to variable with const-qualified type"* + Warning (`-Whlsl-explicit-binding`) | ✅ Error: *"cannot assign to const"* |
+| `local_resource_volatile` | `volatile` qualifier on a resource; method call invoked on it | Error † (methods are not `volatile`-qualified) | N/A | ✅ Error: *"no matching member function"* | ❌ Clean (silently accepts `volatile` on resources) |
+| `local_resource_static_const` | `static const` local resource with `Load` method call | Error † (`Load` not `const`-qualified) | N/A | ✅ Error: *"no matching member function"* | ❌ ICE |
+| `local_resource_static_const_store` | `static const` local resource with `Store` method call | Error † (`Store` not `const`-qualified) | N/A | ✅ Error: *"no matching member function"* | ❌ ICE |
+| `local_resource_lambda_capture` | Lambda captures a local resource by value and calls `Store` on it | TBD / unspecified (HLSL lambda capture semantics for resources are not yet specified) | TBD | ❌ (under proposed spec) Error: *"no matching member function"* (captured resource treated as `const` in lambda body) | ❌ Parse error: *"expected expression"* (lambdas not supported) |
 
 ### Invalid Declarations
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Resource param with default, followed by param without | Error: *"missing default argument on parameter"* | Error: *"missing default argument on parameter"* |
-| Resource type as `RWStructuredBuffer` element (intangible) | Error: *"is an object and cannot be used as a type parameter"* | Error: *"constraints not satisfied for class template"* |
-| Brace (zero) init `= {}` | Error: empty initializer list | Error: empty initializer list |
-| Compile-time out-of-bounds array index | Error: *"array index N is out of bounds"* | Warning (`-Warray-bounds`) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_default_param` | Function parameter with a default value followed by a parameter without one | Error (defaulted parameters must be trailing) | N/A | ✅ Error: *"missing default argument on parameter"* | ✅ Error: *"missing default argument on parameter"* |
+| `local_resource_as_structured_buffer_element` | Resource type used as the element type of `RWStructuredBuffer<T>` (intangible) | Error (resource types cannot be element types) | N/A | ✅ Error: *"constraints not satisfied for class template"* | ✅ Error: *"is an object and cannot be used as a type parameter"* |
+| `local_resource_zero_init` | Brace zero-initialization of a local resource (`= {}`) | Error (resource has no zero/null representation) | N/A | ✅ Error: empty initializer list | ✅ Error: empty initializer list |
+| `local_resource_array_oob` | Compile-time out-of-bounds index into a resource array | Error (OOB constant index) | N/A | ❌ Warning (`-Warray-bounds`) | ✅ Error: *"array index N is out of bounds"* |
+| `local_resource_explicit_register` | Explicit `register()` attribute on a local resource variable | Error (`register` only applies to globals) | N/A | ✅ Error: *"'register' attribute only applies to cbuffer/tbuffer and external global variables"* | ❌ Clean (silently ignores the local `register()`) |
 
 ### Ternary Conditional Resource Assignment (CodeGen)
 
-DXC's `DxilCondenseResources` pass rejects patterns where a local
-resource does not resolve to a single unique global resource. Clang
-accepts these patterns, emitting a warning in most cases.
+These patterns construct a local resource whose binding depends on
+runtime control flow. The "ought" claim throughout this section is that
+the assignment is well-formed but binding-ambiguous, so a warning should
+be emitted and the runtime behavior is to access whichever global the
+control flow selected. Patterns where both ternary branches resolve to
+the same binding are unambiguous and should compile clean.
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Ternary init (`buf = cond ? g0 : g1`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Ternary assignment post-declaration | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Ternary phi merge | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Ternary resource as function argument | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Clean |
-| Nested ternary (`c1 ? g0 : (c2 ? g1 : g2)`) | Error (codegen, 2 errors): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Conditional reassign to different global (`if(cond) out = g1`) | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Conditional reassign from unbounded array element | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
-| Static resource ternary assign (lib target) | Error (codegen): *"non const static global resource use is disallowed"* + *"local resource not guaranteed..."* | Warning (`-Whlsl-explicit-binding`) |
-| Ternary between same-array indices (`cond ? arr[0] : arr[1]`) | Clean | Clean |
-| If/else assigning different array elements | Clean | Clean |
-| Ternary both branches same (`cond ? g0 : g0`) | Clean | Clean |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_ternary_assign` | `buf = cond ? g0 : g1;` after declaration | Warning † (binding-ambiguous reassignment) | Store reaches `g0` or `g1` per `cond` | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_ternary_as_argument` | Pass `cond ? g0 : g1` directly as a function argument | Warning † (binding-ambiguous argument) | Callee Store reaches `g0` or `g1` per `cond` | ❌ Clean (no warning fires for ternary at call site) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_nested_ternary` | `c1 ? g0 : (c2 ? g1 : g2)` | Warning † (binding-ambiguous reassignment) | Store reaches one of `g0`/`g1`/`g2` per conditions | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error (2 errors, one per ternary level) |
+| `local_resource_conditional_reassign_different_global` | `if(cond) out = g1;` reassigning an output resource | Warning † (binding-ambiguous reassignment) | Store reaches `g0` or `g1` per `cond` | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_conditional_reassign_from_array` | `if(cond) out = arr[i];` (conditional reassign from unbounded resource array) | Warning † (binding-ambiguous reassignment) | Store reaches either the original global or `arr[i]` per `cond` | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_static_ternary_assign` | Ternary assigning to a `static` local resource (lib target) | Warning † (binding-ambiguous reassignment) | Store reaches the selected global; the binding persists across calls | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen errors: *"non const static global resource use is disallowed"* + *"local resource not guaranteed to map to unique global resource"* |
+| `local_resource_ternary_both_same` | `cond ? g0 : g0` (both branches the same global) | Clean | Store reaches `g0` | ✅ | ✅ |
+| `local_resource_ternary_same_array_elements` | `cond ? arr[0] : arr[1]` (both branches same global array) | Clean | Store reaches the selected array element | ✅ | ✅ |
+| `local_resource_if_else_array_elements` | `if(cond) buf = arr[0]; else buf = arr[1];` | Clean | Store reaches the selected array element | ✅ | ✅ |
 
 ### Wave-Conditional Reassignment (CodeGen)
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Reassignment under wave-conditional control flow | Error (codegen): *"local resource not guaranteed to map to unique global resource"* | Warning (`-Whlsl-explicit-binding`) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `local_resource_wave_uniform` | Local resource reassigned under wave-conditional control flow (`if(WaveIsFirstLane()) buf = g1;`) | Warning † (binding-ambiguous reassignment) | Each lane's Store reaches the global selected on its path | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
 
 ### Groupshared Resources
 
-| Pattern | DXC | Clang |
-|---------|-----|-------|
-| Passing groupshared resource as argument | Validation error | Sema error (constructor mismatch) |
-| Store on groupshared resource | Validation error | Sema error (address space mismatch) |
-| Resource from groupshared struct | Validation error | Currently silent (expected to fail — see TODO) |
+| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
+|------|----------|---------------|---------------|-------|-----|
+| `use_groupshared` | Pass a `groupshared` resource as a function argument | Error † (resources cannot live in groupshared address space) | N/A | ✅ Error (constructor mismatch on groupshared argument) | ✅ Validation error |
+| `use_groupshared_direct_store` | Call `Store` directly on a `groupshared` resource | Error † (resources cannot live in groupshared address space) | N/A | ✅ Error (address-space mismatch on `this`) | ✅ Validation error |
+| `use_struct_groupshared` | Access a resource from a `groupshared` struct | Error † (resources cannot live in groupshared address space) | N/A | ❌ Clean (currently silent — see TODO in test) | ✅ Validation error |
 
 ## Key Behavioral Themes
 
-### DXC Defers to CodeGen Where Clang Warns at Sema
+### Ambiguous Binding: Sema Warning vs. CodeGen Error
 
-The most significant difference between the two compilers is their approach
-to ambiguous resource bindings. Clang proactively warns at sema via
-`-Whlsl-explicit-binding` when a local resource assignment does not resolve
-to a single unique global resource. DXC has no equivalent sema diagnostic —
-it either silently accepts the pattern or rejects it as a hard error during
-its `DxilCondenseResources` codegen pass.
+A recurring pattern across the tables above is a local resource whose
+binding cannot be resolved to a single unique global at compile time
+(reassignment across control flow, ternary merges, loop-carried
+reassignment, etc.). The expected behavior is a compile-time diagnostic
+that surfaces the ambiguity to the user. Clang emits
+`-Whlsl-explicit-binding` at sema for these patterns. DXC has no
+equivalent sema diagnostic — it either silently accepts the pattern
+(producing implementation-defined runtime behavior) or rejects it as a
+hard error during its `DxilCondenseResources` codegen pass. Neither
+behavior is the spec-defined baseline; the ought-tables flag both
+deviations.
 
 ### DXC ICEs on Static and Const-Static Resources
 
@@ -247,114 +279,45 @@ Some behaviors differ between resource types. DXC ICEs with both
 `static Texture2D` and `static RWByteAddressBuffer`. The test suite
 uses `RWByteAddressBuffer` because Clang does not yet support `Texture2D`.
 
-## Offload Test Suite
+## Test Placement
 
-Tests that produce a valid compiled output from at least one compiler are
-candidates for the
-[offload test suite](https://github.com/llvm/offload-test-suite) under
-`test/Feature/LocalResources/`. The offload test suite executes shaders
-at runtime against real GPU hardware and software rasterizers, validating
-end-to-end correctness beyond what static compilation checks can verify.
+Test placement follows from each row's "Ought Compile" column above, not
+from which compiler currently passes or fails:
 
-### Inclusion criteria
-
-A test is added to the offload test suite when **at least one compiler
-produces a compiled output** — that is, compilation succeeds with zero
-errors. Tests that emit only warnings (e.g. `-Whlsl-explicit-binding`)
-still produce compiled output and qualify. Tests are placed in
-subdirectories based on which compiler(s) succeed and where the other
-compiler fails (sema vs codegen).
-
-### Tests added
-
-The **57 tests** that produce a compiled output from both compilers are
-placed directly in `test/Feature/LocalResources/`. This includes tests
-that are fully clean on both compilers, tests where Clang
-emits `-Whlsl-explicit-binding` warnings but still produces compiled
-output (reassignment patterns across control flow, switches, and loops),
-and 1 test (`local_resource_comma_init.hlsl`) where Clang warns about a
-discarded comma operand but both compilers produce output.
-
-Three subdirectories capture tests that compile on only one compiler:
-
-- **`ClangPass-DXCCodegenError/`** (4 tests) — Clang produces compiled
-  output, but DXC fails to produce output due to a codegen-stage error
-  or ICE. Includes `local_resource_conditional_single_path_assign`,
-  `local_resource_conditional_reassign_different_global`,
-  `local_resource_conditional_reassign_from_array`, and
-  `local_resource_self_assign_uninitialized`.
-- **`DXCPass-ClangSemaError/`** (2 tests) — DXC produces compiled output,
-  but Clang fails at sema. Currently `local_resource_volatile` (DXC
-  silently accepts `volatile` on resources but Clang errors because the
-  methods are not `volatile`-qualified) and `local_resource_const_param`
-  (Clang does not mark `Load`/`Store` as `const`-qualified).
-- **`DXCPass-ClangCodegenError/`** (2 tests) — DXC produces compiled
-  output, but Clang crashes during DXIL codegen. Currently
-  `local_resource_array_dynamic_index` and `local_resource_array_partial_init`
-  (DXIL Legalizer assertion on dynamically-indexed local resource arrays).
-
-### Test distribution
-
-Tests are organized across the clang repository and the offload test
-suite based on the following rules:
-
-- **`SemaHLSL/Resources/Local-Resources/`** — Tests that emit a warning
-  or error in Clang at the sema stage, regardless of DXC behavior.
-- **`offload-test-suite/test/Feature/LocalResources/`** — Tests where
-  both compilers produce a compiled output (warnings are acceptable).
-- **`offload-test-suite/.../ClangPass-DXCCodegenError/`** — Tests where
-  Clang produces a compiled output but DXC fails to produce output due
-  to a codegen-stage error or ICE.
-- **`offload-test-suite/.../DXCPass-ClangSemaError/`** — Tests where DXC
-  produces a compiled output but Clang fails at sema.
-- **`offload-test-suite/.../DXCPass-ClangCodegenError/`** — Tests where DXC
-  produces a compiled output but Clang crashes during DXIL codegen.
-
-Tests that emit Clang sema diagnostics and also produce compiled output
-exist in both the clang repo (SemaHLSL) and the offload test suite.
-
-| Location | Count | Contents |
-|----------|-------|----------|
-| `SemaHLSL/Resources/Local-Resources/` | 41 | Clang emits sema warning or error (regardless of DXC) |
-| `offload-test-suite/test/Feature/LocalResources/` | 57 | Both compilers produce compiled output (clean, or Clang warns) |
-| `offload-test-suite/.../ClangPass-DXCCodegenError/` | 4 | Clang compiles, DXC fails at codegen |
-| `offload-test-suite/.../DXCPass-ClangSemaError/` | 2 | DXC compiles, Clang fails at sema |
-| `offload-test-suite/.../DXCPass-ClangCodegenError/` | 2 | DXC compiles, Clang crashes during DXIL codegen |
-
-16 tests exist in both the clang repo and the offload test suite because
-they emit Clang sema diagnostics (qualifying for SemaHLSL) while also
-producing compiled output from at least one compiler (qualifying for
-the offload test suite).
-
-### Duplicated tests
-
-| Test | Locations |
-|------|-----------|
-| `local_resource_comma_init.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_continue_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_deep_phi.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_do_while_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_early_return_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_loop_carried.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_nested_blocks_reassign.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_reassign_different_global.hlsl` |`llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_switch_default.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_switch_fallthrough.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_switch_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_unreachable_reassign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-| `local_resource_volatile.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/DXCPass-ClangSemaError/` |
-| `local_resource_conditional_reassign_different_global.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `local_resource_conditional_reassign_from_array.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/ClangPass-DXCCodegenError/` |
-| `local_resource_static_ternary_assign.hlsl` | `llvm-project/.../SemaHLSL/Resources/Local-Resources/`, `offload-test-suite/.../LocalResources/` |
-
-The remaining 25 tests in SemaHLSL have no offload test suite counterpart.
-These include tests that produce errors on both compilers (invalid type
-operations, bad declarations), tests where neither compiler produces a
-runnable output (codegen crashes on both sides), and tests whose sema
-behavior is fully covered by the llvm repo's `-verify` or `FileCheck`
-testing without needing runtime execution.
+- Shaders that **ought to compile without error** (Clean or Warning)
+  belong in the
+  [offload test suite](https://github.com/llvm/offload-test-suite)
+  under `test/Feature/LocalResources/`, so that runtime behavior on real
+  GPU hardware and software rasterizers can be validated against the
+  expected runtime behavior. Tests for which a compiler's current
+  behavior disagrees with the Ought column are XFAILed against an
+  appropriate tracking issue.
+- Shaders that **ought to fail compilation with an error** belong
+  somewhere in the clang tree (typically `SemaHLSL/`), where `-verify`
+  can pin the expected diagnostic. They are not added to the offload
+  test suite regardless of any current compiler's behavior.
+- Shaders whose Ought claim is **TBD / unspecified** are blocked on
+  spec work; this document is the place to surface those gaps so the
+  HLSL spec issues can be filed.
 
 ## Alternatives considered
+
+**Document only observed behavior, without ought claims.** An earlier
+draft of this proposal listed Clang and DXC behavior side-by-side
+without expressing what either compiler ought to do. That approach was
+rejected because it leaves no way to tell a compiler bug apart from
+correct behavior, makes XFAIL decisions ad-hoc, and forces the
+ought-discussion to happen scattered across individual test PRs rather
+than as a single comprehensive survey. The current per-row ought claim
+makes spec gaps explicit (via `TBD / unspecified`) and gives every ❌
+a clear next step: either fix the compiler or file a spec issue.
+
+**Organize tests by which compiler currently passes.** An earlier
+draft used subdirectories named `ClangPass-DXCCodegenError/`,
+`DXCPass-ClangSemaError/`, etc. That structure bakes current compiler
+behavior into the file layout, which would require moving tests every
+time a compiler changes. The Ought-driven placement described in
+[Test Placement](#test-placement) is stable against compiler fixes.
 
 ## Acknowledgments
 
