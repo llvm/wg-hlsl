@@ -588,10 +588,6 @@ and always gathers component 0.
 
 ##### Shader Stage and Shader Model Requirements
 
-Some texture operations are only valid in certain shader stages or require a
-minimum shader model version. Operations that compute implicit LOD require
-hardware derivative support, which is not available in all stages.
-
 The following methods require derivative support: `Sample`, `SampleBias`,
 `SampleCmp`, `SampleCmpBias`, `CalculateLevelOfDetail`, and
 `CalculateLevelOfDetailUnclamped`. They are not valid in vertex, hull, domain,
