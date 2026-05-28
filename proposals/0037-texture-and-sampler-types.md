@@ -520,13 +520,15 @@ to texture and sampler types.
 ##### Template Parameter Validation
 
 Texture template parameters are constrained using the same
-[`__is_typed_resource_element_compatible` concept](0011-resource-element-type-validation.md)
+[`__is_typed_resource_element_compatible` concept][typed-resource-concept]
 as `Buffer` and `RWBuffer`. Valid element types are scalars and vectors of
 numeric types (excluding `bool` and enums) that fit in four 32-bit quantities
 (16 bytes). Structs, arrays, matrices, and resource types are rejected.
 `double` and `double2` satisfy this constraint (8 and 16 bytes respectively), so
 additional validation at the point of use is needed for operations that do not
 support 64-bit element types.
+
+[typed-resource-concept]: 0011-resource-element-type-validation.md
 
 ##### Sampling Element Type Validation
 
@@ -537,12 +539,14 @@ contained element type is compatible with the operation:
 - `double` element types are always rejected for sample and gather methods.
 - Integer element types (`int`, `uint`, `int16_t`, `uint16_t`) are rejected for
   `Sample`, `SampleBias`, `SampleGrad`, and `SampleLevel` when the target is
-  below SM 6.7 (see [HLSL Advanced Texture Operations - Integer Sampling](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_7_Advanced_Texture_Ops.html#integer-sampling)).
+  below SM 6.7 (see [HLSL Advanced Texture Operations - Integer Sampling][integer-sampling]).
 - `SampleCmp`, `SampleCmpLevelZero`, and `SampleCmpLevel` require the element
   type to be floating-point, regardless of shader model version.
 
-These restrictions match [DXC's validation](https://github.com/microsoft/DirectXShaderCompiler/blob/7284bb1809613fb12d61cc0426afa4057afb0265/tools/clang/lib/Sema/SemaHLSL.cpp#L6908-L6948)
-behavior.
+These restrictions match [DXC's validation][dxc-validation] behavior.
+
+[integer-sampling]: https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_7_Advanced_Texture_Ops.html#integer-sampling
+[dxc-validation]: https://github.com/microsoft/DirectXShaderCompiler/blob/7284bb1809613fb12d61cc0426afa4057afb0265/tools/clang/lib/Sema/SemaHLSL.cpp#L6908-L6948
 
 ##### Coordinate and Argument Validation
 
@@ -577,8 +581,10 @@ for `Texture3D`).
 
 On the Vulkan target, `GatherCmp` operations only support component 0 (Red).
 `GatherCmpGreen`, `GatherCmpBlue`, and `GatherCmpAlpha` are rejected.
-This is because SPIR-V's [OpImageDrefGather](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpImageDrefGather)
-does not have a Component operand and always gathers component 0.
+This is because SPIR-V's [OpImageDrefGather] does not have a Component operand
+and always gathers component 0.
+
+[OpImageDrefGather]: https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpImageDrefGather
 
 ##### Shader Stage and Shader Model Requirements
 
@@ -590,22 +596,28 @@ The following methods require derivative support: `Sample`, `SampleBias`,
 `SampleCmp`, `SampleCmpBias`, `CalculateLevelOfDetail`, and
 `CalculateLevelOfDetailUnclamped`. They are not valid in vertex, hull, domain,
 geometry, or ray tracing shader stages. In compute, mesh, and amplification
-shaders they require [SM 6.6 or greater](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_6.html#derivatives).
+shaders they require [SM 6.6 or greater][sm66-derivatives].
 Methods that take an explicit LOD or explicit gradients (`SampleLevel`,
 `SampleGrad`, `SampleCmpLevelZero`, `SampleCmpLevel`, `SampleCmpGrad`) do not
 require derivatives.
 
 Clang will diagnose use of derivative-requiring methods in unsupported shader
-stages at the sema level using [availability attributes](0001-availability-diagnostics.md)).
+stages at the sema level using [availability attributes][availability-attributes]).
 This differs from DXC which defers the rejection of `Sample`, `SampleBias`,
 `SampleCmp`, and `SampleCmpBias` in unsupported shaders to the DXIL validator
-via [`ValidateDerivativeOp`](https://github.com/microsoft/DirectXShaderCompiler/blob/1e4181c0f4cede851b9fa67a017717135849ba3d/lib/DxilValidation/DxilValidation.cpp#L402-L412).
+via [`ValidateDerivativeOp`].
 
 Some texture methods require later shader models. `SampleCmpLevel` and
-`GatherRaw` require SM 6.7 ([`AdvancedTextureOps`](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_7_Advanced_Texture_Ops.html)).
+`GatherRaw` require SM 6.7 ([`AdvancedTextureOps`]).
 `SampleCmpBias`, `SampleCmpGrad`, and the use of `CalculateLevelOfDetail` with a
-`SamplerComparisonState` require SM 6.8 ([`SampleCmpGradientOrBias`](https://microsoft.github.io/hlsl-specs/proposals/0014-expanded-comparison-sampling/)).
+`SamplerComparisonState` require SM 6.8 ([`SampleCmpGradientOrBias`]).
 All other texture methods are available from SM 6.0.
+
+[sm66-derivatives]: https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_6.html#derivatives
+[availability-attributes]: 0001-availability-diagnostics.md
+[`ValidateDerivativeOp`]: https://github.com/microsoft/DirectXShaderCompiler/blob/1e4181c0f4cede851b9fa67a017717135849ba3d/lib/DxilValidation/DxilValidation.cpp#L402-L412
+[`AdvancedTextureOps`]: https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_7_Advanced_Texture_Ops.html
+[`SampleCmpGradientOrBias`]: https://microsoft.github.io/hlsl-specs/proposals/0014-expanded-comparison-sampling/
 
 ### HLSL Builtin Interface
 
