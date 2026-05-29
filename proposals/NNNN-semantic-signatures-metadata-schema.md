@@ -206,7 +206,7 @@ semantic in declaration order as it generates `llvm.dx.load.input` /
    - `CompType` from the leaf LLVM type;
    - `Rows` from the array extent of the declaration (1 for scalars and
      vectors), `Cols` from the vector width (1 for scalars);
-   - `InterpMode` from any `HLSLInterpolationModeAttr` (or the stage default);
+   - `InterpMode` from a specified interpolation qualifier (or stage default);
    - `GSStream` from the relevant stream attribute, or 0;
    - `StartRow = -1`, `StartCol = -1`, `UsageMask = 0`, `DynIndexMask = 0`.
 
