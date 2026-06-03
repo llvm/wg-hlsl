@@ -169,27 +169,27 @@ The `dx.semantic.signatures` table is produced entirely from within
 `CGHLSLRuntime::emitEntryFunction` in `clang/lib/CodeGen/CGHLSLRuntime.cpp`.
 Briefly, this is done so by traversing through each of the entry function's
 input parameters and return outputs, accumulating an in-memory representation
-of the signature elements and emitting the load/store intrinsic. It uses the
-order the parameters/return outputs are declared in to assign the signature id
-that will associate the semantic in the intrinsic call and the metadata table.
-Once these have been traversed, the DXIL packing algorithm is run on the
-in-memory signature elements. Finally we can emit the in-memory representation
-to the metadata nodes as described above. This is described in more detail
-below.
+of the signature elements and emitting the load/store intrinsic. Signature IDs
+are assigned in declaration order giving each semantic a stable ID that appears
+in both the intrinsic call and the metadata table. Once these have been
+traversed, the DXIL packing algorithm is run on the in-memory signature
+elements. Finally we can emit the in-memory representation to the metadata nodes
+as described above. This is described in more detail below.
 
 ### In-Memory Representation
 
-A `SemanticSignatureElement` struct will be defined in
-`llvm/Frontend/HLSL/SemanticSignatures.h` that will contain all the operands as
-above, as well as, helpers to determine the extra container field information
-(eg. is allocated). It will also define functions to convert to/from the
-metadata representation and the packing algorithm is defined here.
+A `SemanticSignatureElement` struct, defined in
+`llvm/Frontend/HLSL/SemanticSignatures.h`, will contain all the operands as
+above as well as helpers to determine the extra container field information
+(eg., is allocated). The struct will also define functions to convert to and
+from the metadata representation and the packing algorithm is implemented in
+this library.
 
 ### Accumulate `SemanticSignatureElement`s
 
 `emitEntryFunction` will then have a vector of `SemanticSignatureElement`s for
 both input and output signatures. The existing traversal visits each leaf
-semantic in declaration order as it generates `llvm.dx.load.input` /
+semantic in declaration order as it generates `llvm.dx.load.input` or
 `llvm.dx.store.output` calls. At each leaf:
 
 1. The next available `SigId` is taken from the input or output counter
