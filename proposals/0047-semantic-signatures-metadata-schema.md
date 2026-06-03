@@ -1,9 +1,9 @@
 ---
-title: "[NNNN] - Semantic Signature Metadata"
+title: "[0047] - DirectX Semantic Signature Metadata"
 params:
+  status: Accepted
   authors:
     - inbelic: Finn Plummer
-  status: Accepted
 ---
 
 ## Introduction
