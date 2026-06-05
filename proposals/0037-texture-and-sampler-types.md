@@ -582,7 +582,8 @@ for `Texture3D`).
 On the Vulkan target, `GatherCmp` operations only support component 0 (Red).
 `GatherCmpGreen`, `GatherCmpBlue`, and `GatherCmpAlpha` are rejected.
 This is because SPIR-V's [OpImageDrefGather] does not have a Component operand
-and always gathers component 0.
+and always gathers component 0. Note that `GatherCmp` and `GatherCmpRed` both
+gather component 0 (Red), so both are permitted on the Vulkan target.
 
 [OpImageDrefGather]: https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpImageDrefGather
 
