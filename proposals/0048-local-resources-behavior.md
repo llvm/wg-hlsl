@@ -1,7 +1,7 @@
 ---
-title: "[NNNN] - Local Resources Behavior"
+title: "[0048] - Local Resources Behavior"
 params:
-  status: Under Consideration
+  status: Accepted
   authors:
     - bob80905: Joshua Batista
 ---
