@@ -318,19 +318,19 @@ no such attribute, walk the parent declarations to find the first enclosing
 declaration that has one. Then map the collected set of modifiers to their
 corresponding `InterpolationMode` using the table below:
 
-| Modifier attribute set                       | `InterpolationMode`               |
-|----------------------------------------------|-----------------------------------|
-| `{}`                                         | `Undefined` (0)                   |
-| `{nointerpolation}`                          | `Constant` (1)                    |
-| `{linear}`                                   | `Linear` (2)                      |
-| `{centroid}`, `{linear, centroid}`           | `LinearCentroid` (3)              |
-| `{noperspective}`, `{linear, noperspective}` | `LinearNoperspective` (4)         |
-| `{noperspective, centroid}`                  | `LinearNoperspectiveCentroid` (5) |
-| `{sample}`, `{linear, sample}`               | `LinearSample` (6)                |
-| `{noperspective, sample}`                    | `LinearNoperspectiveSample` (7)   |
+| Modifier attribute set                                                            | `InterpolationMode`               |
+|-----------------------------------------------------------------------------------|-----------------------------------|
+| `{}`                                                                              | `Undefined` (0)                   |
+| `{nointerpolation}`                                                               | `Constant` (1)                    |
+| `{linear}`, `{linear, center}`                                                    | `Linear` (2)                      |
+| `{centroid}`, `{linear, centroid}`                                                | `LinearCentroid` (3)              |
+| `{noperspective}`, `{linear, noperspective}`, `{linear, noperspective, center}`   | `LinearNoperspective` (4)         |
+| `{noperspective, centroid}`, `{linear, noperspective, centroid}`                  | `LinearNoperspectiveCentroid` (5) |
+| `{sample}`, `{linear, sample}`                                                    | `LinearSample` (6)                |
+| `{noperspective, sample}`, `{linear, noperspective, sample}`                      | `LinearNoperspectiveSample` (7)   |
 
-_Note_: `center` does not appear in the table. It is the default sampling
-location, so `center` uses the same encoding as no sampling-location modifier.
+_Note_: `center` does not appear in the `InterpolationMode` as it is the
+default sampling location and is used when `centroid`/`sample` is not present.
 
 Then the interpolation mode is "normalized" as follows:
 
