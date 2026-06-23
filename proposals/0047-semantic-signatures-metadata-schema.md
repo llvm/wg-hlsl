@@ -256,7 +256,7 @@ on declarations that contribute to a signature element. Practically, this means
 the same set of declarations on which a semantic may appear on:
 
 - a function parameter declaration,
-- a struct or class field declaration,
+- a struct or class field declaration, or
 - a function declaration (applied to its return value).
 
 When applied to an aggregate type, the modifier propagates recursively to
@@ -312,7 +312,7 @@ metadata.
 
 During entry-function emission (the `emitEntryFunction` flow described in
 [Generating Metadata](#generating-metadata)), each leaf signature element
-determines it's set of interpolation modes by reading the `Modifiers` bitmask
+determines its set of interpolation modes by reading the `Modifiers` bitmask
 from the leaf declaration's `HLSLInterpolationModeAttr`. If the declaration has
 no such attribute, walk the parent declarations to find the first enclosing
 declaration that has one. Then map the collected set of modifiers to their
