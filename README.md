@@ -24,12 +24,15 @@ See [issue_tracking](docs/issue_tracking) for more info.
 
 ## Meetings
 
-Public meetings are the first Thursday of every month at 5:00-5:30 pm UTC (1
-EDT, 12 CDT, 11 MDT, 10 PST). The meeting is a [Google Meet
-call](https://meet.google.com/tcs-srdn-dig).
+We have a public meeting every Thursday at 9:30-10:30 AM Pacific. Note that the
+meeting time follows US daylight savings. We meet in Microsoft Teams and you
+can find the invite on the [LLVM Community Calendar].
 
-If you want to be added to the Google calendar invite send your Google account
-email address to beanz on LLVM’s Discourse or Discord.
+If you'd like to add agenda items for the meeting, there will be an "Agenda and
+Minutes" draft PR set up ahead of time that you may comment on.
+
+[LLVM Community Calendar]:
+  https://llvm.org/docs/GettingInvolved.html#llvm-community-calendar
 
 ## Contact Information
 
