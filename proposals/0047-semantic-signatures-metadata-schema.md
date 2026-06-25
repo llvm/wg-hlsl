@@ -322,7 +322,7 @@ corresponding `InterpolationMode` using the table below:
 |-----------------------------------------------------------------------------------|-----------------------------------|
 | `{}`                                                                              | `Undefined` (0)                   |
 | `{nointerpolation}`                                                               | `Constant` (1)                    |
-| `{linear}`, `{linear, center}`                                                    | `Linear` (2)                      |
+| `{linear}`, `{center}`, `{linear, center}`                                        | `Linear` (2)                      |
 | `{centroid}`, `{linear, centroid}`                                                | `LinearCentroid` (3)              |
 | `{noperspective}`, `{linear, noperspective}`, `{linear, noperspective, center}`   | `LinearNoperspective` (4)         |
 | `{noperspective, centroid}`, `{linear, noperspective, centroid}`                  | `LinearNoperspectiveCentroid` (5) |
