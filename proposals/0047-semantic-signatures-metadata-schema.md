@@ -243,3 +243,115 @@ packed, the metadata is materialized in one pass:
 3. Build the function/signature triple `{ ptr @entry, !inputs, !outputs }`
    and append it as an operand of the module's `!dx.semantic.signatures`
    named metadata, creating the named node on first use.
+
+## Interpolation Modifiers
+
+A signature element may carry an *interpolation modifier* that specifies how
+the rasterizer interpolates its value across a primitive for the pixel shader.
+The recognized modifiers are `nointerpolation`, `linear`, `centroid`,
+`noperspective`, `sample` and `center`.
+
+The modifier keywords are independent of semantics, but they are only meaningful
+on declarations that contribute to a signature element. Practically, this means
+the same set of declarations on which a semantic may appear on:
+
+- a function parameter declaration,
+- a struct or class field declaration, or
+- a function declaration (applied to its return value).
+
+When applied to an aggregate type, the modifier propagates recursively to
+every scalar or vector of the type. A modifier on an inner field overrides one
+inherited from an enclosing declaration.
+
+For example:
+
+```hlsl
+struct Material {
+   float3                albedo : COLOR0;     // inherits nointerpolation from the parameter
+   nointerpolation float gloss  : COLOR1;     // already nointerpolation
+   linear float2         uv     : TEXCOORD0;  // inner linear overrides the outer
+};
+
+float4 ps_main(nointerpolation Material m) : SV_Target {
+   ...
+}
+```
+
+### Parse and Sema
+
+An `HLSLInterpolationModeAttr` is defined with a spelling for each unique
+modifier and carries a single `Modifiers` bitmask argument with one bit per
+modifier. The attr has `ParmVarDecl`, `FieldDecl`, or `FunctionDecl` as
+subjects. At parse time a new `HLSLInterpolationModeAttr` is created with the
+respective modifier set and then the attribute is consolidated through a
+dedicated merge step, `SemaHLSL::mergeInterpolationModeAttr`. The merge runs at
+declaration time and guarantees that a declaration ends up with at most one
+`HLSLInterpolationModeAttr` whose `Modifiers` mask is the union of the keywords
+written on it.
+
+`mergeInterpolationModeAttr` is invoked once per keyword occurrence and:
+
+1. If the declaration has no `HLSLInterpolationModeAttr` yet, it creates one
+   whose `Modifiers` mask has only this keyword's bit set.
+2. Otherwise it creates a new `HLSLInterpolationModeAttr` carrying the OR-ed
+   mask and drops the existing attr.
+3. It will then perform diagnostics of the constructed attr:
+   - Error: `nointerpolation` with any of `linear`, `centroid`,
+     `noperspective`, `sample`, `center`
+   - Error: `nointerpolation` on `SV_Position`
+   - Error: Any non-`nointerpolation` modifier on integer, boolean and 64-bit
+     floating point
+   - Warning: Duplicate of the same modifier on one declaration
+   - Warning: `center` < `centroid` < `sample` overrides in ascending order
+
+_Note_: A modifier on a declaration that does not reach an entry-point
+signature parses and is preserved on the AST, but produces no signature
+metadata.
+
+### CodeGen
+
+During entry-function emission (the `emitEntryFunction` flow described in
+[Generating Metadata](#generating-metadata)), each leaf signature element
+determines its set of interpolation modes by reading the `Modifiers` bitmask
+from the leaf declaration's `HLSLInterpolationModeAttr`. If the declaration has
+no such attribute, walk the parent declarations to find the first enclosing
+declaration that has one. Then map the collected set of modifiers to their
+corresponding `InterpolationMode` using the table below:
+
+| Modifier attribute set                                                            | `InterpolationMode`               |
+|-----------------------------------------------------------------------------------|-----------------------------------|
+| `{}`                                                                              | `Undefined` (0)                   |
+| `{nointerpolation}`                                                               | `Constant` (1)                    |
+| `{linear}`, `{center}`, `{linear, center}`                                        | `Linear` (2)                      |
+| `{centroid}`, `{linear, centroid}`                                                | `LinearCentroid` (3)              |
+| `{noperspective}`, `{linear, noperspective}`, `{linear, noperspective, center}`   | `LinearNoperspective` (4)         |
+| `{noperspective, centroid}`, `{linear, noperspective, centroid}`                  | `LinearNoperspectiveCentroid` (5) |
+| `{sample}`, `{linear, sample}`                                                    | `LinearSample` (6)                |
+| `{noperspective, sample}`, `{linear, noperspective, sample}`                      | `LinearNoperspectiveSample` (7)   |
+
+_Note_: `center` does not appear in the `InterpolationMode` as it is the
+default sampling location and is used when `centroid`/`sample` is not present.
+
+Then the interpolation mode is "normalized" as follows:
+
+1. If the mode is `Undefined`, set it based on the component type:
+   `Linear` for 32-bit-or-smaller floating-point leaves, `Constant`
+   otherwise.
+2. Promote an `SV_Position` interpolation mode into the corresponding
+   `noperspective` variant of its current mode (`Linear` →
+   `LinearNoperspective`, `LinearCentroid` → `LinearNoperspectiveCentroid`,
+   `LinearSample` → `LinearNoperspectiveSample`).
+3. Finally, if the entry function is not a pixel shader then it is set to
+   `Undefined`
+
+### Metadata
+
+The normalized `InterpolationMode` is written into operand `5` of
+the [Signature Element](#signature-element) metadata node. In the
+`SemanticElement` population step described in
+[Accumulate `SemanticSignatureElement`s](#accumulate-semanticsignatureelements),
+the `InterpMode` field is set to the value produced by normalization.
+
+No additional metadata operands are required, the modifier is fully
+captured by the existing `InterpMode` slot and is propogated to the
+DXContainer accordingly.
