@@ -299,23 +299,63 @@ uses `RWByteAddressBuffer` because Clang does not yet support `Texture2D`.
 ## Test Placement
 
 Test placement follows from each row's "Ought Compile" column above, not
-from which compiler currently passes or fails:
+from which compiler currently passes or fails. Within the set of shaders
+that ought to compile, placement further depends on whether the test
+exercises behavior that benefits from on-hardware validation.
+
+**Motivation.** Local resource assignment is, fundamentally, a static
+question: which global resource does each use of a local handle bind to?
+That question is answered entirely by tracking how a pointer to a global
+flows through assignments, returns, parameters, struct members, and
+control flow — all of which are visible in the LLVM IR. For the bulk of
+the surface area covered by this proposal, a focused IR test in the
+clang tree (`CodeGenHLSL/` for codegen, `SemaHLSL/` for diagnostics)
+gives a sharper, faster, and more vendor-agnostic check than running a
+compute shader on real hardware and comparing buffer contents. Running
+every pattern on real GPUs would mostly be re-verifying the IR through a
+much noisier and slower channel.
+
+The offload test suite is reserved for cases where on-hardware behavior
+adds information that IR inspection cannot — that is, where the
+*execution* of the shader, not just its IR, is the interesting thing.
 
 - Shaders that **ought to compile without error** (Clean or Warning)
   belong in the
   [offload test suite](https://github.com/llvm/offload-test-suite)
-  under `test/Feature/LocalResources/`, so that runtime behavior on real
-  GPU hardware and software rasterizers can be validated against the
-  expected runtime behavior. Tests for which a compiler's current
-  behavior disagrees with the Ought column are XFAILed against an
-  appropriate tracking issue.
-- Shaders that **ought to fail compilation with an error** belong
-  somewhere in the clang tree (typically `SemaHLSL/`), where `-verify`
-  can pin the expected diagnostic. They are not added to the offload
-  test suite regardless of any current compiler's behavior.
+  under `test/Feature/LocalResources/` **only if** the test exercises
+  one of:
+  - a **common, idiomatic HLSL usage pattern** that a smoke test should
+    catch end-to-end (initialization from a global, reassignment,
+    function forwarding, struct member access, simple control flow); or
+  - a pattern whose **runtime behavior may differ across vendors,
+    drivers, or targets** (e.g. wave-conditional reassignment,
+    bindless / unbounded resource arrays, group-shared interactions),
+    where comparing actual GPU output is the only way to catch a
+    divergence.
+
+  Everything else that ought to compile — pattern variants whose
+  binding resolution is fully decidable by reading the IR (e.g.
+  static-condition ternaries that collapse to a single global, plain
+  shadowing, no-op self-assignment, simple aliasing) — belongs as an
+  IR-level test in the clang tree (`CodeGenHLSL/`) rather than as an
+  offload test. Tests for which a compiler's current behavior disagrees
+  with the Ought column are XFAILed against an appropriate tracking
+  issue regardless of placement.
+
+- Shaders that **ought to fail compilation with an error** belong in
+  the clang tree (typically `SemaHLSL/`), where `-verify` can pin the
+  expected diagnostic. They are not added to the offload test suite
+  regardless of any current compiler's behavior.
+
 - Shaders whose Ought claim is **TBD / unspecified** are blocked on
   spec work; this document is the place to surface those gaps so the
   HLSL spec issues can be filed.
+
+The net effect is that the offload `LocalResources/` directory holds a
+small, curated set of shaders that together cover the everyday
+patterns and the vendor-divergent ones; the long tail of variant
+patterns lives as IR-level tests in clang, where they are easier to
+maintain and faster to run.
 
 ## Alternatives considered
 
