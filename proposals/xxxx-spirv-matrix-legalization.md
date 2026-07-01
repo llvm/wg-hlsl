@@ -8,7 +8,7 @@ params:
 
 ## Introduction
 
-HLSL matrix types flatten to wide `<N x T>` vectors (e.g. `bool3x4` → `<12 x i1>`),
+HLSL matrix types flatten to wide `<N x T>` vectors (e.g. `bool3x4` --> `<12 x i1>`),
 but SPIR-V shader/Vulkan targets cap vectors at 4 components. The GlobalISel
 legalizer must split wide loads, stores, extends, and shuffles into legal chunks.
 See https://github.com/llvm/llvm-project/issues/186864.
@@ -53,7 +53,7 @@ Lower every wide shuffle generically to `G_EXTRACT_VECTOR_ELT` + `G_BUILD_VECTOR
 Use `moreElementsToNextPow2` then `fewerElementsIf(... MaxVectorSize)`.
 
 - Pros: reuses existing generic split actions; uniform 4-lane chunks.
-- Cons: padding `<12>`→`<16>`, `<6>`→`<8>`, `<9>`→`<16>` forces an illegal
+- Cons: padding `<12>`-->`<16>`, `<6>`-->`<8>`, `<9>`-->`<16>` forces an illegal
   wide `G_BUILD_VECTOR` with undef lanes, and the padded widths incidentally
   match the internal load-gather shuffles, breaking
   `pointers/load-vector-from-array-of-vectors.ll`. Padding also wastes lanes and
@@ -65,7 +65,7 @@ Use `moreElementsToNextPow2` then `fewerElementsIf(... MaxVectorSize)`.
 
 Split both operands into `W`-lane chunks, where `W` is the largest divisor of the
 element count in `[2, MaxVectorSize]` shared by source and destination
-(`<12>`→3×`<4>`, `<6>`→2×`<3>`, `<9>`→3×`<3>`), and emit chained per-chunk
+(`<12>`-->3×`<4>`, `<6>`-->2×`<3>`, `<9>`-->3×`<3>`), and emit chained per-chunk
 `OpVectorShuffle`s. This keeps every chunk a legal SPIR-V vector with no undef
 padding and preserves vectorized `OpDot`/`OpSelect` downstream.
 
@@ -93,18 +93,11 @@ Option C is implemented in in my llvm-project PR on `SPIRVLegalizerInfo.cpp`:
    then concatenates the result. Chunkable cases that do not apply fall through
    to `moreElementsToNextPow2` + `lowerIf(vectorElementCountIsGreaterThan)`.
 
-4. **Use-aware opt-out** — before chunking, `legalizeShuffleVector` inspects the
-   result's uses. If the shuffle feeds only a scatter store (a `G_STORE`, or a
-   scalar `G_UNMERGE_VALUES` whose scalar defs are *not* recombined into a
-   `G_BUILD_VECTOR`/`G_BUILD_VECTOR_TRUNC`), it falls back to the generic scalar
-   lowering (`Helper.lower`), since the `OpVectorShuffle`s would immediately be
-   undone by `OpCompositeExtract`s. When a def is recombined into a build-vector
-   (matrix-multiply rebuilding `<3>` rows for `OpDot`) or feeds a vector extend
-   (bool transpose `G_ZEXT`), the shuffle stays vectorized. This detection lives
-   in the custom handler rather than the predicate because `customIf`'s
-   `LegalityQuery` cannot see instruction uses, and because store legalization
-   runs first (so "used only by stores" is unreliable — the stable KEEP signal
-   is recombination into a build-vector).
+4. **Use-aware opt-out** — `legalizeShuffleVector` checks uses before chunking.
+    It falls back to scalar lowering if feeding only scatter stores to avoid
+    redundant extracts. It stays vectorized if outputs are recombined (e.g.,
+    `G_BUILD_VECTOR`) or extended. This logic is in the custom handler since
+    `LegalityQuery` cannot see uses.
 
 5. **Post-legalizer type fix** — `SPIRVPostLegalizer.cpp`'s
    `deduceIntTypeFromResult` now preserves vector-ness so a split `<4 x i1>`
