@@ -384,10 +384,9 @@ triggered by the hlsl_constant address and type of the handle in the resource.
     ConstantBuffer are in an incompatible address space. How will we call member
     functions on members of a ConstantBuffer? The same applies for CBuffers.
 
-**No solution:** The solution in
-[0021 - Allowing multiple address spaces for the `this` pointer](0021-this-address-space.md)
-does not work because the layout for a struct in the hlsl_constant address space
-is different than if it is in another address space.
+**Solution:** Convert the struct from `hlsl_constant` address space and constant
+buffer layout to a const struct in default address space and standard layout
+before calling the member function.
 
 3. **Const correctness:** Should the conversion operator return a `const`
    reference for HLSL 202x?
