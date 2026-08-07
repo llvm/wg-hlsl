@@ -38,12 +38,17 @@ specified, the starting index is assumed to be `0`.
 Any semantic starting with the `SV_` prefix is considered to be a system
 semantic.
 
+A valid semantic name is a cpp idenfier as described by N3337 and P1949.
+
 Examples:
  - `SEMANTIC0`, Name = SEMANTIC, Index = 0, user semantic
  - `Semantic`, Name = SEMANTIC, Index = 0, user semantic
  - `semANtIC12`, Name = SEMANTIC, Index = 12, user semantic
  - `SV_Position`, Name = SV_POSITION, Index = 0, system semantic
  - `SV_POSITION2`, Name = SV_POSITION, Index = 2, system semantic
+ - `_`, Name = `_`, Index = 0, user semantic
+ - `ça_va7`, Name = `ça_va`, Index = 7, user semantic
+ - `💾256`, invalid since P1939.
 
 The HLSL language does not impose restriction on the indices except it has to
 be a positive integer or zero. Target APIs can apply additional restrictions.
@@ -353,11 +358,6 @@ to any HLSL semantic-like notation.
 When, when this attribute kind is parsed, we rely on Sema to emit the correct
 `HLSLUserSemanticAttr` or `HLSLSV_*Attr`, etc.
 
-Sema will do stateless checks like:
-  - Is this system semantic compatible with this shader stage?
-  - Is this system semantic compatible with the type it's associated with?
-  - Is this system semantic indexable if an explicit index is used?
-
 We must also consider `MY_SEMANTIC0` to be equal to `MY_semantic`.
 The solution is to modify the `ParseHLSLAnnotations` function to add a custom
 attribute parsing function.
@@ -374,29 +374,44 @@ name regeneration.
 
 ### Sema
 
-Sema check is only stateless, and done during parsing.
 The parser first emits an `HLSLUnparsedSemantic` attribute, which is passed
 down to Sema.
 Sema goal is to:
  - convert this class into a valid semantic class like `HLSLUserSemantic` or `HLSLSV_*`.
  - check shader stage compatibility with the system semantic.
  - check type compability with the system semantic.
+ - determine effecive semantics depending on the use.
+ - verify each input/output value has a valid semantic attached.
 
 At this stage, we have either `HLSLUserSemanticAttr` attributes, or known
 compatible `HLSLSV_*Attr` attributes.
 All non-converted `HLSLUnparsedSemantic` would have raised a diagnostic to
 say `unknown HLSL system semantic X`.
 
-No further checking is done as we must wait for codegen to move forward.
+For each entrypoint, we take the list of parameters & return values,
+and iterate on them, checking each value/struct field has a valid semantic
+following the inheritance/shadowing rules described above.
+We create a new function attribute for each active semantic, which associates
+the semantic attribute to the parameter/return-value declaration.
+This will allow codegen to easily retrieve which semantic applies to which
+input/output.
+Semantic indices collision is handled at this stage.
+
+At this stage, each leaf element has a valid semantic, or diagnostic
+has been emitted. All code passed down to codegen is considered valid.
+This means we have one function attribute for each function input/output
+describing the active semantic for this function.
+Codegen will be able to handle each element independently.
+
+In some cases, DXC considered a `SV_` semantic to either be a system semantic,
+or a user semantic on stages where this particular system semantic was not
+available. Clang will follow this behavior: the system semantic attribute
+will be intepreted as a system or user depending on the final context.
 
 ### CodeGen
 
-DXIL and SPIR-V codegen will be very different, but the flattening/inheritance
-bit can be shared.
-
-The proposal is to have the whole semantic inheritance & validation shared,
-and at the very end allow each target to emit the BuiltIn/Location codegen.
-
+DXIL and SPIR-V codegen will be very different, but the traversal
+can be shared.
 
 The pseudo code for the `emitEntryFunction` would be as follows:
 
@@ -438,70 +453,46 @@ In this code, two main functions are to write:
  - `storeSemanticRecursively`
  - `loadSemanticRecursively`
 
-Both will be quite similar, since both follow the same semantic
-indexing/inheritance rules.
-
 Pseudo code would be:
 
 ```python
 
-def loadSemanticRecursively(decl, appliedSemantic = None):
+def loadSemanticRecursively(decl):
   if (decl->isStruct())
     return loadSemanticStructRecurively()
   return loadSemanticScalarRecursively()
 
-def loadSemanticStructRecurively(decl, &appliedSemantic)
-
-  if appliedSemantic is None:
-    appliedSemantic = decl->getSemantic()
-
+def loadSemanticStructRecurively(decl)
   output = createEmptyStruct(decl->getType())
   for field in decl->structDecl():
-    tmp = copy(appliedSemantic)
-    val = loadSemanticRecursively(decl, tmp)
+    val = loadSemanticRecursively(decl)
     output.insert(val, field.index)
   return output
 
-def loadSemanticScalarRecursively(decl, &appliedSemantic):
-  if appliedSemantic is None:
-    appliedSemantic = decl->getSemantic()
+def getActiveSemantic(decl):
+  for attr in entrypoint.getAttrs<HLSLSemantic>():
+    if decl == attr->getTargetDecl()
+      return attr
+  unreachable("Sema should have failed").
 
-  if appliedSemantic is None:
-    raise ("semantic is required")
-
+def loadSemanticScalarRecursively(decl):
+  auto appliedSemantic = getActiveSemantic(decl);
   if appliedSemantic->isUserSemantic():
     return emitUserSemanticLoad(decl, appliedSemantic)
   return emitSystemSemanticLoad(decl, appliedSemantic)
 
-def emitSystemSemanticLoad(decl, &appliedSemantic):
+def emitSystemSemanticLoad(decl, appliedSemantic):
   if appliedSemantic == SV_Position:
     # For SPIR-V for ex, logic is the same as user semantics.
     return emitUserSemanticLoad(decl, appliedSemantic)
-
-  # But compute semantics based on builtins are different.
-  if not this->ActiveInputSemantic.insert(appliedSemantic.Name):
-    raise "duplicate semantic"
-
   if appliedSemantic == SV_GroupID:
     return emitSystemSemanticLoad_TARGET(decl, appliedSemantic)
+  unreachable();
 
-  raise "Unknown system semantic"
-
-def emitUserSemanticLoad(decl, &appliedSemantic):
-  Length = decl->isArray() ? decl->getArraySize() : 1
-
-  # Mark each index as busy. Some system semantics also require this,
-  # the example above shows the compute semantic which has no index.
-  for I in Length:
-    SemanticName = appliedSemantic.SemanticName + I
-    if not this->ActiveInputSemantic.insert(semanticName):
-      raise "Duplicate semantic index"
-    appliedSemantic.Index += 1
-
-  # For SPIR-V, emit a global with a Location ID.
+def emitUserSemanticLoad(decl, appliedSemantic):
   return emitUserSemanticLoad_TARGET(decl, appliedSemantic)
 
-def emitSystemSemanticLoad_TARGET(decl, &appliedSemantic):
+def emitSystemSemanticLoad_TARGET(decl, appliedSemantic):
   # Each target will emit the required code. This lives in CGHLSLRuntime,
   # meaning we can have state to determine packing rules, etc.
 
@@ -512,9 +503,6 @@ load the semantics after all checks. What we expect is to get a single
 value with the input semantic loaded.
 For store, same scenario: the target-specific code will take an `llvm::Value`
 with a non-aggregate value, and will have to store it to a semantic.
-Index collision, semantic inheritance and invalid system semantics are handled
-by the shared code.
 
 A demo branch can be found here:
 https://github.com/Keenuts/llvm-project/tree/hlsl-semantics
-
