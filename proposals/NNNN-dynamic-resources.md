@@ -92,8 +92,10 @@ https://godbolt.org/z/EjaK4rxhe
 
 ### Example 3 - Using directly indexed heap as a resource class
 
-The result of the direct indexing into `ResourceDescriptorHeap` or
-`SamplerDescriptorHeap` cannot be directly used as if it was a resource class:
+The result of directly indexing `ResourceDescriptorHeap` or
+`SamplerDescriptorHeap` cannot be used as a concrete resource object. That makes
+sense because, at that point, the descriptor's resource type is unknown, so
+resource-specific members such as `Load` are not available.
 
 ```cpp
 cbuffer CB {
