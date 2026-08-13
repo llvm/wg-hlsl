@@ -25,7 +25,7 @@ signature descriptor-table mappings.
 
 ## Motivation
 
-Dynamic resources are part of the HLSL language and we need to support it in
+Dynamic resources are part of the HLSL language and we need to support them in
 Clang.
 
 ## Current Behavior in DXC
@@ -34,7 +34,7 @@ This section documents how DXC handles dynamic resources.
 
 ### Example 1 - Assigning to local resource variable
 
-Resource instance aquired by direct indexing is usually assigned to a local
+Resource instance acquired by direct indexing is usually assigned to a local
 resource variable:
 
 ```cpp
@@ -72,7 +72,7 @@ https://godbolt.org/z/xE3P9Yzff
 ### Example 2 - Function argument
 
 Directly indexed resource instance can also be used as a function
-argument(without first assigning it to a local variable).
+argument (without first assigning it to a local variable).
 
 ```
 cbuffer CB {
@@ -105,14 +105,18 @@ void main() {
   int i = ResourceDescriptorHeap[Index].Load(10);
 }
 ```
-https://godbolt.org/z/6qP6eeYsj
+https://godbolt.org/z/ezPf8aaeb
+
+DXC produces the following diagnostics:
+```
+error: no member named 'Load' in '.Resource'`
+```
 
 ### Example 4 - Indexing into a wrong heap does not get diagnosed
 
-Indexing into a `SamplerDescriptorHeap` to get a CVB/SRV/UAV resource, or
-indexing into a `ResourceDescriptorHeap` to get a SamplerState resource does not
-produce an error. This is something the Clang implementation could possibly
-improve upon.
+Indexing into a `SamplerDescriptorHeap` to get a CBV/SRV/UAV resource, or
+indexing into a `ResourceDescriptorHeap` to get a sampler resource does not
+produce an error. This is something the Clang implementation could improve upon.
 
 ```cpp
 cbuffer CB {
@@ -162,8 +166,8 @@ Instead, it will return a small internal struct, `__hlsl_heap_resource_info`,
 that carries the heap index and a flag identifying the indexed heap.
 
 Every resource class will have an implicit constructor that accepts
-`__hlsl_heap_resource_info` and it will use use this information and a Clang
-built-in function(s) to create a concrete handle type from heap. Standard C++
+`__hlsl_heap_resource_info` and it will use this information and Clang built-in
+function(s) to create a concrete handle type from the heap. Standard C++
 implicit conversion rules then make the assignment, initialization, and
 function-argument cases work without special handling in `Sema`. This design
 also supports creating multiple handles for resources with counters.
@@ -181,17 +185,17 @@ an argument of the heap resource constructor. The struct will look like this:
 ```cpp
 struct __hlsl_heap_resource_info {
   unsigned int Index;
-  bool isSamplerHeap;
+  bool IsSamplerHeap;
 };
 ```
 
 #### Heap Globals
 
 The global heap variables `ResourceDescriptorHeap` and `SamplerDescriptorHeap`
-can be in a new builtin header `hlsl/hlsl_resources.h`, which will be included
-from the default header `hlsl.h`.
+can be declared in a new builtin header `hlsl/hlsl_resources.h`, which will be
+included from the default header `hlsl.h`.
 
-The definition would look like this:
+It would look like this:
 
 ```cpp
 namespace hlsl {
@@ -199,8 +203,7 @@ namespace hlsl {
 #define _HLSL_AVAILABILITY(platform, version)                                  \
   __attribute__((availability(platform, introduced = version)))
 
-template <bool IsSamplerHeap>
-struct _HLSL_AVAILABILITY(shadermodel, 6.6) DescriptorHeapStruct {
+template <bool IsSamplerHeap> DescriptorHeapStruct {
   __hlsl_heap_resource_info operator[](uint32_t Index) {
     return __hlsl_heap_resource_info{Index, IsSamplerHeap};
   }
@@ -217,10 +220,10 @@ static DescriptorHeapStruct<true> SamplerDescriptorHeap;
 
 #### Heap Constructors on Resource Types
 
-Add resource types will get a new constructor that takes
-`__hlsl_heap_resource_info` and that will call a new Clang builtin function
-`__builtin_hlsl_resource_handlefromheap`, passing in the heap index and whether
-the indexed heap is a Sampler heap or not.
+All resource types will get a new constructor that takes
+`__hlsl_heap_resource_info`. This constructor will call a new Clang builtin
+function `__builtin_hlsl_resource_handlefromheap`, passing in the heap index and
+a flag indicating whether the indexed heap is a sampler heap or not.
 
 For example:
 
@@ -229,16 +232,16 @@ template <typename T> struct RWBuffer {
   ...
 public:
   RWBuffer(__hlsl_heap_resource_info HeapResInfo) {
-    __handle = __builtin_hlsl_resource_handlefromheap(__handle, HeapResInfo.Index,     HeapResInfo.IsSamplerHeap);
+    __handle = __builtin_hlsl_resource_handlefromheap(__handle, HeapResInfo.Index, HeapResInfo.IsSamplerHeap);
   };
 };
 ```
 
 The first argument of the builtin function will be used to infer the return
-handle type.
+handle type of the builtin.
 
-For resource types with counters the constructor will use additional builtin
-`__builtin_hlsl_resource_counterhandlefromheap` to initialize the counter
+For resource types with counters the constructor will use an additional builtin
+`__builtin_hlsl_resource_counterhandlefromheap` to initialize their counter
 handle.
 
 Because this constructor is implicit and takes exactly one argument, all of the
@@ -261,20 +264,22 @@ created from implicit and explicit bindings.
 ### Backend (LLVM)
 
 The DirectX and SPIR-V backends will gain the new intrinsic
-`llvm.[dx|spv].resource.handlefromheap`. SPIR-V will also support
-`llvm.spv.resource.counterhandlefromheap`. The `handlefromheap` intrinsic takes
-a heap index and a flag that selects either the sampler heap or the CBV/SRV/UAV
-heap, and returns a value of the concrete resource target type.
+`llvm.[dx|spv].resource.handlefromheap`. The intrinsic will take a heap index
+and a flag that selects either the sampler heap or the CBV/SRV/UAV heap, and
+return a value of the concrete resource target type.
+
+SPIR-V will also support `llvm.spv.resource.counterhandlefromheap` which will
+take a heap index and will create a handle for the resource counter.
 
 Passes that currently identify resource-handle creation by looking for
-`llvm.[dx|spv].resource.handlefrombinding` must also recognize the corresponding
-`handlefromheap` intrinsic.
+`llvm.[dx|spv].resource.handlefrombinding` will need to be updated to also
+recognize the corresponding `*.handlefromheap` intrinsic calls.
 
-Resources created from a descriptor heap do not have bindings. Existing passes
-assume that every resource has a binding and use it to distinguish resource
-instances of the same type. These passes must be updated to support binding-less
-resources and to distinguish resource instances created from different heap
-index values.
+Existing passes assume that every resource has a binding and use that binding to
+distinguish instances of the same resource type. Resources created from a
+descriptor heap have no binding, so resource analysis must be extended to
+support binding-less resources and distinguish their instances by heap index
+value instead.
 
 The following LLVM passes will need to be updated:
 
@@ -283,11 +288,9 @@ The following LLVM passes will need to be updated:
 The analysis will handle each call to `llvm.dx.resource.handlefromheap` by
 creating a binding-less `ResourceInfo`. The `Binding` member of `ResourceInfo`
 will become optional, and a new `HeapIndexID` field will distinguish heap
-resource instances.
-
-The heap-index operand of `llvm.dx.resource.handlefromheap` is a `Value *`.
-`DXILResourceAnalysis` will assign a unique `HeapIndexID` to each distinct
-heap-index value.
+resource instances. The heap-index operand of `llvm.dx.resource.handlefromheap`
+is a `Value *`. `DXILResourceAnalysis` will assign a unique `HeapIndexID` to
+each distinct heap-index value.
 
 Heap resources do not participate in binding ID assignment, so `setBindingID`
 will be called only for resources that have a binding. To reflect this meaning,
@@ -303,15 +306,15 @@ The pass should also remove unused resources created by
 This pass could verify that each directly indexed resource uses the appropriate
 descriptor heap. For sampler resources, `llvm.dx.resource.handlefromheap` must
 have `IsSamplerHeap` set to `true`. For all other resource classes, it must be
-set to `false` to select the CBV/SRV/UAV heap.
+set to `false` to select the CBV/SRV/UAV heap. This would be an improvement over
+DXC.
 
 #### `DXILTranslateMetadata` and `DXILPrettyPrinter`
 
 `DXILTranslateMetadata` will neither create symbols for heap resources nor emit
-entries for them in the `SRV`, `UAV`, `CBuffer`, or `Sampler` metadata lists.
-
+entries for them in the `SRV`, `UAV`, `CBuffer`, or `Sampler` metadata lists. 
 `DXILPrettyPrinter` will omit heap resources from the resource bindings table
-printed as a comment in the LLVM assembly.
+that is printed as a comment in the LLVM assembly.
 
 #### `DXContainerGlobals`
 
@@ -320,7 +323,7 @@ entries.
 
 #### SPIR-V passes
 
-Preliminary analysis found no SPIR-V-specific passes that recognize
+Preliminary analysis found no SPIR-V-specific passes that process
 `llvm.spv.resource.handlefrombinding` and therefore need to be extended to
 recognize `llvm.spv.resource.handlefromheap`.
 
@@ -360,11 +363,6 @@ Descriptor-heap usage must be recorded in the shader feature flags. The
 `DXILShaderFlags` pass will inspect each `llvm.dx.resource.handlefromheap` call
 and set `SamplerDescriptorHeapIndexing` when `IsSamplerHeap` is `true`, or
 `ResourceDescriptorHeapIndexing` when it is `false`.
-
-### Testing
-
-TBD - Clang tests for AST shape, CodeGen output, and availability diagnostics
-  still need to be added.
 
 ## Alternatives considered
 
