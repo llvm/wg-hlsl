@@ -1,5 +1,5 @@
 ---
-title: "[NNNN] - Resource Property Annotation"
+title: "[NNNN] - Resource Instance Property Annotations"
 params:
   status: Under Consideration
   authors:
