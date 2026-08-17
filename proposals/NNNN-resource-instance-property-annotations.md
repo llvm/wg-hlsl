@@ -182,11 +182,22 @@ The most direct representation would be for the loads and stores through a
 coherent resource to carry the memory semantics themselves, which would make
 the property inferable rather than annotated. As described in the Global
 Coherence section, LLVM has does not have such semantics available on `load`
-and `store`, and memory barriers apply to a memory space rather than to a
-specific resource.
+and `store`.
 
 This would be possible but would require additions to LLVM's memory semantics,
-which is a substanial change.
+which is a substanial change due to it's wide use.
+
+### Allow barriers to be resource specific
+
+When emitting the resource operations, it would be possible to mark the memory
+access using memory barrier instructions. As described in the Global Coherence
+section, current LLVM memory barriers apply to a memory space rather than to a
+specific resource instances.
+
+This would require us to add a new barrier type that is resource specific and
+would follow a similar pattern as the annotation intrinsic above. However, the
+intrinsic's placement would hold more fine-grained meaning for optimization or
+otherwise.
 
 ### Encode coherence in the handle type
 
