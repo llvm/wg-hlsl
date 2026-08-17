@@ -86,7 +86,7 @@ recorded in the table. This matters for binding-ambiguous patterns: a
 miss the codegen-stage error that both compilers raise from
 `DxilCondenseResources` / equivalent.
 
-### Basic Local Resource Operations
+### Assignment and Initialization Forms
 
 > ✅ = currently matches the "ought" claim. ❌ = does not match (actual
 > behavior in parentheses).
@@ -95,51 +95,46 @@ miss the codegen-stage error that both compilers raise from
 |------|----------|---------------|---------------|-------|-----|
 | [`consolidated_assignments`] | Chained aliasing/initialization forms — ternary initializer (constant and same-arm runtime conditions), struct aggregate init from a function return, direct init from a function return, a method called directly on a function return, alias chain, comma initializer, self-assign, dead-branch reassignment, and forwarding through a call chain — all resolving to one global | Clean | Every Store reaches the single global (`gBuf0`); `gBuf1`'s binding is folded away | ✅ | ✅ |
 
-### Parameter Passing
+### Const-Qualified Locals
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
 | [`const_local_store`] | `const RWByteAddressBuffer local = gBuf;` then `local.Store(...)` (also passes `local` to a callee doing `Load` on a `const RWByteAddressBuffer` parameter, which both compilers accept) | Clean (per `int *const` semantics: `const` qualifies the handle binding, not the buffer's mutability — `Store` should remain callable) | Store round-trips through the buffer; final value reaches the global | ❌ Error: *"no matching member function for call to 'Store'"* (clang treats `const` on the handle as forbidding non-`const` member calls, like a C++ `const T`) | ✅ Clean |
 
-### Struct and Array Patterns
+### Local Resource Arrays
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
 | [`array`] | Two plain local resource arrays of different sizes (`Arr[2]` and `Arr2[1]`), each initialized from a distinct global, then Stored through at distinct offsets and values | Clean | Each element's Store reaches the corresponding global | ✅ | ✅ |
 | [`array_partial_init_dynamic`] | 4-element local resource array with only `arr[0]` and `arr[1]` assigned, both from the same global; dynamic store `arr[tid.x & 1]` provably stays within the assigned elements | Clean (every reachable element resolves to the same unique global) | Store reaches `Out` | ❌ Sema clean, but codegen fails: *"Load of … is not a global resource handle"*, then asserts in `DXILLegalizePass` ([#192538](https://github.com/llvm/llvm-project/issues/192538)) | ✅ Clean |
 
-### Control Flow
+### Binding Ambiguity Diagnostics
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
 | [`branched_reassign_ambiguous`] | Local initialized from one global, then reassigned to a different global inside an `if` (`buf = gBuf1; if (cond) { buf = gBuf2; }`) — `buf` resolves to either global at the access site | Error † (binding-ambiguous reassignment that cannot be folded away) | N/A | ❌ Warning at sema, then codegen error *"Resource access is not guaranteed to map to a unique global resource"* | ✅ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
-
-### Reassignment and Phi/Merge
-
-| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
-|------|----------|---------------|---------------|-------|-----|
 | [`ternary_lvalue_unambiguous`] | Ternary lvalue with a statically constant condition (`(true ? a : b) = g`) | Warning † at sema (front end is syntactic and cannot prove unambiguity); Clean codegen (backend folds the constant condition) | Store targets the statically-selected side (`a` here) | ❌ Clean at sema (warning does not fire); ✅ Clean codegen | ✅ Clean |
 | [`bindings_errs`] | Grouped warning cases: ternary initializer, reassignment from a resource-array element, ternary assignment to an uninitialized local, and ternary assignment to a `static` global | Warning † (each shape leaves the binding ambiguous) | N/A | ✅ Warning (`-Whlsl-explicit-binding`) for all four shapes | ❌ Clean (no diagnostic for any shape) |
 | [`bindings`] | Grouped must-not-warn cases pinning the diagnostic's lower boundary: single-path conditional assign, self-assign of an uninitialized local, conditional reassign to the *same* global, and ternary/if-else selecting between elements of one resource array | Clean (binding stays unique in every shape) | Store reaches the single selected global | ✅ Clean | ✅ Clean |
 
-### Bindless
+### Global Resource Array Indexing
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
 | [`init_from_global_array_dynamic_index`] | Initialize a local from a dynamically-indexed element of a global resource array | Clean | Store reaches the dynamically-indexed global | ✅ | ✅ |
 
-### Static and Storage
+### Static Storage
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`static_local`] | `static RWByteAddressBuffer buf = g;` inside a function | Clean | Store reaches the global; the binding persists across calls | ✅ | ❌ ICE: `llvm::cast<X>()` argument of incompatible type |
+| [`static_local`] | `static RWByteAddressBuffer buf = g;` inside a function | Clean | Store reaches the global; the binding persists across calls | ❌ Clean at `-O0`; asserts at `-O1`+ in `GlobalOpt` ([#205169](https://github.com/llvm/llvm-project/issues/205169)) | ❌ ICE: `llvm::cast<X>()` argument of incompatible type |
+| [`static_const`] | `static const` local resource with `Load` method call | Error † (`Load` not `const`-qualified) | N/A | ❌ Clean (no diagnostic) | ❌ ICE |
 
 ### Invalid Type Operations
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
 | [`assign_wrong_type`] | Assign `RWStructuredBuffer` to `RWByteAddressBuffer` | Error (incompatible resource types) | N/A | ✅ Error: *"no viable overloaded '='"* | ✅ Error: type mismatch |
-| [`static_const`] | `static const` local resource with `Load` method call | Error † (`Load` not `const`-qualified) | N/A | ✅ Error: *"no matching member function"* | ❌ ICE |
 
 ### Invalid Declarations
 
@@ -153,8 +148,9 @@ miss the codegen-stage error that both compilers raise from
 
 A recurring pattern across the tables above is a local resource whose
 binding cannot be resolved to a single unique global at compile time
-(reassignment across control flow, ternary merges, etc.). The expected behavior is a compile-time diagnostic
-that surfaces the ambiguity to the user. Clang emits
+(reassignment across control flow, ternary merges, etc.). The expected
+behavior is a compile-time diagnostic that surfaces the ambiguity to the
+user. Clang emits
 `-Whlsl-explicit-binding` at sema for these patterns. DXC has no
 equivalent sema diagnostic — it either silently accepts the pattern
 (producing implementation-defined runtime behavior) or rejects it as a
@@ -162,10 +158,14 @@ hard error during its `DxilCondenseResources` codegen pass. Neither
 behavior is the spec-defined baseline; the ought-tables flag both
 deviations.
 
-### DXC ICEs on Static and Const-Static Resources
+### Both Compilers Crash on Static Resources
 
 DXC asserts internally on `static` local resources and `static const`
-resources. These are compiler bugs, not intentional behavior.
+resources. Clang accepts both at `-O0`, but a plain `static` local
+resource also asserts in Clang once optimizations run
+(`GlobalOpt`/`SRAGlobal` at `-O1` and above,
+[#205169](https://github.com/llvm/llvm-project/issues/205169)). These
+are compiler bugs in both, not intentional behavior.
 
 ### Texture2D vs RWByteAddressBuffer
 
