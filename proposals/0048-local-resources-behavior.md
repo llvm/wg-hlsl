@@ -43,14 +43,6 @@ This proposal aims to:
    current behavior is wrong points back to a tracking compiler bug or
    spec issue.
 
-> **Note:** Two pre-existing multi-function test files landed via PR
-> #182101 (`local_resource_bindings.hlsl` and
-> `local_resource_bindings_errs.hlsl`) were moved from directly under the
-> SemaHLSL directory into `Resources/Local-Resources/` and renamed to
-> `bindings.hlsl` and `bindings_errs.hlsl`. They are retained as
-> multi-function files rather than split per-pattern, so their original
-> cases stay together.
-
 ## Proposed solution
 
 Each local-resource pattern is documented below in a per-category
@@ -69,7 +61,11 @@ Each local-resource pattern is documented below in a per-category
   group disagrees.
 - **Ought Runtime** — what the shader ought to do at runtime if it
   compiles, or `N/A` when a compile error is expected. A `†` here has
-  the same meaning as on Ought Compile.
+  the same meaning as on Ought Compile. This column appears only for
+  tests in the
+  [offload test suite](https://github.com/llvm/offload-test-suite),
+  which are actually executed. Tests living in the clang tree are
+  compile-only, so they make no runtime claim and omit the column.
 - **Clang** / **DXC** — ✅ if the compiler's current behavior matches the
   ought claim; ❌ followed by the actual behavior otherwise. A ❌ marks
   either a compiler bug or, when the ought claim is itself uncertain, a
@@ -91,56 +87,112 @@ miss the codegen-stage error that both compilers raise from
 > ✅ = currently matches the "ought" claim. ❌ = does not match (actual
 > behavior in parentheses).
 
+**Clang tests** (`llvm-project`) — not executed, so no runtime claim:
+
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`consolidated_assignments`] | Chained aliasing/initialization forms — ternary initializer (constant and same-arm runtime conditions), struct aggregate init from a function return, direct init from a function return, a method called directly on a function return, alias chain, comma initializer, self-assign, dead-branch reassignment, and forwarding through a call chain — all resolving to one global | Clean | ✅ | ✅ |
+
+**Offload tests** (executed on hardware):
+
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`consolidated_assignments`] | Chained aliasing/initialization forms — ternary initializer (constant and same-arm runtime conditions), struct aggregate init from a function return, direct init from a function return, a method called directly on a function return, alias chain, comma initializer, self-assign, dead-branch reassignment, and forwarding through a call chain — all resolving to one global | Clean | Every Store reaches the single global (`gBuf0`); `gBuf1`'s binding is folded away | ✅ | ✅ |
+| [`local_resource_alias_global`] | Initialize a local from a single global, then Store through the local | Clean | Store reaches the global's binding | ✅ | ✅ |
 
 ### Const-Qualified Locals
 
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`const_local_store`] | `const RWByteAddressBuffer local = gBuf;` then `local.Store(...)` (also passes `local` to a callee doing `Load` on a `const RWByteAddressBuffer` parameter, which both compilers accept) | Clean (per `int *const` semantics: `const` qualifies the handle binding, not the buffer's mutability — `Store` should remain callable) | ❌ Error: *"no matching member function for call to 'Store'"* (clang treats `const` on the handle as forbidding non-`const` member calls, like a C++ `const T`) | ✅ Clean |
+
+### Struct and Array Patterns
+
+**Clang tests** (`llvm-project`) — not executed, so no runtime claim:
+
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`array`] | Two plain local resource arrays of different sizes (`Arr[2]` and `Arr2[1]`), each initialized from a distinct global, then Stored through at distinct offsets and values | Clean | ✅ | ✅ |
+| [`array_partial_init_dynamic`] | 4-element local resource array with only `arr[0]` and `arr[1]` assigned, both from the same global; dynamic store `arr[tid.x & 1]` provably stays within the assigned elements | Clean (every reachable element resolves to the same unique global) | ❌ Sema clean, but codegen fails: *"Load of … is not a global resource handle"*, then asserts in `DXILLegalizePass` ([#192538](https://github.com/llvm/llvm-project/issues/192538)) | ✅ Clean |
+
+**Offload tests** (executed on hardware):
+
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`const_local_store`] | `const RWByteAddressBuffer local = gBuf;` then `local.Store(...)` (also passes `local` to a callee doing `Load` on a `const RWByteAddressBuffer` parameter, which both compilers accept) | Clean (per `int *const` semantics: `const` qualifies the handle binding, not the buffer's mutability — `Store` should remain callable) | Store round-trips through the buffer; final value reaches the global | ❌ Error: *"no matching member function for call to 'Store'"* (clang treats `const` on the handle as forbidding non-`const` member calls, like a C++ `const T`) | ✅ Clean |
+| [`local_resource_array_dynamic_index`] | Dynamic (runtime) index into a local resource array | Clean | Store reaches the dynamically-indexed global | ❌ Clean (sema); codegen error: *"Load of … is not a global resource handle"* | ✅ |
+| [`local_resource_struct_method`] | Struct with a member function that operates on a resource member | Clean | Store reaches the global via the member function | ✅ | ✅ |
 
-### Local Resource Arrays
+### Loop Patterns
 
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`array`] | Two plain local resource arrays of different sizes (`Arr[2]` and `Arr2[1]`), each initialized from a distinct global, then Stored through at distinct offsets and values | Clean | Each element's Store reaches the corresponding global | ✅ | ✅ |
-| [`array_partial_init_dynamic`] | 4-element local resource array with only `arr[0]` and `arr[1]` assigned, both from the same global; dynamic store `arr[tid.x & 1]` provably stays within the assigned elements | Clean (every reachable element resolves to the same unique global) | Store reaches `Out` | ❌ Sema clean, but codegen fails: *"Load of … is not a global resource handle"*, then asserts in `DXILLegalizePass` ([#192538](https://github.com/llvm/llvm-project/issues/192538)) | ✅ Clean |
+| [`local_resource_loop_array_index`] | Pick resource from a global array inside a loop using loop index | Clean | Per-iteration Store reaches the indexed global | ✅ | ✅ |
 
 ### Binding Ambiguity Diagnostics
 
+**Clang tests** (`llvm-project`) — not executed, so no runtime claim:
+
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`branched_reassign_ambiguous`] | Local initialized from one global, then reassigned to a different global inside an `if` (`buf = gBuf1; if (cond) { buf = gBuf2; }`) — `buf` resolves to either global at the access site | Error † (binding-ambiguous reassignment that cannot be folded away) | ❌ Warning at sema, then codegen error *"Resource access is not guaranteed to map to a unique global resource"* | ✅ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
+| [`ternary_lvalue_unambiguous`] | Ternary lvalue with a statically constant condition (`(true ? a : b) = g`) | Warning † at sema (front end is syntactic and cannot prove unambiguity); Clean codegen (backend folds the constant condition) | ❌ Clean at sema (warning does not fire); ✅ Clean codegen | ✅ Clean |
+| [`bindings_errs`] | Grouped warning cases: ternary initializer, reassignment from a resource-array element, ternary assignment to an uninitialized local, and ternary assignment to a `static` global | Warning † (each shape leaves the binding ambiguous) | ✅ Warning (`-Whlsl-explicit-binding`) for all four shapes | ❌ Clean (no diagnostic for any shape) |
+| [`bindings`] | Grouped must-not-warn cases pinning the diagnostic's lower boundary: single-path conditional assign, self-assign of an uninitialized local, conditional reassign to the *same* global, and ternary/if-else selecting between elements of one resource array | Clean (binding stays unique in every shape) | ✅ Clean | ✅ Clean |
+
+**Offload tests** (executed on hardware):
+
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`branched_reassign_ambiguous`] | Local initialized from one global, then reassigned to a different global inside an `if` (`buf = gBuf1; if (cond) { buf = gBuf2; }`) — `buf` resolves to either global at the access site | Error † (binding-ambiguous reassignment that cannot be folded away) | N/A | ❌ Warning at sema, then codegen error *"Resource access is not guaranteed to map to a unique global resource"* | ✅ Codegen error: *"local resource not guaranteed to map to unique global resource"* |
-| [`ternary_lvalue_unambiguous`] | Ternary lvalue with a statically constant condition (`(true ? a : b) = g`) | Warning † at sema (front end is syntactic and cannot prove unambiguity); Clean codegen (backend folds the constant condition) | Store targets the statically-selected side (`a` here) | ❌ Clean at sema (warning does not fire); ✅ Clean codegen | ✅ Clean |
-| [`bindings_errs`] | Grouped warning cases: ternary initializer, reassignment from a resource-array element, ternary assignment to an uninitialized local, and ternary assignment to a `static` global | Warning † (each shape leaves the binding ambiguous) | N/A | ✅ Warning (`-Whlsl-explicit-binding`) for all four shapes | ❌ Clean (no diagnostic for any shape) |
-| [`bindings`] | Grouped must-not-warn cases pinning the diagnostic's lower boundary: single-path conditional assign, self-assign of an uninitialized local, conditional reassign to the *same* global, and ternary/if-else selecting between elements of one resource array | Clean (binding stays unique in every shape) | Store reaches the single selected global | ✅ Clean | ✅ Clean |
+| [`local_resource_reassign_different_global`] | Plain reassignment of a local to a different global | Warning † (binding-ambiguous reassignment) | Store reaches the most-recently-assigned global | ✅ Warning (`-Whlsl-explicit-binding`) | ❌ Clean |
 
 ### Global Resource Array Indexing
 
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`init_from_global_array_dynamic_index`] | Initialize a local from a dynamically-indexed element of a global resource array | Clean | ✅ | ✅ |
+
+### Function Forwarding and Multiple Uses
+
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`init_from_global_array_dynamic_index`] | Initialize a local from a dynamically-indexed element of a global resource array | Clean | Store reaches the dynamically-indexed global | ✅ | ✅ |
+| [`local_resource_with_wave_intrinsic`] | Local resource handle used together with a wave intrinsic (`WavePrefixCountBits`); each lane stores a per-lane, wave-derived value through the local handle at a per-lane offset | Clean | Wave intrinsic returns per-lane rank and each lane's store reaches its offset in the global | ✅ | ✅ |
 
 ### Static Storage
 
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`static_local`] | `static RWByteAddressBuffer buf = g;` inside a function | Clean | ❌ Clean at `-O0`; asserts at `-O1`+ in `GlobalOpt` ([#205169](https://github.com/llvm/llvm-project/issues/205169)) | ❌ ICE: `llvm::cast<X>()` argument of incompatible type |
+| [`static_const`] | `static const` local resource with `Load` method call | Error † (`Load` not `const`-qualified) | ❌ Clean (no diagnostic) | ❌ ICE |
+
+### Type Mixing and Alternative Resource Types
+
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`static_local`] | `static RWByteAddressBuffer buf = g;` inside a function | Clean | Store reaches the global; the binding persists across calls | ❌ Clean at `-O0`; asserts at `-O1`+ in `GlobalOpt` ([#205169](https://github.com/llvm/llvm-project/issues/205169)) | ❌ ICE: `llvm::cast<X>()` argument of incompatible type |
-| [`static_const`] | `static const` local resource with `Load` method call | Error † (`Load` not `const`-qualified) | N/A | ❌ Clean (no diagnostic) | ❌ ICE |
+| [`local_resource_read_only`] | Local `ByteAddressBuffer` (read-only SRV) initialized from a global, Loaded from | Clean | Load returns the bound global's contents | ✅ | ✅ |
 
 ### Invalid Type Operations
 
-| Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
-|------|----------|---------------|---------------|-------|-----|
-| [`assign_wrong_type`] | Assign `RWStructuredBuffer` to `RWByteAddressBuffer` | Error (incompatible resource types) | N/A | ✅ Error: *"no viable overloaded '='"* | ✅ Error: type mismatch |
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`assign_wrong_type`] | Assign `RWStructuredBuffer` to `RWByteAddressBuffer` | Error (incompatible resource types) | ✅ Error: *"no viable overloaded '='"* | ✅ Error: type mismatch |
 
 ### Invalid Declarations
 
+| Test | Behavior | Ought Compile | Clang | DXC |
+|------|----------|---------------|-------|-----|
+| [`explicit_register`] | Explicit `register()` attribute on a local resource variable | Error (`register` only applies to globals) | ✅ Error: *"'register' attribute only applies to cbuffer/tbuffer and external global variables"* | ❌ Clean (silently ignores the local `register()`) |
+
+### Ternary Conditional Resource Assignment (CodeGen)
+
+These patterns construct a local resource whose binding depends on
+runtime control flow. The "ought" claim throughout this section is that
+the assignment is well-formed but binding-ambiguous, so a warning should
+be emitted and the runtime behavior is to access whichever global the
+control flow selected. Patterns where both ternary branches resolve to
+the same binding are unambiguous and should compile clean.
+
 | Test | Behavior | Ought Compile | Ought Runtime | Clang | DXC |
 |------|----------|---------------|---------------|-------|-----|
-| [`explicit_register`] | Explicit `register()` attribute on a local resource variable | Error (`register` only applies to globals) | N/A | ✅ Error: *"'register' attribute only applies to cbuffer/tbuffer and external global variables"* | ❌ Clean (silently ignores the local `register()`) |
+| [`local_resource_if_else_array_elements`] | `if(cond) buf = arr[NonUniformResourceIndex(0)]; else buf = arr[NonUniformResourceIndex(1)];` where `cond` is derived from `SV_DispatchThreadID` so both branches execute across lanes | Clean | Both branches execute; each thread's store reaches the distinct selected array element with the per-thread value | ✅ | ✅ |
 
 ## Key Behavioral Themes
 
@@ -275,4 +327,12 @@ Helena Kotas, Justin Bogner, Finn Plummer
 [`ternary_lvalue_unambiguous`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3siaWQiOjEsImxhbmd1YWdlIjoiaGxzbCIsInNvdXJjZSI6IlJXQnl0ZUFkZHJlc3NCdWZmZXIgR0J1ZjAgOiByZWdpc3Rlcih1MCk7XG5SV0J5dGVBZGRyZXNzQnVmZmVyIEdCdWYxIDogcmVnaXN0ZXIodTEpO1xuXG5bbnVtdGhyZWFkcygxLDEsMSldXG52b2lkIG1haW4odWludDMgVGlkIDogU1ZfRGlzcGF0Y2hUaHJlYWRJRCkge1xuICAgIFJXQnl0ZUFkZHJlc3NCdWZmZXIgQSA9IEdCdWYwO1xuICAgIFJXQnl0ZUFkZHJlc3NCdWZmZXIgQiA9IEdCdWYxO1xuICAgICh0cnVlID8gQSA6IEIpID0gR0J1ZjA7XG4gICAgQS5TdG9yZShUaWQueCAqIDQsIDEpO1xuICAgIEIuU3RvcmUoVGlkLnggKiA0LCAyKTtcbn1cbiIsImNvbXBpbGVycyI6W3siaWQiOiJkeGNfdHJ1bmsiLCJvcHRpb25zIjoiLVQgY3NfNl8zIC1FIG1haW4iLCJsaWJzIjpbXSwidG9vbHMiOltdfSx7ImlkIjoiaGxzbF9jbGFuZ190cnVuayIsIm9wdGlvbnMiOiItVCBjc182XzMgLUUgbWFpbiIsImxpYnMiOltdLCJ0b29scyI6W119XX1dfQ%3D%3D
 [`bindings_errs`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3siaWQiOjEsImxhbmd1YWdlIjoiaGxzbCIsInNvdXJjZSI6IlJXQnVmZmVyPHVpbnQ%2BIEluIDogcmVnaXN0ZXIodTApO1xuUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIE91dDAgOiByZWdpc3Rlcih1MSk7XG5SV1N0cnVjdHVyZWRCdWZmZXI8dWludD4gT3V0MSA6IHJlZ2lzdGVyKHUyKTtcblJXU3RydWN0dXJlZEJ1ZmZlcjx1aW50PiBPdXRBcnJbXTtcblxuY2J1ZmZlciBjIHtcbiAgICBib29sIGNvbmQ7XG59O1xuXG52b2lkIGNvbmRpdGlvbmFsX2luaXRpYWxpemF0aW9uKHVpbnQgaWR4KSB7XG4gICAgUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIE91dCA9IGNvbmQgPyBPdXQwIDogT3V0MTtcbiAgICBPdXRbaWR4XSA9IEluW2lkeF07XG59XG5cbnZvaWQgYnJhbmNoZWRfYXNzaWdubWVudF93aXRoX2FycmF5KHVpbnQgaWR4KSB7XG4gICAgUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIE91dCA9IE91dDA7IC8vIGV4cGVjdGVkLW5vdGUge3t2YXJpYWJsZSAnT3V0JyBpcyBkZWNsYXJlZCBoZXJlfX1cbiAgICBpZiAoY29uZCkge1xuICAgICAgICBPdXQgPSBPdXRBcnJbMF07XG4gICAgfVxuICAgIE91dFtpZHhdID0gSW5baWR4XTtcbn1cblxudm9pZCBjb25kaXRpb25hbF9hc3NpZ25tZW50KHVpbnQgaWR4KSB7XG4gICAgUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIE91dDtcbiAgICBPdXQgPSBjb25kID8gT3V0MCA6IE91dDE7XG4gICAgT3V0W2lkeF0gPSBJbltpZHhdO1xufVxuXG5zdGF0aWMgUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIFN0YXRpY091dDtcblxudm9pZCBzdGF0aWNfY29uZGl0aW9uYWxfYXNzaWdubWVudCh1aW50IGlkeCkge1xuICAgIFN0YXRpY091dCA9IGNvbmQgPyBPdXQwIDogT3V0MTtcbiAgICBTdGF0aWNPdXRbaWR4XSA9IEluW2lkeF07XG59XG4iLCJjb21waWxlcnMiOlt7ImlkIjoiZHhjX3RydW5rIiwib3B0aW9ucyI6Ii1UIGxpYl82XzYiLCJsaWJzIjpbXSwidG9vbHMiOltdfSx7ImlkIjoiaGxzbF9jbGFuZ190cnVuayIsIm9wdGlvbnMiOiItVCBsaWJfNl82IiwibGlicyI6W10sInRvb2xzIjpbXX1dfV19
 [`bindings`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3siaWQiOjEsImxhbmd1YWdlIjoiaGxzbCIsInNvdXJjZSI6IlJXQnVmZmVyPHVpbnQ%2BIEluIDogcmVnaXN0ZXIodTApO1xuUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIE91dDAgOiByZWdpc3Rlcih1MSk7XG5SV1N0cnVjdHVyZWRCdWZmZXI8dWludD4gT3V0MSA6IHJlZ2lzdGVyKHUyKTtcblJXU3RydWN0dXJlZEJ1ZmZlcjx1aW50PiBPdXRBcnJbXTtcblxuY2J1ZmZlciBjIHtcbiAgICBib29sIGNvbmQ7XG59O1xuXG52b2lkIHNhbWVfYXNzaWdubWVudCh1aW50IGlkeCkge1xuICAgIFJXU3RydWN0dXJlZEJ1ZmZlcjx1aW50PiBPdXQgPSBPdXQxO1xuICAgIGlmIChjb25kKSB7XG4gICAgICAgIE91dCA9IE91dDE7XG4gICAgfVxuICAgIE91dFtpZHhdID0gSW5baWR4XTtcbn1cblxudm9pZCBjb25kaXRpb25hbF9pbml0aWFsaXphdGlvbl93aXRoX2luZGV4KHVpbnQgaWR4KSB7XG4gICAgUldTdHJ1Y3R1cmVkQnVmZmVyPHVpbnQ%2BIE91dCA9IGNvbmQgPyBPdXRBcnJbMF0gOiBPdXRBcnJbMV07XG4gICAgT3V0W2lkeF0gPSBJbltpZHhdO1xufVxuXG52b2lkIGNvbmRpdGlvbmFsX2Fzc2lnbm1lbnRfd2l0aF9pbmRleCh1aW50IGlkeCkge1xuICAgIFJXU3RydWN0dXJlZEJ1ZmZlcjx1aW50PiBPdXQ7XG5cdGlmIChjb25kKSB7XG5cdFx0T3V0ID0gT3V0QXJyWzBdO1xuXHR9IGVsc2Uge1xuXHRcdE91dCA9IE91dEFyclsxXTtcblx0fVxuICAgIE91dFtpZHhdID0gSW5baWR4XTtcbn1cblxudm9pZCByZWFzc2lnbm1lbnQodWludCBpZHgpIHtcbiAgICBSV1N0cnVjdHVyZWRCdWZmZXI8dWludD4gT3V0ID0gT3V0MDtcblx0aWYgKGNvbmQpIHtcblx0XHRPdXQgPSBPdXQwO1xuXHR9XG5cdE91dFtpZHhdID0gSW5baWR4XTtcbn1cblxudm9pZCBjb25kaXRpb25hbF9yZXN1bHRfaW5fc2FtZSh1aW50IGlkeCkge1xuICAgIFJXU3RydWN0dXJlZEJ1ZmZlcjx1aW50PiBPdXQgPSBjb25kID8gT3V0MCA6IE91dDA7XG5cdE91dFtpZHhdID0gSW5baWR4XTtcbn1cbiIsImNvbXBpbGVycyI6W3siaWQiOiJkeGNfdHJ1bmsiLCJvcHRpb25zIjoiLVQgbGliXzZfNiIsImxpYnMiOltdLCJ0b29scyI6W119LHsiaWQiOiJobHNsX2NsYW5nX3RydW5rIiwib3B0aW9ucyI6Ii1UIGxpYl82XzYiLCJsaWJzIjpbXSwidG9vbHMiOltdfV19XX0%3D
+[`local_resource_alias_global`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFRlc3QgdGhhdCBhIGxvY2FsIHJlc291cmNlIHZhcmlhYmxlIGNhbiBhbGlhcyBhIGdsb2JhbCBhbmQgc3RvcmUgdGhyb3VnaCBpdC5cblxuUldCeXRlQWRkcmVzc0J1ZmZlciBPdXQgOiByZWdpc3Rlcih1MCk7XG5cbltudW10aHJlYWRzKDEsMSwxKV1cbnZvaWQgbWFpbigpIHtcbiAgICBSV0J5dGVBZGRyZXNzQnVmZmVyIEJ1ZiA9IE91dDtcbiAgICBCdWYuU3RvcmUoMCwgNDIpO1xufSIsImNvbXBpbGVycyI6W3sib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sImlkIjoiZHhjX3RydW5rIiwidG9vbHMiOltdfSx7Im9wdGlvbnMiOiItVCBjc182XzMgLUUgbWFpbiIsImxpYnMiOltdLCJpZCI6Imhsc2xfY2xhbmdfdHJ1bmsiLCJ0b29scyI6W119XX1dfQ%3D%3D
+[`local_resource_array_dynamic_index`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFRlc3QgdGhhdCBhIGxvY2FsIHJlc291cmNlIGFycmF5IGRpc3BhdGNoZXMgdG8gdGhlIGNvcnJlY3QgZWxlbWVudFxuLy8gd2hlbiBpbmRleGVkIGF0IHJ1bnRpbWUuIFRoZSA0LXRocmVhZCBkaXNwYXRjaCBhbmQgcGVyLXRocmVhZCBpbmRleFxuLy8gZW5zdXJlIHRoZSBjb21waWxlciBjYW5ub3QgY29uc3RhbnQtZm9sZCB0aGUgaW5kZXggYXdheS4gRWFjaCB0aHJlYWRcbi8vIHN0b3JlcyBgdGlkLnggKyAxMGAgc28gYSBzaHVmZmxlL2FsaWFzaW5nIGJ1ZyB0aGF0IHN3YXBzIHR3byB0aHJlYWRzJ1xuLy8gZGVzdGluYXRpb25zIHdvdWxkIHNob3cgdXAgYXMgc3dhcHBlZCB2YWx1ZXMgaW4gdGhlIHJlc3VsdCBidWZmZXJzLlxuUldCeXRlQWRkcmVzc0J1ZmZlciBnQnVmQXJyYXlbNF0gOiByZWdpc3Rlcih1MCk7XG5cbltudW10aHJlYWRzKDQsMSwxKV1cbnZvaWQgbWFpbih1aW50MyBUaWQgOiBTVl9EaXNwYXRjaFRocmVhZElEKSB7XG4gICAgUldCeXRlQWRkcmVzc0J1ZmZlciBBcnJbNF07XG4gICAgQXJyWzBdID0gZ0J1ZkFycmF5WzBdO1xuICAgIEFyclsxXSA9IGdCdWZBcnJheVsxXTtcbiAgICBBcnJbMl0gPSBnQnVmQXJyYXlbMl07XG4gICAgQXJyWzNdID0gZ0J1ZkFycmF5WzNdO1xuICAgIEFycltUaWQueF0uU3RvcmUoMCwgVGlkLnggKyAxMCk7XG59IiwiY29tcGlsZXJzIjpbeyJvcHRpb25zIjoiLVQgY3NfNl8zIC1FIG1haW4iLCJsaWJzIjpbXSwiaWQiOiJkeGNfdHJ1bmsiLCJ0b29scyI6W119LHsib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sImlkIjoiaGxzbF9jbGFuZ190cnVuayIsInRvb2xzIjpbXX1dfV19
+[`local_resource_if_else_array_elements`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFRlc3QgdGhhdCBib3RoIGJyYW5jaGVzIG9mIGFuIGlmL2Vsc2UgYXNzaWduaW5nIGRpZmZlcmVudCBlbGVtZW50cyBvZlxuLy8gdGhlIHNhbWUgdW5ib3VuZGVkIGdsb2JhbCByZXNvdXJjZSBhcnJheSBwcm9kdWNlIGNvcnJlY3Qgb3V0cHV0LlxuLy8gVHdvIHRocmVhZHMgZGlzcGF0Y2g6IHRocmVhZCAwIHRha2VzIHRoZSBgaWZgIGJyYW5jaCBhbmQgd3JpdGVzIHRvXG4vLyBPdXRBcnJbMF07IHRocmVhZCAxIHRha2VzIHRoZSBgZWxzZWAgYnJhbmNoIGFuZCB3cml0ZXMgdG8gT3V0QXJyWzFdLlxuLy8gRWFjaCB0aHJlYWQgc3RvcmVzIGBJbi5Mb2FkKDApICsgVGlkLnhgLCBnaXZpbmcgZGlzdGluY3QgdmFsdWVzXG4vLyBwZXIgZGVzdGluYXRpb24gc28gYSBidWcgdGhhdCBhbHdheXMgdG9vayBvbmUgYnJhbmNoIHdvdWxkIHNob3cgdXBcbi8vIGFzIGFuIGFsbC1zYW1lLXZhbHVlIHBhdHRlcm4uXG4vLyBOb25Vbmlmb3JtUmVzb3VyY2VJbmRleCBpcyByZXF1aXJlZCBiZWNhdXNlIHRoZSBicmFuY2ggKGFuZCB0aHVzXG4vLyB0aGUgY2hvc2VuIGRlc2NyaXB0b3IpIGlzIHNlbGVjdGVkIGJ5IFRpZC54LCB3aGljaCBpcyB3YXZlLWRpdmVyZ2VudC5cblxuUldCeXRlQWRkcmVzc0J1ZmZlciBJbiA6IHJlZ2lzdGVyKHUwKTtcblJXQnl0ZUFkZHJlc3NCdWZmZXIgT3V0QXJyW10gOiByZWdpc3Rlcih1MSk7XG5cbltudW10aHJlYWRzKDIsMSwxKV1cbnZvaWQgbWFpbih1aW50MyBUaWQgOiBTVl9EaXNwYXRjaFRocmVhZElEKSB7XG4gICAgUldCeXRlQWRkcmVzc0J1ZmZlciBPdXQ7XG4gICAgaWYgKFRpZC54ID09IDApIHtcbiAgICAgICAgT3V0ID0gT3V0QXJyW05vblVuaWZvcm1SZXNvdXJjZUluZGV4KDApXTtcbiAgICB9IGVsc2Uge1xuICAgICAgICBPdXQgPSBPdXRBcnJbTm9uVW5pZm9ybVJlc291cmNlSW5kZXgoMSldO1xuICAgIH1cbiAgICBPdXQuU3RvcmUoMCwgSW4uTG9hZCgwKSArIFRpZC54KTtcbn0iLCJjb21waWxlcnMiOlt7Im9wdGlvbnMiOiItVCBjc182XzMgLUUgbWFpbiIsImxpYnMiOltdLCJpZCI6ImR4Y190cnVuayIsInRvb2xzIjpbXX0seyJvcHRpb25zIjoiLVQgY3NfNl8zIC1FIG1haW4iLCJsaWJzIjpbXSwiaWQiOiJobHNsX2NsYW5nX3RydW5rIiwidG9vbHMiOltdfV19XX0%3D
+[`local_resource_loop_array_index`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFRlc3QgdGhhdCBpbmRleGluZyBhIGxvY2FsIHJlc291cmNlIGFycmF5IGluc2lkZSBhIGxvb3Agd2l0aFxuLy8gY29tcGlsZXItdW5yb2xsYWJsZSBib3VuZHMgd3JpdGVzIGVhY2ggZWxlbWVudCBkaXN0aW5jdGx5LlxuLy8gRWFjaCBpdGVyYXRpb24gc3RvcmVzIGBJICsgMTBgIHNvIGEgYnVnIHRoYXQgaG9pc3RlZCB0aGUgc3RvcmUgb3Jcbi8vIG1pcy1pbmRleGVkIHdvdWxkIHNob3cgdXAgYXMgYW4gYWxsLXNhbWUtdmFsdWUgb3Igd3Jvbmctb3JkZXIgcGF0dGVybi5cblJXQnl0ZUFkZHJlc3NCdWZmZXIgZ0J1ZkFycmF5WzRdIDogcmVnaXN0ZXIodTApO1xuXG5bbnVtdGhyZWFkcygxLDEsMSldXG52b2lkIG1haW4oKSB7XG4gICAgZm9yICh1aW50IEkgPSAwOyBJIDwgNDsgSSsrKSB7XG4gICAgICAgIFJXQnl0ZUFkZHJlc3NCdWZmZXIgQnVmID0gZ0J1ZkFycmF5W0ldO1xuICAgICAgICBCdWYuU3RvcmUoMCwgSSArIDEwKTtcbiAgICB9XG59IiwiY29tcGlsZXJzIjpbeyJvcHRpb25zIjoiLVQgY3NfNl8zIC1FIG1haW4iLCJsaWJzIjpbXSwiaWQiOiJkeGNfdHJ1bmsiLCJ0b29scyI6W119LHsib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sImlkIjoiaGxzbF9jbGFuZ190cnVuayIsInRvb2xzIjpbXX1dfV19
+[`local_resource_read_only`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFRlc3QgdGhhdCBhIGxvY2FsIHJlYWQtb25seSBCeXRlQWRkcmVzc0J1ZmZlciAoU1JWKSBjYW4gbG9hZCBkYXRhIGNvcnJlY3RseS5cbkJ5dGVBZGRyZXNzQnVmZmVyIGdJbnB1dCA6IHJlZ2lzdGVyKHQwKTtcblJXQnl0ZUFkZHJlc3NCdWZmZXIgZ091dHB1dCA6IHJlZ2lzdGVyKHUxKTtcblxuW251bXRocmVhZHMoMSwxLDEpXVxudm9pZCBtYWluKCkge1xuICAgIEJ5dGVBZGRyZXNzQnVmZmVyIExvY2FsID0gZ0lucHV0O1xuICAgIHVpbnQgVmFsID0gTG9jYWwuTG9hZCgwKTtcbiAgICBnT3V0cHV0LlN0b3JlKDAsIFZhbCk7XG59IiwiY29tcGlsZXJzIjpbeyJvcHRpb25zIjoiLVQgY3NfNl8zIC1FIG1haW4iLCJsaWJzIjpbXSwiaWQiOiJkeGNfdHJ1bmsiLCJ0b29scyI6W119LHsib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sImlkIjoiaGxzbF9jbGFuZ190cnVuayIsInRvb2xzIjpbXX1dfV19
+[`local_resource_reassign_different_global`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFJlYXNzaWduIGEgbG9jYWwgcmVzb3VyY2UgaGFuZGxlIHRvIGEgZGlmZmVyZW50IGdsb2JhbCwgdGhlbiBTdG9yZS5cbi8vIFZlcmlmaWVzIGxhc3Qtd3JpdGUtd2lucyBzZW1hbnRpY3M6IHRoZSBwcmUtcmVhc3NpZ25tZW50IFN0b3JlIHdyaXRlc1xuLy8gdG8gZ0J1ZjAsIHRoZSBwb3N0LXJlYXNzaWdubWVudCBTdG9yZSB3cml0ZXMgdG8gZ0J1ZjEsIGFuZCBib3RoXG4vLyBidWZmZXJzIGVuZCB1cCBwb3B1bGF0ZWQgd2l0aCB0aGVpciByZXNwZWN0aXZlIHNlbnRpbmVsIHZhbHVlcy5cblxuUldCeXRlQWRkcmVzc0J1ZmZlciBnQnVmMCA6IHJlZ2lzdGVyKHUwKTtcblJXQnl0ZUFkZHJlc3NCdWZmZXIgZ0J1ZjEgOiByZWdpc3Rlcih1MSk7XG5cbnZvaWQgUGFzc19SZWFzc2lnbih1aW50IElkeCkge1xuICAgIFJXQnl0ZUFkZHJlc3NCdWZmZXIgQnVmID0gZ0J1ZjA7XG4gICAgQnVmLlN0b3JlKElkeCAqIDQsIDcpO1xuICAgIEJ1ZiA9IGdCdWYxO1xuICAgIEJ1Zi5TdG9yZShJZHggKiA0LCAxMyk7XG59XG5cbltudW10aHJlYWRzKDgsOCwxKV1cbnZvaWQgbWFpbih1aW50MyBUaWQgOiBTVl9EaXNwYXRjaFRocmVhZElEKSB7XG4gICAgdWludCBJZHggPSBUaWQueCArIFRpZC55ICogODtcbiAgICBQYXNzX1JlYXNzaWduKElkeCk7XG59IiwiY29tcGlsZXJzIjpbeyJvcHRpb25zIjoiLVQgY3NfNl8zIC1FIG1haW4iLCJsaWJzIjpbXSwiaWQiOiJkeGNfdHJ1bmsiLCJ0b29scyI6W119LHsib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sImlkIjoiaGxzbF9jbGFuZ190cnVuayIsInRvb2xzIjpbXX1dfV19
+[`local_resource_struct_method`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3sibGFuZ3VhZ2UiOiJobHNsIiwiaWQiOjEsInNvdXJjZSI6Ii8vIFRlc3QgdGhhdCBhIHN0cnVjdCBtZW1iZXIgZnVuY3Rpb24gY2FuIHN0b3JlIHRocm91Z2ggYSByZXNvdXJjZSBtZW1iZXIgY29ycmVjdGx5LlxuUldCeXRlQWRkcmVzc0J1ZmZlciBnQnVmIDogcmVnaXN0ZXIodTApO1xuXG5zdHJ1Y3QgV3JhcHBlciB7XG4gICAgUldCeXRlQWRkcmVzc0J1ZmZlciBCdWY7XG4gICAgdm9pZCBEb1N0b3JlKHVpbnQgVmFsKSB7IEJ1Zi5TdG9yZSgwLCBWYWwpOyB9XG59O1xuXG5bbnVtdGhyZWFkcygxLDEsMSldXG52b2lkIG1haW4oKSB7XG4gICAgV3JhcHBlciBXO1xuICAgIFcuQnVmID0gZ0J1ZjtcbiAgICBXLkRvU3RvcmUoNDIpO1xufSIsImNvbXBpbGVycyI6W3sib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sImlkIjoiZHhjX3RydW5rIiwidG9vbHMiOltdfSx7Im9wdGlvbnMiOiItVCBjc182XzMgLUUgbWFpbiIsImxpYnMiOltdLCJpZCI6Imhsc2xfY2xhbmdfdHJ1bmsiLCJ0b29scyI6W119XX1dfQ%3D%3D
+[`local_resource_with_wave_intrinsic`]: https://godbolt.org/clientstate/eyJzZXNzaW9ucyI6W3siaWQiOjEsImxhbmd1YWdlIjoiaGxzbCIsInNvdXJjZSI6IlJXQnl0ZUFkZHJlc3NCdWZmZXIgZ0J1ZiA6IHJlZ2lzdGVyKHUwKTtcblxuW251bXRocmVhZHMoOCw4LDEpXVxudm9pZCBtYWluKCkge1xuICAgIFJXQnl0ZUFkZHJlc3NCdWZmZXIgYnVmID0gZ0J1ZjtcbiAgICB1aW50IGFjdGl2ZSA9IFdhdmVBY3RpdmVDb3VudEJpdHModHJ1ZSk7XG4gICAgYnVmLlN0b3JlKDAsIGFjdGl2ZSA%2BIDAgPyA0MiA6IDApO1xufVxuIiwiY29tcGlsZXJzIjpbeyJpZCI6ImR4Y190cnVuayIsIm9wdGlvbnMiOiItVCBjc182XzMgLUUgbWFpbiIsImxpYnMiOltdLCJ0b29scyI6W119LHsiaWQiOiJobHNsX2NsYW5nX3RydW5rIiwib3B0aW9ucyI6Ii1UIGNzXzZfMyAtRSBtYWluIiwibGlicyI6W10sInRvb2xzIjpbXX1dfV19
 <!-- /godbolt-link-defs -->
