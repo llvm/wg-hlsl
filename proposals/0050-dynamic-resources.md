@@ -392,6 +392,4 @@ is a sampler, or `ResourceDescriptorHeapIndexing` otherwise.
   value is converted to a specific resource type. `__hlsl_heap_resource_info`
   and `__hlsl_heap_sampler_info` defer handle creation until that conversion.
 
-## Open questions
-
 ## Acknowledgments
