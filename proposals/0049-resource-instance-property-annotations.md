@@ -1,7 +1,7 @@
 ---
 title: "[0049] - Resource Instance Property Annotations"
 params:
-  status: Under Consideration
+  status: Accepted
   authors:
     - inbelic: Finn Plummer
   sponsors:
@@ -140,9 +140,14 @@ resource analysis and erased by the corresponding lowering pass.
 ### Annotating a Resource Instance
 
 A resource instance may have more than one handle creation, and each is
-annotated independently. It is an error for these handles to disagree about the
-coherence type, they must either all be un-annotated or hold the same
-annotation, this is verified during analysis.
+annotated independently. During analysis a resource instance will be marked
+with the corresponding coherence property if any of its uses is annotated, or
+vice versa, if it was assigned to a resource instance with a coherence
+property. For example, if a global resource does not have any coherence
+properties but a local resource is assigned to it, then this is propogated up
+to global resource instance. A best-effort warning can be emit during SemaHLSL
+to describe these cases early, otherwise, warnings can be generated when the
+analysis is consumed.
 
 ### Lowering
 
@@ -168,8 +173,8 @@ When the Vulkan memory model is in use, the `Coherent` decoration is deprecated.
 In which case the equivalent is to mark the accesses instead of the variable,
 decorating the pointers `NonPrivatePointer` and giving the loads and stores
 through them the `MakePointerVisible` and `MakePointerAvailable` operands with
-`QueueFamily` scope. This should be revisited when we consider supporting this
-memory model.
+`QueueFamily` scope. This will require a pass during SPIR-V lowering but all
+required info to decorate the accesses is retained in the annotation intrinsics.
 
 Currently, reorder coherence has no SPIR-V mapping, and defining it is out of
 scope of this proposal. This will need to be revisited when SER is addressed.
@@ -185,7 +190,9 @@ Coherence section, LLVM has does not have such semantics available on `load`
 and `store`.
 
 This would be possible but would require additions to LLVM's memory semantics,
-which is a substanial change due to it's wide use.
+which is a substanial change due to it's wide use. Further, it is unclear if
+the additional fidelity provides substantial benefit to memory access
+optimizations, as this only models cross thread-group accesses.
 
 ### Allow barriers to be resource specific
 
